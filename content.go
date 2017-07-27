@@ -13,6 +13,10 @@ import (
 
 // addDivs adds kobo divs.
 func addDivs(doc *goquery.Document) error {
+	if len(doc.Find("div").Nodes) > len(doc.Find("p").Nodes) {
+		// If there are more divs than ps, divs are probably being used as paragraphs, and adding the kobo divs will most likely break the book.
+		return nil
+	}
 	doc.Find("body>*").WrapAllHtml(`<div class="book-inner"></div>`)
 	doc.Find("body>*").WrapAllHtml(`<div class="book-columns"></div>`)
 	return nil
