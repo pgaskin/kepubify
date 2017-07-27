@@ -17,13 +17,13 @@ Work-in-progress
         - Removes extra characters
         - Removes MS Word tags
         - Removes ADEPT encryption leftover tags
-    - kobo style fixes
-- TODO:
-    - Conversion
-        - Remove extra calibre tags from content opf
+    - Kobo style fixes
+    - Clean up extra files from ePub
+    - Remove extra calibre tags from content opf
+- Coming soon:
     - Output
-        - Automatically find kobo and place book
-    - Integration with BookBrowser?
+        - Automatically find kobo and import book
+    - Integration with BookBrowser: download your ePubs as a kepub right from the Kobo Web Browser
 
 ## Why would I use kepubify rather than calibre-kobo-driver
 - Works from the command line
