@@ -1,8 +1,6 @@
 # kepubify
 Convert your ePubs into kepubs, with a easy-to-use command-line tool.
 
-Work-in-progress
-
 ## Usage
 - `kepubify /path/to/my/book.epub` will output to `./book.kepub.epub`
 - `kepubify /path/to/my/book.epub /path/to/another/folder/` will output to `/path/to/another/folder/book.kepub.epub`
