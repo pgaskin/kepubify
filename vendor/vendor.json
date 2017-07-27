@@ -43,6 +43,12 @@
 			"path": "golang.org/x/net/html/atom",
 			"revision": "f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f",
 			"revisionTime": "2017-07-19T21:11:51Z"
+		},
+		{
+			"checksumSHA1": "brhONOPp4CSdTZf5uEtcH+FpFUI=",
+			"path": "gopkg.in/urfave/cli.v1",
+			"revision": "0bdeddeeb0f650497d603c4ad7b20cfe685682f6",
+			"revisionTime": "2016-11-22T04:36:10Z"
 		}
 	],
 	"rootPath": "git.geek1011.net/geek1011/kepubify"
