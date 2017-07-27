@@ -1,4 +1,6 @@
 # kepubify
+[![Build Status](https://travis-ci.org/geek1011/kepubify.svg?branch=master)](https://travis-ci.org/geek1011/kepubify)
+
 Convert your ePubs into kepubs, with a easy-to-use command-line tool.
 
 ## Usage
