@@ -9,9 +9,17 @@ import (
 	"path/filepath"
 )
 
-// Exists checks whether a path exists
+// exists checks whether a path exists
 func exists(path string) bool {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return true
+	}
+	return false
+}
+
+// isDir checks if a exists and is a dir
+func isDir(path string) bool {
+	if fi, err := os.Stat(path); err == nil && fi.IsDir() {
 		return true
 	}
 	return false
