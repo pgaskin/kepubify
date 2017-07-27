@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/beevik/etree"
 	"github.com/cheggaaa/pb"
 	zglob "github.com/mattn/go-zglob"
 	cli "gopkg.in/urfave/cli.v1"
@@ -71,6 +72,50 @@ func kepubify(src, dest string) error {
 	bar.Finish()
 	fmt.Println()
 
+	fmt.Println("Cleaning content.opf.")
+	fmt.Println()
+
+	rsk, err := os.Open(filepath.Join(td, "META-INF", "container.xml"))
+	if err != nil {
+		return fmt.Errorf("Error parsing container.xml: %s", err)
+	}
+	defer rsk.Close()
+
+	container := etree.NewDocument()
+	_, err = container.ReadFrom(rsk)
+	if err != nil {
+		return fmt.Errorf("Error parsing container.xml: %s", err)
+	}
+
+	rootfile := ""
+	for _, e := range container.FindElements("//rootfiles/rootfile[@full-path]") {
+		rootfile = e.SelectAttrValue("full-path", "")
+	}
+	if rootfile == "" {
+		return fmt.Errorf("Error parsing container.xml")
+	}
+
+	buf, err := ioutil.ReadFile(filepath.Join(td, rootfile))
+	if err != nil {
+		return fmt.Errorf("Error parsing content.opf: %s", err)
+	}
+
+	opf := string(buf)
+
+	err = cleanOPF(&opf)
+	if err != nil {
+		return fmt.Errorf("Error cleaning content.opf: %s", err)
+	}
+
+	err = ioutil.WriteFile(filepath.Join(td, rootfile), []byte(opf), 0644)
+	if err != nil {
+		return fmt.Errorf("Error writing new content.opf: %s", err)
+	}
+
+	fmt.Println("Cleaning epub files.")
+	fmt.Println()
+	cleanFiles(td)
+
 	fmt.Println("Packing ePub.")
 	fmt.Println()
 	PackEPUB(td, dest, true)
@@ -128,6 +173,7 @@ func convert(c *cli.Context) error {
 
 	fmt.Printf("Input file: %s\n", infile)
 	fmt.Printf("Output file: %s\n", outfile)
+	fmt.Println()
 
 	err = kepubify(infile, outfile)
 	if err != nil {
