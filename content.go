@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -10,6 +12,30 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+func cleanFiles(basepath string) error {
+	_ = os.Remove(filepath.Join(basepath, "META-INF", "calibre_bookmarks.txt"))
+	_ = os.Remove(filepath.Join(basepath, "META-INF", "iTunesMetadata.plist"))
+	_ = os.Remove(filepath.Join(basepath, "iTunesMetadata.plist"))
+	_ = os.Remove(filepath.Join(basepath, "META-INF", "iTunesArtwork.plist"))
+	_ = os.Remove(filepath.Join(basepath, "iTunesArtwork.plist"))
+	_ = os.Remove(filepath.Join(basepath, "META-INF", ".DS_STORE"))
+	_ = os.Remove(filepath.Join(basepath, ".DS_STORE"))
+	_ = os.Remove(filepath.Join(basepath, "META-INF", "thumbs.db"))
+	_ = os.Remove(filepath.Join(basepath, "thumbs.db"))
+	return nil
+}
+
+// cleanOPF cleans up extra calibre metadata from the content.opf file
+func cleanOPF(opftext *string) error {
+	calibreTimestampRe := regexp.MustCompile(`<meta\s+name="calibre:timestamp"\s+content=".+"\s*\/>`)
+	*opftext = calibreTimestampRe.ReplaceAllString(*opftext, "")
+
+	calibreContributorRe := regexp.MustCompile(`<dc:contributor\s+opf:role="bkp"\s*>calibre .+<\/dc:contributor>`)
+	*opftext = calibreContributorRe.ReplaceAllString(*opftext, "")
+
+	return nil
+}
 
 // addDivs adds kobo divs.
 func addDivs(doc *goquery.Document) error {
@@ -62,7 +88,7 @@ func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
 
 		for _, sentence := range sentences {
 			if strings.TrimSpace(sentence) != "" {
-				newhtml.WriteString(fmt.Sprintf(`<span class="koboSpan" id="kobo.%v.%v">%s</span>`, *paragraph, *segment, sentence))
+				newhtml.WriteString(fmt.Sprintf(`<span class="koboSpan" id="kobo.%v.%v">%s</span>`, *paragraph, *segment, html.EscapeString(sentence)))
 				*segment++
 			}
 		}
