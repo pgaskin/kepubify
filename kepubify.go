@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -9,13 +10,71 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cheggaaa/pb"
+	zglob "github.com/mattn/go-zglob"
 	cli "gopkg.in/urfave/cli.v1"
 )
 
 var version = "dev"
 
 func kepubify(src, dest string) error {
-	return fmt.Errorf("Not implemented")
+	td, err := ioutil.TempDir("", "kepubify")
+	if err != nil {
+		return fmt.Errorf("Could not create temp dir: %s", err)
+	}
+	defer os.RemoveAll(td)
+
+	fmt.Println("Unpacking ePub.")
+	UnpackEPUB(src, td, true)
+	fmt.Println()
+
+	a, err := zglob.Glob(filepath.Join(td, "**", "*.html"))
+	if err != nil {
+		return fmt.Errorf("Could not create find content files: %s", err)
+	}
+	b, err := zglob.Glob(filepath.Join(td, "**", "*.xhtml"))
+	if err != nil {
+		return fmt.Errorf("Could not create find content files: %s", err)
+	}
+	c, err := zglob.Glob(filepath.Join(td, "**", "*.htm"))
+	if err != nil {
+		return fmt.Errorf("Could not create find content files: %s", err)
+	}
+	contentfiles := append(append(a, b...), c...)
+
+	fmt.Printf("Processing %v content files.\n", len(contentfiles))
+
+	bar := pb.New(len(contentfiles))
+	bar.SetRefreshRate(time.Millisecond * 300)
+	bar.SetMaxWidth(60)
+	bar.Format("[=> ]")
+	bar.Start()
+
+	for _, cf := range contentfiles {
+		buf, err := ioutil.ReadFile(cf)
+		if err != nil {
+			return fmt.Errorf("Could not open content file \"%s\" for reading: %s", cf, err)
+		}
+		str := string(buf)
+		err = process(&str)
+		if err != nil {
+			return fmt.Errorf("Error processing content file \"%s\": %s", cf, err)
+		}
+		err = ioutil.WriteFile(cf, []byte(str), 0644)
+		if err != nil {
+			return fmt.Errorf("Error writing content file \"%s\": %s", cf, err)
+		}
+		time.Sleep(time.Millisecond * 25)
+		bar.Increment()
+	}
+
+	bar.Finish()
+	fmt.Println()
+
+	fmt.Println("Packing ePub.")
+	fmt.Println()
+	PackEPUB(td, dest, true)
+	return nil
 }
 
 func convert(c *cli.Context) error {
@@ -75,7 +134,7 @@ func convert(c *cli.Context) error {
 		return fmt.Errorf("Error converting epub to kepub: %s.", err)
 	}
 
-	fmt.Printf("Succesfully converted \"%s\" to a kepub.\n You can find the converted file at \"%s\"\n", infile, outfile)
+	fmt.Printf("Succesfully converted \"%s\" to a kepub.\nYou can find the converted file at \"%s\"\n", infile, outfile)
 
 	if runtime.GOOS == "windows" {
 		time.Sleep(5000 * time.Second)

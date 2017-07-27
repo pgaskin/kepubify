@@ -15,10 +15,34 @@
 			"revisionTime": "2016-12-24T14:14:13Z"
 		},
 		{
+			"checksumSHA1": "t8CsjyFayB7tH16Th46OH2zL09I=",
+			"path": "github.com/cheggaaa/pb",
+			"revision": "f6ccf2184de4dd34495277e38dc19b6e7fbe0ea2",
+			"revisionTime": "2017-05-08T13:24:47Z"
+		},
+		{
 			"checksumSHA1": "mrz/kicZiUaHxkyfvC/DyQcr8Do=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "adab96458c51a58dc1783b3335dcce5461522e75",
 			"revisionTime": "2017-07-11T18:34:51Z"
+		},
+		{
+			"checksumSHA1": "cJE7dphDlam/i7PhnsyosNWtbd4=",
+			"path": "github.com/mattn/go-runewidth",
+			"revision": "97311d9f7767e3d6f422ea06661bc2c7a19e8a5d",
+			"revisionTime": "2017-05-10T07:48:58Z"
+		},
+		{
+			"checksumSHA1": "5xzgVm4v/J7VXwtip+KDu96be18=",
+			"path": "github.com/mattn/go-zglob",
+			"revision": "95345c4e1c0ebc9d16a3284177f09360f4d20fab",
+			"revisionTime": "2017-01-24T11:57:57Z"
+		},
+		{
+			"checksumSHA1": "xcAVbwtk3z9gi2Eig6DYgAiMzSc=",
+			"path": "github.com/mattn/go-zglob/fastwalk",
+			"revision": "95345c4e1c0ebc9d16a3284177f09360f4d20fab",
+			"revisionTime": "2017-01-24T11:57:57Z"
 		},
 		{
 			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
