@@ -1,5 +1,5 @@
 # kepubify
-[![Build Status](https://travis-ci.org/geek1011/kepubify.svg?branch=master)](https://travis-ci.org/geek1011/kepubify)
+[![Build Status](https://travis-ci.org/geek1011/kepubify.svg?branch=master)](https://travis-ci.org/geek1011/kepubify) [![Go Report Card](https://goreportcard.com/badge/github.com/geek1011/kepubify)](https://goreportcard.com/report/github.com/geek1011/kepubify)
 
 Convert your ePubs into kepubs, with a easy-to-use command-line tool.
 
