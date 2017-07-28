@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/html"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/beevik/etree"
 )
 
 func cleanFiles(basepath string) error {
@@ -34,6 +35,20 @@ func cleanOPF(opftext *string) error {
 	calibreContributorRe := regexp.MustCompile(`<dc:contributor\s+opf:role="bkp"\s*>calibre .+<\/dc:contributor>`)
 	*opftext = calibreContributorRe.ReplaceAllString(*opftext, "")
 
+	opf := etree.NewDocument()
+	err := opf.ReadFromString(*opftext)
+	if err != nil {
+		return err
+	}
+
+	for _, e := range opf.FindElements("//meta[@name='cover']") {
+		coverid := e.SelectAttrValue("content", "")
+		if coverid != "" {
+			*opftext = strings.Replace(*opftext, `id="`+coverid+`"`, `id="`+coverid+`" properties="cover-image"`, -1)
+		} else {
+			*opftext = strings.Replace(*opftext, `id="cover"`, `id="cover" properties="cover-image"`, -1)
+		}
+	}
 	return nil
 }
 
