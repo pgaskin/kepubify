@@ -3,12 +3,12 @@ go:
  - 1.8.3
 
 script:
- - go get -v "github.com/kardianos/govendor"
- - go get -v "github.com/aktau/github-release"
- - govendor sync
- - go generate
- - go test -v ./...
- - go build
+ - make clean
+ - make build-deps
+ - make deps
+ - make generate
+ - make test
+ - make build
 
 deploy:
   provider: script
