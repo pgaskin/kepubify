@@ -44,6 +44,12 @@ done
 
 if [[ "$SKIP_UPLOAD" != "true" ]]; then
     echo "Creating release"
+    echo "Deleting old release if it exists"
+    GITHUB_TOKEN=$GITHUB_TOKEN github-release delete \
+        --user geek1011 \
+        --repo kepubify \
+        --tag $APP_VERSION >/dev/null 2>/dev/null || true
+    echo "Creating new release"
     GITHUB_TOKEN=$GITHUB_TOKEN github-release release \
         --user geek1011 \
         --repo kepubify \
