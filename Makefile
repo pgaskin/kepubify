@@ -26,3 +26,7 @@ test:
 build:
 	mkdir -p build
 	go build -ldflags "-X main.version=dev" -o "build/kepubify"
+
+.PHONY: install
+install:
+	go install
