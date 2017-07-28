@@ -30,3 +30,6 @@ Convert your ePubs into kepubs, with a easy-to-use command-line tool.
 - Faster processing
 - Standalone
 - Does not add extra calibre meta tags
+
+## Screenshots
+![](docs/kepubify.gif)
