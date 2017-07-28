@@ -40,6 +40,7 @@ done
 
 
 if [[ "$SKIP_UPLOAD" != "true" ]]; then
+    echo "Creating release"
     GITHUB_TOKEN=$GITHUB_TOKEN github-release release \
         --user geek1011 \
         --repo kepubify \
@@ -49,6 +50,7 @@ if [[ "$SKIP_UPLOAD" != "true" ]]; then
 
     for f in build/kepubify-*;do 
         fn="$(basename $f)"
+        echo "Uploading $fn"
         GITHUB_TOKEN=$GITHUB_TOKEN github-release upload \
             --user geek1011 \
             --repo kepubify \
