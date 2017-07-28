@@ -15,6 +15,12 @@
 			"revisionTime": "2016-12-24T14:14:13Z"
 		},
 		{
+			"checksumSHA1": "V8IOVCEbg5n8vBs0x7svZ0sv1P0=",
+			"path": "github.com/beevik/etree",
+			"revision": "09746331a38f3da8c023a85a65c8c152070de725",
+			"revisionTime": "2017-05-11T20:24:51Z"
+		},
+		{
 			"checksumSHA1": "t8CsjyFayB7tH16Th46OH2zL09I=",
 			"path": "github.com/cheggaaa/pb",
 			"revision": "f6ccf2184de4dd34495277e38dc19b6e7fbe0ea2",
@@ -75,5 +81,5 @@
 			"revisionTime": "2016-11-22T04:36:10Z"
 		}
 	],
-	"rootPath": "git.geek1011.net/geek1011/kepubify"
+	"rootPath": "github.com/geek1011/kepubify"
 }

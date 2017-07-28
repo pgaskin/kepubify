@@ -1,0 +1,184 @@
+@import url('https://fonts.googleapis.com/css?family=Open+Sans:300,400,400i,700');
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #333333;
+    font-size: 14px;
+    font-family: 'Open Sans', 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+}
+
+body {
+    overflow-y: auto;
+}
+
+.container {
+    margin: 0 auto;
+    max-width: 728px;
+    -webkit-box-shadow: 0px 0px 20px -2px rgba(0, 0, 0, 0.75);
+    -moz-box-shadow: 0px 0px 20px -2px rgba(0, 0, 0, 0.75);
+    box-shadow: 0px 0px 20px -2px rgba(0, 0, 0, 0.75);
+    min-height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+@media only screen and (min-width: 750px) {
+    .container {
+        margin: 20px auto;
+    }
+}
+
+.nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    font-size: 18px;
+    border-bottom: 1px solid #AAA;
+}
+
+.nav .left,
+.nav .right {
+    display: inline-block;
+    flex: 0 0 auto;
+    vertical-align: middle;
+}
+
+.nav .right {
+    text-align: right;
+    float: right;
+}
+
+.nav a.item,
+.nav a.item:link,
+.nav a.item:visited {
+    display: inline-block;
+    margin: 0 5px;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 4px solid transparent;
+    padding: 0 2px;
+}
+
+.nav a.item:hover {
+    border-bottom: 4px solid #CCC;
+}
+
+.nav a.item:active {
+    border-bottom: 4px solid #AAA;
+}
+
+.nav a.item.active {
+    border-bottom: 4px solid green;
+}
+
+.masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: #DDDDDD;
+    border-bottom: 1px solid #AAA;
+    padding: 20px 40px;
+}
+
+.masthead .left,
+.masthead .right {
+    display: inline-block;
+    flex: 1;
+    vertical-align: top;
+    padding: 5px;
+}
+
+.masthead .right img {
+    max-width: 100%;
+    width: 300px;
+}
+
+.masthead .header {
+    display: block;
+    font-size: 26px;
+    margin: 5px 0;
+}
+
+.masthead .description {
+    display: block;
+    font-size: 14px;
+    margin: 5px 0;
+}
+
+.masthead .button,
+.masthead .button:link,
+.masthead .button:visited {
+    display: inline-block;
+    border-radius: 5px;
+    background: #008000;
+    border: 1px solid #004000;
+    color: #FFFFFF;
+    text-decoration: none;
+    padding: 8px 10px;
+    margin: 10px 0;
+}
+
+.masthead .button:hover {
+    background: #007000;
+}
+
+.masthead .button:active {
+    transform: scale(0.98);
+}
+
+@media only screen and (max-width: 500px) {
+    .masthead {
+        display: block;
+    }
+    .masthead .left,
+    .masthead .right {
+        display: block;
+    }
+}
+
+.features {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    border-bottom: 1px solid #AAA;
+    padding: 10px 5px;
+    text-align: center;
+}
+
+.features .feature {
+    display: inline-block;
+    width: 120px;
+    vertical-align: top;
+    text-align: left;
+    margin: 5px;
+    padding: 5px 20px;
+    background: #E0E0E0;
+    min-height: 160px;
+}
+
+.features .feature .name {
+    display: block;
+    font-size: 18px;
+    margin: 10px 0;
+    text-align: center;
+}
+
+.features .feature .description {
+    display: block;
+    font-size: 13px;
+}
+
+.section {
+    display: block;
+    border-bottom: 1px solid #AAA;
+    padding: 20px 40px;
+}
+
+.section .title {
+    display: block;
+    font-size: 26px;
+    margin: 5px 0;
+    text-align: center;
+}

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>kepubify - Convert ePubs into Kobo ePubs</title>
+    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="Convert your ePubs into kepubs, with an easy-to-use, standalone tool.">
+</head>
+
+<body>
+    <div class="container">
+        <div class="nav">
+            <div class="left">
+                <div class="title">
+                    <a href="#" class="item">kepubify</a>
+                </div>
+            </div>
+            <div class="right">
+                <a href="https://github.com/geek1011/kepubify/releases/latest" class="item">Download</a>
+                <a href="https://github.com/geek1011/kepubify" class="item">GitHub</a>
+            </div>
+        </div>
+
+        <div class="masthead">
+            <div class="left">
+                <div class="header">kepubify</div>
+                <div class="description">Convert your ePubs into kepubs, with an easy-to-use, standalone tool.</div>
+                <a href="https://github.com/geek1011/kepubify/releases/latest" class="download button">Download Now<br><small>Windows, Linux, macOS</small></a>
+                <a class="github-button" href="https://github.com/geek1011/kepubify" data-icon="octicon-star" data-size="large" aria-label="Star geek1011/kepubify on GitHub">Star on GitHub</a>
+            </div>
+            <div class="right">
+                <img src="kepubify.gif" alt="">
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="name">Cross-Platform</div>
+                <div class="description">kepubify runs on Windows, macOS, and Linux.</div>
+            </div>
+            <div class="feature">
+                <div class="name">Fast and Lightweight</div>
+                <div class="description">It only takes a few seconds to convert a book, and no extra cruft is added to your books.</div>
+            </div>
+            <div class="feature">
+                <div class="name">No Dependencies</div>
+                <div class="description">kepubify does not depend on any other tools such as Calibre.</div>
+            </div>
+            <div class="feature">
+                <div class="name">Full-Featured</div>
+                <div class="description">kepubify supports all the necessary features for Kobo ePubs.</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="title">Usage</div>
+            <div class="body">
+                <ul>
+                    <li>On Windows, you can drag your book on top of <tt>kepubify.exe</tt></li>
+                    <li><tt>kepubify /path/to/my/book.epub</tt> will output to <tt>./book.kepub.epub</tt></li>
+                    <li><tt>kepubify /path/to/my/book.epub /path/to/another/folder/</tt> will output to <tt>/path/to/another/folder/book.kepub.epub</tt></li>
+                    <li><tt>kepubify /path/to/my/book.epub /path/to/another/folder//newname.kepub.epub</tt> will output to <tt>/path/to/another/folder/newname.kepub.epub</tt></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="title">Features</div>
+            <div class="body">
+                <ul>
+                    <li>Conversion
+                        <ul>
+                            <li>Adds kobo spans to allow notes and highlighting</li>
+                            <li>Adds kobo divs</li>
+                            <li>Smartens punctuation</li>
+                            <li>Cleans up html
+                                <ul>
+                                    <li>Removes extra characters</li>
+                                    <li>Removes MS Word tags</li>
+                                    <li>Removes ADEPT encryption leftover tags</li>
+                                </ul>
+                            </li>
+                            <li>Kobo style fixes</li>
+                            <li>Clean up extra files from ePub</li>
+                            <li>Remove extra calibre tags from content opf</li>
+                        </ul>
+                    </li>
+                    <li>Coming soon:
+                        <ul>
+                            <li>Output
+                                <ul>
+                                    <li>Automatically find kobo and import book</li>
+                                </ul>
+                            </li>
+                            <li>Integration with BookBrowser: download your ePubs as a kepub right from the Kobo Web Browser</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="title">Why would I use kepubify rather than calibre-kobo-driver</div>
+            <div class="body">
+                <ul>
+                    <li>Works from the command line</li>
+                    <li>Faster processing</li>
+                    <li>Standalone</li>
+                    <li>Does not add extra calibre meta tags</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section" id="screenshots">
+            <div class="title">Screenshots</div>
+            <div class="body">
+                <table>
+                    <tr>
+                        <td><a href="kepubify.gif" target="_blank"><img src="kepubify.gif" alt="" style="max-width:100%;"></a></td>
+                        <td><a href="kepubify-windows.gif" target="_blank"><img src="kepubify-windows.gif" alt="" style="max-width:100%;"></a></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="section" id="download">
+            <div class="title">Download</div>
+            <div class="body">
+                Download links can be found <a href="https://github.com/geek1011/kepubify/releases/latest">here</a>.
+            </div>
+        </div>
+
+        <div class="footer section">
+            <center>
+                <div>Copyright 2017 <a href="https://geek1011.github.io">Patrick G</a></div>
+            </center>
+        </div>
+    </div>
+    <script async defer src="https://buttons.github.io/buttons.js"></script>
+</body>
+
+</html>
