@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,116 +9,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beevik/etree"
-	"github.com/cheggaaa/pb"
-	zglob "github.com/mattn/go-zglob"
+	"github.com/geek1011/kepubify/kepub"
+
 	cli "gopkg.in/urfave/cli.v1"
 )
 
 var version = "dev"
 
-func kepubify(src, dest string) error {
-	td, err := ioutil.TempDir("", "kepubify")
-	if err != nil {
-		return fmt.Errorf("Could not create temp dir: %s", err)
+// exists checks whether a path exists
+func exists(path string) bool {
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return true
 	}
-	defer os.RemoveAll(td)
+	return false
+}
 
-	fmt.Println("Unpacking ePub.")
-	UnpackEPUB(src, td, true)
-	fmt.Println()
-
-	a, err := zglob.Glob(filepath.Join(td, "**", "*.html"))
-	if err != nil {
-		return fmt.Errorf("Could not create find content files: %s", err)
+// isDir checks if a exists and is a dir
+func isDir(path string) bool {
+	if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+		return true
 	}
-	b, err := zglob.Glob(filepath.Join(td, "**", "*.xhtml"))
-	if err != nil {
-		return fmt.Errorf("Could not create find content files: %s", err)
-	}
-	c, err := zglob.Glob(filepath.Join(td, "**", "*.htm"))
-	if err != nil {
-		return fmt.Errorf("Could not create find content files: %s", err)
-	}
-	contentfiles := append(append(a, b...), c...)
-
-	fmt.Printf("Processing %v content files.\n", len(contentfiles))
-
-	bar := pb.New(len(contentfiles))
-	bar.SetRefreshRate(time.Millisecond * 300)
-	bar.SetMaxWidth(60)
-	bar.Format("[=> ]")
-	bar.Start()
-
-	for _, cf := range contentfiles {
-		buf, err := ioutil.ReadFile(cf)
-		if err != nil {
-			return fmt.Errorf("Could not open content file \"%s\" for reading: %s", cf, err)
-		}
-		str := string(buf)
-		err = process(&str)
-		if err != nil {
-			return fmt.Errorf("Error processing content file \"%s\": %s", cf, err)
-		}
-		err = ioutil.WriteFile(cf, []byte(str), 0644)
-		if err != nil {
-			return fmt.Errorf("Error writing content file \"%s\": %s", cf, err)
-		}
-		time.Sleep(time.Millisecond * 25)
-		bar.Increment()
-	}
-
-	bar.Finish()
-	fmt.Println()
-
-	fmt.Println("Cleaning content.opf.")
-	fmt.Println()
-
-	rsk, err := os.Open(filepath.Join(td, "META-INF", "container.xml"))
-	if err != nil {
-		return fmt.Errorf("Error parsing container.xml: %s", err)
-	}
-	defer rsk.Close()
-
-	container := etree.NewDocument()
-	_, err = container.ReadFrom(rsk)
-	if err != nil {
-		return fmt.Errorf("Error parsing container.xml: %s", err)
-	}
-
-	rootfile := ""
-	for _, e := range container.FindElements("//rootfiles/rootfile[@full-path]") {
-		rootfile = e.SelectAttrValue("full-path", "")
-	}
-	if rootfile == "" {
-		return fmt.Errorf("Error parsing container.xml")
-	}
-
-	buf, err := ioutil.ReadFile(filepath.Join(td, rootfile))
-	if err != nil {
-		return fmt.Errorf("Error parsing content.opf: %s", err)
-	}
-
-	opf := string(buf)
-
-	err = cleanOPF(&opf)
-	if err != nil {
-		return fmt.Errorf("Error cleaning content.opf: %s", err)
-	}
-
-	err = ioutil.WriteFile(filepath.Join(td, rootfile), []byte(opf), 0644)
-	if err != nil {
-		return fmt.Errorf("Error writing new content.opf: %s", err)
-	}
-
-	fmt.Println("Cleaning epub files.")
-	fmt.Println()
-	cleanFiles(td)
-
-	fmt.Println("Packing ePub.")
-	fmt.Println()
-	PackEPUB(td, dest, true)
-	return nil
+	return false
 }
 
 func convert(c *cli.Context) error {
@@ -175,7 +85,7 @@ func convert(c *cli.Context) error {
 	fmt.Printf("Output file: %s\n", outfile)
 	fmt.Println()
 
-	err = kepubify(infile, outfile)
+	err = kepub.Kepubify(infile, outfile, true)
 	if err != nil {
 		return fmt.Errorf("Error converting epub to kepub: %s.", err)
 	}

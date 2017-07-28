@@ -20,7 +20,7 @@ generate:
 
 .PHONY: test
 test:
-	go test -v .
+	go test -v . ./kepub
 
 .PHONY: build
 build:

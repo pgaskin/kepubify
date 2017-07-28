@@ -1,4 +1,4 @@
-package main
+package kepub
 
 import (
 	"crypto/sha256"
