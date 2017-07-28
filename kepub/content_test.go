@@ -11,9 +11,9 @@ import (
 )
 
 func TestCleanHTML(t *testing.T) {
-	h := `<meta  content="urn:uuid:asd--asdasd-asdasdas-dasdasd234234"   name="Adept.expected.resource"   />��<st1:asd></st1:asd><o:p></o:p><h1></h1><h3></h3><h2>test</h2>`
+	h := `<meta  content="urn:uuid:asd--asdasd-asdasdas-dasdasd234234"   name="Adept.expected.resource"   />��<st1:asd></st1:asd><o:p></o:p><h1></h1><h3></h3><h2>test</h2><style></style>`
 	cleanHTML(&h)
-	assert.Equal(t, " <h2>test</h2>", h, "should be equal if cleaned correctly")
+	assert.Equal(t, " <h2>test</h2><style type=\"text/css\"></style>", h, "should be equal if cleaned correctly")
 }
 
 func TestSmartenPunctuation(t *testing.T) {
