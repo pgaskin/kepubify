@@ -25,6 +25,7 @@ Convert your ePubs into kepubs, with a easy-to-use command-line tool.
     - Output
         - Automatically find kobo and import book
     - Integration with BookBrowser: download your ePubs as a kepub right from the Kobo Web Browser
+    - Update Kobo series metadata
 
 ## Why would I use kepubify rather than calibre-kobo-driver
 - Works from the command line
