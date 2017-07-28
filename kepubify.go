@@ -103,6 +103,7 @@ func main() {
 	app := cli.NewApp()
 
 	app.Name = "kepubify"
+	app.Usage = "Convert epub to kepub"
 	app.Description = "Convert your ePubs into kepubs, with a easy-to-use command-line tool."
 	app.Version = version
 
