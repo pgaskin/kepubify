@@ -12,7 +12,7 @@ script:
 
 deploy:
   provider: script
-  script: release.sh
+  script: /bin/bash $TRAVIS_BUILD_DIR/release.sh
   skip_cleanup: true
   on:
     tags: true
