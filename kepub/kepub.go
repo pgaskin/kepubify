@@ -50,7 +50,7 @@ func Kepubify(src, dest string, printlog bool) error {
 
 	if printlog {
 		bar = pb.New(len(contentfiles))
-		bar.SetRefreshRate(time.Millisecond * 300)
+		bar.SetRefreshRate(time.Millisecond * 60)
 		bar.SetMaxWidth(60)
 		bar.Format("[=> ]")
 		bar.Start()
@@ -70,7 +70,7 @@ func Kepubify(src, dest string, printlog bool) error {
 		if err != nil {
 			return fmt.Errorf("Error writing content file \"%s\": %s", cf, err)
 		}
-		time.Sleep(time.Millisecond * 25)
+		time.Sleep(time.Millisecond * 5)
 		if printlog {
 			bar.Increment()
 		}
