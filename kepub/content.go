@@ -228,7 +228,7 @@ func process(content *string) error {
 	}
 
 	// Kobo style fixes
-	h = strings.Replace(h, "</head>", "<style>div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head>", 1)
+	h = strings.Replace(h, "</head>", "<style type=\"text/css\">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head>", 1)
 
 	*content = h
 
