@@ -185,6 +185,9 @@ func cleanHTML(html *string) error {
 	// unicode replacement chars
 	*html = strings.Replace(*html, "�", "", -1)
 
+	// Add type to style tags
+	*html = strings.Replace(*html, `<style>`, `<style type="text/css">`, -1)
+
 	// ADEPT drm tags
 	adeptRe := regexp.MustCompile(`(<meta\s+content=".+"\s+name="Adept.expected.resource"\s+\/>)`)
 	*html = adeptRe.ReplaceAllString(*html, "")
