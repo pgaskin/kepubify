@@ -3,5 +3,15 @@ go:
  - 1.8.3
 
 script:
+ - go get -v "github.com/kardianos/govendor"
+ - go get -v "github.com/aktau/github-release"
+ - govendor sync
+ - go generate
  - go test -v ./...
  - go build
+
+deploy:
+  provider: script
+  script: release.sh
+  on:
+    branch: master
