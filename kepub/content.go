@@ -192,6 +192,9 @@ func cleanHTML(html *string) error {
 	adeptRe := regexp.MustCompile(`(<meta\s+content=".+"\s+name="Adept.expected.resource"\s+\/>)`)
 	*html = adeptRe.ReplaceAllString(*html, "")
 
+	// Fix commented xml tag
+	*html = strings.Replace(*html, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
+
 	return nil
 }
 
