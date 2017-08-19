@@ -93,7 +93,7 @@ func convert(c *cli.Context) error {
 	fmt.Printf("Successfully converted \"%s\" to a kepub.\nYou can find the converted file at \"%s\"\n", infile, outfile)
 
 	if runtime.GOOS == "windows" {
-		time.Sleep(5000 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 	return nil
