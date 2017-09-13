@@ -3,6 +3,10 @@
 
 Convert your ePubs into kepubs, with an easy-to-use tool. Kepubify can also be embedded into your own apps with the import path `github.com/geek1011/kepubify/kepub`.
 
+## Installation
+- You can install kepubify from the [releases](https://github.com/geek1011/kepubify/releases/latest) page.
+- On macOS, you can also use the [Homebrew](https://brew.sh) package contributed by [@vitorgalvao](https://github.com/vitorgalvao) with the command `brew install vitorgalvao/kepubify/kepubify`
+
 ## Usage
 - On Windows, you can drag your book on top of `kepubify.exe`
 - `kepubify /path/to/my/book.epub` will output to `./book.kepub.epub`
