@@ -26,6 +26,7 @@ only the following limited syntax is supported:
     [tag]           Selects all elements with a child element named tag
     [tag='val']     Selects all elements with a child element named tag
                       and text matching val
+    [text()]        Selects all elements with non-empty text
     [text()='val']  Selects all elements whose text matches val
 
 Examples:
@@ -278,10 +279,12 @@ func (c *compiler) parseFilter(path string) filter {
 		}
 	}
 
-	// Filter contains [@attr], [N] or [tag]
+	// Filter contains [@attr], [N], [tag] or [text()]
 	switch {
 	case path[0] == '@':
 		return newFilterAttr(path[1:])
+	case path == "text()":
+		return newFilterText()
 	case isInteger(path):
 		pos, _ := strconv.Atoi(path)
 		switch {
@@ -423,6 +426,22 @@ func (f *filterAttrVal) apply(p *pather) {
 				p.scratch = append(p.scratch, c)
 				break
 			}
+		}
+	}
+	p.candidates, p.scratch = p.scratch, p.candidates[0:0]
+}
+
+// filterText filters the candidate list for elements having text.
+type filterText struct{}
+
+func newFilterText() *filterText {
+	return &filterText{}
+}
+
+func (f *filterText) apply(p *pather) {
+	for _, c := range p.candidates {
+		if c.Text() != "" {
+			p.scratch = append(p.scratch, c)
 		}
 	}
 	p.candidates, p.scratch = p.scratch, p.candidates[0:0]
