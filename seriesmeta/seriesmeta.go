@@ -232,7 +232,7 @@ func main() {
 			epubs = append(epubs, match)
 		}
 
-		fmt.Printf("INFO: Found %v epub files", len(epubs))
+		fmt.Printf("INFO: Found %v epub files\n", len(epubs))
 
 		errcount := 0
 		for _, epub := range epubs {
@@ -249,6 +249,6 @@ func main() {
 			fmt.Println()
 		}
 
-		fmt.Printf("INFO: Finished updating metadata. %v books processed. %v errors.", len(epubs), errcount)
+		fmt.Printf("INFO: Finished updating metadata. %v books processed. %v errors.\n", len(epubs), errcount)
 	}
 }
