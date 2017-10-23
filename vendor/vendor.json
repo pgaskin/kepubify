@@ -17,8 +17,8 @@
 		{
 			"checksumSHA1": "usT4LCSQItkFvFOQT7cBlkCuGaE=",
 			"path": "github.com/beevik/etree",
-			"revision": "15a30b44cfd6c5a16a7ddfe271bf146aaf2d3195",
-			"revisionTime": "2017-08-08T08:22:18Z"
+			"revision": "af219c0c7ea1b67ec263c0b1b1b96d284a9181ce",
+			"revisionTime": "2017-10-15T22:09:51Z"
 		},
 		{
 			"checksumSHA1": "gk79AfKA6lVJ/wJf2dhq7kQdaaI=",
@@ -37,6 +37,12 @@
 			"path": "github.com/mattn/go-runewidth",
 			"revision": "97311d9f7767e3d6f422ea06661bc2c7a19e8a5d",
 			"revisionTime": "2017-05-10T07:48:58Z"
+		},
+		{
+			"checksumSHA1": "vJOfjdXbjymKpuay2nyRnGncJUw=",
+			"path": "github.com/mattn/go-sqlite3",
+			"revision": "5160b48509cf5c877bc22c11c373f8c7738cdb38",
+			"revisionTime": "2017-09-28T04:00:20Z"
 		},
 		{
 			"checksumSHA1": "AwqckCx0dyBrqpF8AHkJ7j2yUG8=",
@@ -63,6 +69,12 @@
 			"revisionTime": "2017-07-05T02:17:15Z"
 		},
 		{
+			"checksumSHA1": "dr5+PfIRzXeN+l1VG+s0lea9qz8=",
+			"path": "golang.org/x/net/context",
+			"revision": "cd69bc3fc700721b709c3a59e16e24c67b58f6ff",
+			"revisionTime": "2017-10-17T20:25:22Z"
+		},
+		{
 			"checksumSHA1": "/PGQlVbw8jILX3tLQaYAg6bTAFI=",
 			"path": "golang.org/x/net/html",
 			"revision": "a04bdaca5b32abe1c069418fb7088ae607de5bd0",
@@ -73,6 +85,18 @@
 			"path": "golang.org/x/net/html/atom",
 			"revision": "a04bdaca5b32abe1c069418fb7088ae607de5bd0",
 			"revisionTime": "2017-10-03T05:09:24Z"
+		},
+		{
+			"checksumSHA1": "NC6sRRBg4e1wHOkOu2doF24QWh0=",
+			"path": "golang.org/x/tools/godoc/vfs",
+			"revision": "9bd2f442688b66c5289262d70f537c2ecf81d7de",
+			"revisionTime": "2017-10-07T19:42:05Z"
+		},
+		{
+			"checksumSHA1": "PNmeEAMPM9nLqYkgmzwfeGIAl7Q=",
+			"path": "golang.org/x/tools/godoc/vfs/zipfs",
+			"revision": "9bd2f442688b66c5289262d70f537c2ecf81d7de",
+			"revisionTime": "2017-10-07T19:42:05Z"
 		},
 		{
 			"checksumSHA1": "Yx1MU40fyGe7hhqW9+dkv8kXa60=",
