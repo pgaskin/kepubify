@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mattn/go-zglob"
+
 	"golang.org/x/tools/godoc/vfs/zipfs"
 
 	"github.com/beevik/etree"
@@ -141,8 +143,8 @@ func loadKoboDB(koboPath string) (*sql.DB, error) {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Printf("USAGE: %s KOBO_ROOT_PATH EPUB_PATH\n", filepath.Base(os.Args[0]))
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		fmt.Printf("USAGE: %s KOBO_ROOT_PATH [EPUB_PATH]\n", filepath.Base(os.Args[0]))
 		os.Exit(1)
 	}
 
@@ -152,32 +154,77 @@ func main() {
 		os.Exit(1)
 	}
 
-	epubPath, err := filepath.Abs(os.Args[2])
-	if err != nil {
-		fmt.Printf("FATAL: Could resolve ePub path %s: %v\n", os.Args[2], err)
+	if _, err := os.Stat(filepath.Join(koboPath, ".kobo")); os.IsNotExist(err) {
+		fmt.Printf("FATAL: %s is not a valid path to a Kobo eReader.\n", os.Args[1])
+		fmt.Printf("USAGE: %s KOBO_ROOT_PATH [EPUB_PATH]\n", filepath.Base(os.Args[0]))
 		os.Exit(1)
 	}
 
-	if !strings.HasPrefix(epubPath, koboPath) {
-		fmt.Printf("FATAL: ePub file not in the specified Kobo path.\n")
-		os.Exit(1)
-	}
-
-	db, err := loadKoboDB(koboPath)
-	if err != nil {
-		fmt.Printf("FATAL: Could not open Kobo database: %v\n", err)
-		os.Exit(1)
-	}
-
-	ra, err := updateSeriesMetaFromEPUB(db, koboPath, epubPath)
-	if err != nil {
-		fmt.Printf("ERROR: Could not update series metadata from epub: %v\n", err)
-	} else {
-		if ra < 1 {
-			fmt.Printf("ERROR: Could not update series metadata from epub: the database does not yet have an entry for the specified book. Please let the kobo import the book before using this tool.\n")
+	if len(os.Args) == 3 {
+		epubPath, err := filepath.Abs(os.Args[2])
+		if err != nil {
+			fmt.Printf("FATAL: Could resolve ePub path %s: %v\n", os.Args[2], err)
+			os.Exit(1)
 		}
-		if ra > 1 {
+
+		if !strings.HasPrefix(epubPath, koboPath) {
+			fmt.Printf("FATAL: ePub file not in the specified Kobo path.\n")
+			os.Exit(1)
+		}
+
+		db, err := loadKoboDB(koboPath)
+		if err != nil {
+			fmt.Printf("FATAL: Could not open Kobo database: %v\n", err)
+			os.Exit(1)
+		}
+
+		ra, err := updateSeriesMetaFromEPUB(db, koboPath, epubPath)
+		if err != nil {
+			fmt.Printf("ERROR: Could not update series metadata from epub: %v\n", err)
+			os.Exit(1)
+		} else if ra < 1 {
+			fmt.Printf("ERROR: Could not update series metadata from epub: the database does not yet have an entry for the specified book. Please let the kobo import the book before using this tool.\n")
+		} else if ra > 1 {
 			fmt.Printf("WARN: More than 1 match for book in database.\n")
 		}
+	} else {
+		db, err := loadKoboDB(koboPath)
+		if err != nil {
+			fmt.Printf("FATAL: Could not open Kobo database: %v\n", err)
+			os.Exit(1)
+		}
+
+		matches, err := zglob.Glob(filepath.Join(koboPath, "**/*.epub"))
+		if err != nil {
+			fmt.Printf("FATAL: Error searching for epub files: %v\n", err)
+			os.Exit(1)
+		}
+
+		epubs := []string{}
+		for _, match := range matches {
+			if strings.HasPrefix(filepath.Base(match), ".") {
+				continue
+			}
+			epubs = append(epubs, match)
+		}
+
+		fmt.Printf("INFO: Found %v epub files", len(epubs))
+
+		errcount := 0
+		for _, epub := range epubs {
+			ra, err := updateSeriesMetaFromEPUB(db, koboPath, epub)
+			if err != nil {
+				fmt.Printf("ERROR: Could not update series metadata from epub: %v\n", err)
+				errcount++
+			} else if ra < 1 {
+				fmt.Printf("ERROR: Could not update series metadata from epub: the database does not yet have an entry for the specified book. Please let the kobo import the book before using this tool.\n")
+				errcount++
+			} else if ra > 1 {
+				fmt.Printf("WARN: More than 1 match for book in database.\n")
+			}
+			fmt.Println()
+		}
+
+		fmt.Printf("INFO: Finished updating metadata. %v books processed. %v errors.", len(epubs), errcount)
 	}
 }
