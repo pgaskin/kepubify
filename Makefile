@@ -20,12 +20,13 @@ generate:
 
 .PHONY: test
 test:
-	go test -v . ./kepub
+	go test -v . ./kepub ./seriesmeta
 
 .PHONY: build
 build:
 	mkdir -p build
 	go build -ldflags "-X main.version=dev" -o "build/kepubify"
+	go build -ldflags "-X main.version=dev" -o "build/seriesmeta"
 
 .PHONY: install
 install:

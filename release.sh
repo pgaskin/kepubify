@@ -41,6 +41,13 @@ for GOOS in linux windows darwin; do
     done
 done
 
+for GOOS in linux; do
+    for GOARCH in amd64; do
+        echo "Building seriesmeta $APP_VERSION for $GOOS $GOARCH"
+        GOOS=$GOOS GOARCH=$GOOARCH go build -ldflags "-X main.version=$APP_VERSION" -o "build/seriesmeta-$GOOS-$(echo $GOARCH|sed 's/386/32bit/g'|sed 's/amd64/64bit/g')$(echo $GOOS|sed 's/windows/.exe/g'|sed 's/linux//g'|sed 's/darwin//g')" seriesmeta/seriesmeta.go
+    done
+done
+
 
 if [[ "$SKIP_UPLOAD" != "true" ]]; then
     echo "Creating release"
@@ -58,6 +65,18 @@ if [[ "$SKIP_UPLOAD" != "true" ]]; then
         --description "$(cat build/release-notes.md)"
 
     for f in build/kepubify-*;do 
+        fn="$(basename $f)"
+        echo "Uploading $fn"
+        GITHUB_TOKEN=$GITHUB_TOKEN github-release upload \
+            --user geek1011 \
+            --repo kepubify \
+            --tag $APP_VERSION \
+            --name "$fn" \
+            --file "$f" \
+            --replace
+    done
+
+    for f in build/seriesmeta-*;do 
         fn="$(basename $f)"
         echo "Uploading $fn"
         GITHUB_TOKEN=$GITHUB_TOKEN github-release upload \

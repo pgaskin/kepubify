@@ -19,6 +19,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+var version = "dev"
+
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
