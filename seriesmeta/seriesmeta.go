@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,6 +18,26 @@ import (
 	"github.com/beevik/etree"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
+}
 
 func pathToContentID(koboPath, path string) (imageID string, err error) {
 	relPath, err := filepath.Rel(koboPath, path)
@@ -134,10 +155,13 @@ func updateSeriesMetaFromEPUB(db *sql.DB, koboPath, epubPath string) (int64, err
 
 func loadKoboDB(koboPath string) (*sql.DB, error) {
 	koboDBPath := filepath.Join(koboPath, ".kobo/KoboReader.sqlite")
+	koboDBBackupPath := filepath.Join(koboPath, "KoboReader.sqlite.bak")
 
 	if _, err := os.Stat(koboDBPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("Kobo database %s does not exist", koboDBPath)
 	}
+
+	copyFile(koboDBPath, koboDBBackupPath)
 
 	return sql.Open("sqlite3", koboDBPath)
 }
@@ -180,10 +204,10 @@ func main() {
 
 		ra, err := updateSeriesMetaFromEPUB(db, koboPath, epubPath)
 		if err != nil {
-			fmt.Printf("ERROR: Could not update series metadata from epub: %v\n", err)
+			fmt.Printf("ERROR: Could not update series metadata: %v\n", err)
 			os.Exit(1)
 		} else if ra < 1 {
-			fmt.Printf("ERROR: Could not update series metadata from epub: the database does not yet have an entry for the specified book. Please let the kobo import the book before using this tool.\n")
+			fmt.Printf("ERROR: Could not update series metadata: no database entry for book. Please let the kobo import the book before using this tool.\n")
 		} else if ra > 1 {
 			fmt.Printf("WARN: More than 1 match for book in database.\n")
 		}
@@ -214,10 +238,10 @@ func main() {
 		for _, epub := range epubs {
 			ra, err := updateSeriesMetaFromEPUB(db, koboPath, epub)
 			if err != nil {
-				fmt.Printf("ERROR: Could not update series metadata from epub: %v\n", err)
+				fmt.Printf("ERROR: Could not update series metadata: %v\n", err)
 				errcount++
 			} else if ra < 1 {
-				fmt.Printf("ERROR: Could not update series metadata from epub: the database does not yet have an entry for the specified book. Please let the kobo import the book before using this tool.\n")
+				fmt.Printf("ERROR: Could not update series metadata: no entry in database for book. Please let the kobo import the book before using this tool.\n")
 				errcount++
 			} else if ra > 1 {
 				fmt.Printf("WARN: More than 1 match for book in database.\n")
