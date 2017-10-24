@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/mattn/go-zglob"
 
 	"golang.org/x/tools/godoc/vfs/zipfs"
@@ -137,7 +139,7 @@ func getEPUBMeta(path string) (string, float64, error) {
 	return series, seriesNumber, nil
 }
 
-func updateSeriesMetaFromEPUB(db *sql.DB, koboPath, epubPath string) (int64, error) {
+func updateSeriesMetaFromEPUB(s *spinner.Spinner, db *sql.DB, koboPath, epubPath string) (int64, error) {
 	series, seriesNumber, err := getEPUBMeta(epubPath)
 	if err != nil {
 		return 0, err
@@ -150,7 +152,11 @@ func updateSeriesMetaFromEPUB(db *sql.DB, koboPath, epubPath string) (int64, err
 
 	iid := contentIDToImageID(cid)
 
-	fmt.Printf("INFO: UPDATE %s => [%s %v]\n", iid, series, seriesNumber)
+	if s != nil {
+		s.Suffix = fmt.Sprintf(" UPDATE %s => [%s %v]\n", iid, series, seriesNumber)
+	} else {
+		fmt.Printf("INFO: UPDATE %s => [%s %v]\n", iid, series, seriesNumber)
+	}
 
 	return updateSeriesMeta(db, iid, series, seriesNumber)
 }
@@ -204,7 +210,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		ra, err := updateSeriesMetaFromEPUB(db, koboPath, epubPath)
+		ra, err := updateSeriesMetaFromEPUB(nil, db, koboPath, epubPath)
 		if err != nil {
 			fmt.Printf("ERROR: Could not update series metadata: %v\n", err)
 			os.Exit(1)
@@ -214,18 +220,26 @@ func main() {
 			fmt.Printf("WARN: More than 1 match for book in database.\n")
 		}
 	} else {
+		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+		s.Start()
+
+		s.Suffix = " Opening Kobo database"
 		db, err := loadKoboDB(koboPath)
 		if err != nil {
+			s.Stop()
 			fmt.Printf("FATAL: Could not open Kobo database: %v\n", err)
 			os.Exit(1)
 		}
 
+		s.Suffix = " Searching for epub files"
 		matches, err := zglob.Glob(filepath.Join(koboPath, "**/*.epub"))
 		if err != nil {
+			s.Stop()
 			fmt.Printf("FATAL: Error searching for epub files: %v\n", err)
 			os.Exit(1)
 		}
 
+		s.Suffix = " Filtering epub files"
 		epubs := []string{}
 		for _, match := range matches {
 			if strings.HasPrefix(filepath.Base(match), ".") {
@@ -234,23 +248,39 @@ func main() {
 			epubs = append(epubs, match)
 		}
 
+		s.Stop()
 		fmt.Printf("INFO: Found %v epub files\n", len(epubs))
+		s.Start()
 
 		errcount := 0
 		for _, epub := range epubs {
-			ra, err := updateSeriesMetaFromEPUB(db, koboPath, epub)
+			ra, err := updateSeriesMetaFromEPUB(s, db, koboPath, epub)
+
+			b, err := filepath.Rel(koboPath, epub)
 			if err != nil {
-				fmt.Printf("ERROR: Could not update series metadata: %v\n", err)
+				b = filepath.Base(epub)
+			}
+
+			if err != nil {
+				s.Stop()
+				fmt.Printf("ERROR: Could not update series metadata for %s: %v\n", b, err)
+				s.Start()
 				errcount++
 			} else if ra < 1 {
-				fmt.Printf("ERROR: Could not update series metadata: no entry in database for book. Please let the kobo import the book before using this tool.\n")
+				s.Stop()
+				fmt.Printf("ERROR: Could not update series metadata for %s: no entry in database for book. Please let the kobo import the book before using this tool.\n", b)
+				s.Start()
 				errcount++
 			} else if ra > 1 {
-				fmt.Printf("WARN: More than 1 match for book in database.\n")
+				s.Stop()
+				fmt.Printf("WARN: More than 1 match for book in database: %s.\n", b)
+				s.Start()
 			}
-			fmt.Println()
 		}
 
+		time.Sleep(time.Second)
+		s.Stop()
+		fmt.Println()
 		fmt.Printf("INFO: Finished updating metadata. %v books processed. %v errors.\n", len(epubs), errcount)
 	}
 }
