@@ -249,7 +249,7 @@ func main() {
 		}
 
 		s.Stop()
-		fmt.Printf("INFO: Found %v epub files\n", len(epubs))
+		fmt.Printf("INFO: Found %v epub files\n\n", len(epubs))
 		s.Start()
 
 		errcount := 0
