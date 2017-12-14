@@ -165,7 +165,10 @@ func PackEPUB(src, dest string, overwritedest bool) error {
 			return fmt.Errorf(`error getting relative path of "%s"`, path)
 		}
 
-		if path == dest {
+		// Fix issue with path separators in zip on windows
+		relativePath = filepath.ToSlash(relativePath)
+
+		if filepath.ToSlash(path) == filepath.ToSlash(dest) {
 			// Skip if it is trying to pack itself
 			return nil
 		}
@@ -175,7 +178,7 @@ func PackEPUB(src, dest string, overwritedest bool) error {
 			return nil
 		}
 
-		if path == filepath.Join(src, "mimetype") {
+		if filepath.ToSlash(path) == filepath.ToSlash(filepath.Join(src, "mimetype")) {
 			// Skip if it is the mimetype file
 			return nil
 		}
