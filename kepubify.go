@@ -92,10 +92,6 @@ func convert(c *cli.Context) error {
 
 	fmt.Printf("Successfully converted \"%s\" to a kepub.\nYou can find the converted file at \"%s\"\n", infile, outfile)
 
-	if runtime.GOOS == "windows" {
-		time.Sleep(1 * time.Second)
-	}
-
 	return nil
 }
 
@@ -113,6 +109,11 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
+
+		if runtime.GOOS == "windows" && len(c.Args()) == 1 {
+			time.Sleep(1 * time.Second)
+		}
+
 		return err
 	}
 
