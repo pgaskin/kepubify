@@ -85,6 +85,8 @@ func convert(c *cli.Context) error {
 			}
 		}
 
+		fmt.Printf("%v books found\n", len(epubs))
+
 		errs := map[string]error{}
 		for i, epub := range epubs {
 			rel, err := filepath.Rel(infile, epub)
