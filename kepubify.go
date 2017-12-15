@@ -73,9 +73,16 @@ func convert(c *cli.Context) error {
 			return fmt.Errorf("Error creating output dir: %s.", err)
 		}
 
-		epubs, err := zglob.Glob(filepath.Join(infile, "**", "*.epub"))
+		lst, err := zglob.Glob(filepath.Join(infile, "**", "*.epub"))
 		if err != nil {
 			return fmt.Errorf("Error searching for epubs in input dir: %s.", err)
+		}
+
+		epubs := []string{}
+		for _, f := range lst {
+			if !strings.HasSuffix(f, ".kepub.epub") {
+				epubs = append(epubs, f)
+			}
 		}
 
 		errs := map[string]error{}
