@@ -98,7 +98,9 @@ func Kepubify(src, dest string, printlog bool) error {
 	}
 	wg.Wait()
 	if len(cerr) > 0 {
-		bar.Finish()
+		if printlog {
+			bar.Finish()
+		}
 		fmt.Println()
 		return <-cerr
 	}
