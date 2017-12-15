@@ -12,6 +12,7 @@ Convert your ePubs into kepubs, with an easy-to-use tool. Kepubify can also be e
 - `kepubify /path/to/my/book.epub` will output to `./book.kepub.epub`
 - `kepubify /path/to/my/book.epub /path/to/another/folder/` will output to `/path/to/another/folder/book.kepub.epub`
 - `kepubify /path/to/my/book.epub /path/to/another/folder/newname.kepub.epub` will output to `/path/to/another/folder/newname.kepub.epub`
+- `kepubify /path/to/my/books /path/to/place/converted/books` will convert all books in `/path/to/my/books`, and output to `/path/to/place/converted/books/`. Errors will be shown at the end, if any.
 
 ## Features
 - Conversion
@@ -25,6 +26,7 @@ Convert your ePubs into kepubs, with an easy-to-use tool. Kepubify can also be e
     - Kobo style fixes
     - Clean up extra files from ePub
     - Remove extra calibre tags from content opf
+    - Convert whole folder of epubs
 - Coming soon:
     - Output
         - Automatically find kobo and import book
@@ -34,6 +36,7 @@ Convert your ePubs into kepubs, with an easy-to-use tool. Kepubify can also be e
 - Faster processing
 - Standalone
 - Does not add extra calibre meta tags
+- Command-line batch processing
 
 ## Screenshots
 | ![](docs/kepubify.gif) | ![](docs/kepubify-windows.gif) |
