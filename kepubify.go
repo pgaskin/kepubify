@@ -108,7 +108,13 @@ func main() {
 	app.Version = version
 
 	app.ArgsUsage = "EPUB_INPUT_PATH [KEPUB_OUTPUT_PATH]"
-	app.Action = convert
+	app.Action = func(c *cli.Context) error {
+		err := convert(c)
+		if err != nil {
+			fmt.Println(err)
+		}
+		return err
+	}
 
 	app.Run(os.Args)
 }

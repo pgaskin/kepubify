@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/beevik/etree"
@@ -56,24 +58,49 @@ func Kepubify(src, dest string, printlog bool) error {
 		bar.Start()
 	}
 
-	for _, cf := range contentfiles {
-		buf, err := ioutil.ReadFile(cf)
-		if err != nil {
-			return fmt.Errorf("Could not open content file \"%s\" for reading: %s", cf, err)
-		}
-		str := string(buf)
-		err = process(&str)
-		if err != nil {
-			return fmt.Errorf("Error processing content file \"%s\": %s", cf, err)
-		}
-		err = ioutil.WriteFile(cf, []byte(str), 0644)
-		if err != nil {
-			return fmt.Errorf("Error writing content file \"%s\": %s", cf, err)
-		}
-		time.Sleep(time.Millisecond * 5)
-		if printlog {
-			bar.Increment()
-		}
+	runtime.GOMAXPROCS(runtime.NumCPU() + 1)
+	wg := sync.WaitGroup{}
+	cerr := make(chan error, 1)
+	for _, f := range contentfiles {
+		wg.Add(1)
+		go func(cf string) {
+			defer wg.Done()
+			buf, err := ioutil.ReadFile(cf)
+			if err != nil {
+				select {
+				case cerr <- fmt.Errorf("Could not open content file \"%s\" for reading: %s", cf, err): // Put err in the channel unless it is full
+				default:
+				}
+				return
+			}
+			str := string(buf)
+			err = process(&str)
+			if err != nil {
+				select {
+				case cerr <- fmt.Errorf("Error processing content file \"%s\": %s", cf, err): // Put err in the channel unless it is full
+				default:
+				}
+				return
+			}
+			err = ioutil.WriteFile(cf, []byte(str), 0644)
+			if err != nil {
+				select {
+				case cerr <- fmt.Errorf("Error writing content file \"%s\": %s", cf, err): // Put err in the channel unless it is full
+				default:
+				}
+				return
+			}
+			time.Sleep(time.Millisecond * 5)
+			if printlog {
+				bar.Increment()
+			}
+		}(f)
+	}
+	wg.Wait()
+	if len(cerr) > 0 {
+		bar.Finish()
+		fmt.Println()
+		return <-cerr
 	}
 
 	if printlog {
