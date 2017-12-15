@@ -87,7 +87,7 @@ func convert(c *cli.Context) error {
 				continue
 			}
 
-			err = os.MkdirAll(filepath.Join(outdir, rel), os.ModePerm)
+			err = os.MkdirAll(filepath.Join(outdir, filepath.Dir(rel)), os.ModePerm)
 			if err != nil {
 				fmt.Printf("[%v/%v] Error creating output dir for %s: %v\n", i+1, len(epubs), epub, err)
 				errs[rel] = err
