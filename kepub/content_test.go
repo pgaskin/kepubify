@@ -13,21 +13,23 @@ import (
 )
 
 func TestCleanHTML(t *testing.T) {
-	h := `<meta  content="urn:uuid:asd--asdasd-asdasdas-dasdasd234234"   name="Adept.expected.resource"   />��<st1:asd></st1:asd><o:p></o:p><h1></h1><h3></h3><h2>test</h2><style></style>`
-	cleanHTML(&h)
-	assert.Equal(t, " <h2>test</h2><style type=\"text/css\"></style>", h, "should be equal if cleaned correctly")
+	h := `<html><head></head><body><p /><p>test</p><p /><p  /><p>test</p><meta  content="urn:uuid:asd--asdasd-asdasdas-dasdasd234234"   name="Adept.expected.resource"   /><st1:asd></st1:asd><o:p></o:p><h1></h1><h3></h3><h2>test</h2><p>test</p><style></style></body></html>`
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(h))
+	assert.Nil(t, err, "err should be nil")
+
+	cleanHTML(doc)
+
+	nh, err := doc.Html()
+	assert.Nil(t, err, "err should be nil")
+
+	assert.Equal(t, `<html><head></head><body><p></p><p>test</p><p></p><p></p><p>test</p><h2>test</h2><p>test</p><style type="text/css"></style></body></html>`, nh, "should be equal if cleaned correctly")
 }
 
 func TestSmartenPunctuation(t *testing.T) {
 	h := `-- --- <!--test-->`
 	smartenPunctuation(&h)
 	assert.Equal(t, " &#x2014;   &#x2013;  <!-- test -->", h, "should be equal if smartened correctly")
-}
-
-func TestOpenSelfClosingPs(t *testing.T) {
-	h := `<p>test</p><p /><p  /><p>test</p>`
-	openSelfClosingPs(&h)
-	assert.Equal(t, "<p>test</p><p></p><p></p><p>test</p>", h, "should be equal if reopened correctly")
 }
 
 func TestAddSpans(t *testing.T) {

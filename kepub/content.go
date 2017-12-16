@@ -169,10 +169,12 @@ func addSpans(doc *goquery.Document) error {
 	return nil
 }
 
-// openSelfClosingPs opens self-closing p tags.
-func openSelfClosingPs(html *string) error {
-	re := regexp.MustCompile(`<p[^>/]*/>`)
-	*html = re.ReplaceAllString(*html, `<p></p>`)
+// addKoboStyles adds kobo styles.
+func addKoboStyles(doc *goquery.Document) error {
+	s := doc.Find("head").First().AppendHtml(`<style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style>`)
+	if s.Length() != 1 {
+		return fmt.Errorf("could not append kobo styles")
+	}
 	return nil
 }
 
@@ -191,28 +193,34 @@ func smartenPunctuation(html *string) error {
 }
 
 // cleanHTML cleans up html for a kobo epub.
-func cleanHTML(html *string) error {
-	emptyHeadingRe := regexp.MustCompile(`<h\d+>\s*</h\d+>`)
-	*html = emptyHeadingRe.ReplaceAllString(*html, "")
+func cleanHTML(doc *goquery.Document) error {
+	// Remove Adobe DRM tags
+	doc.Find(`meta[name="Adept.expected.resource"]`).Remove()
 
-	msPRe := regexp.MustCompile(`\s*<o:p>\s*<\/o:p>`)
-	*html = msPRe.ReplaceAllString(*html, " ")
+	// Remove empty MS <o:p> tags
+	doc.Find(`o\:p`).FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return strings.Trim(s.Text(), "\t \n") == ""
+	}).Remove()
 
-	msStRe := regexp.MustCompile(`<\/?st1:\w+>`)
-	*html = msStRe.ReplaceAllString(*html, "")
+	// Remove empty headings
+	doc.Find(`h1,h2,h3,h4,h5,h6`).FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return strings.Trim(s.Text(), "\t \n") == ""
+	}).Remove()
 
-	// unicode replacement chars
-	*html = strings.Replace(*html, "�", "", -1)
+	// Remove MS <st1:whatever> tags
+	doc.Find(`*`).FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return strings.HasPrefix(goquery.NodeName(s), "st1:")
+	}).Remove()
+
+	// Open self closing p tags
+	doc.Find(`p`).Each(func(_ int, s *goquery.Selection) {
+		if s.Children().Length() == 0 && strings.Trim(s.Text(), "\n \t") == "" {
+			s.SetHtml("")
+		}
+	})
 
 	// Add type to style tags
-	*html = strings.Replace(*html, `<style>`, `<style type="text/css">`, -1)
-
-	// ADEPT drm tags
-	adeptRe := regexp.MustCompile(`(<meta\s+content=".+"\s+name="Adept.expected.resource"\s+\/>)`)
-	*html = adeptRe.ReplaceAllString(*html, "")
-
-	// Fix commented xml tag
-	*html = strings.Replace(*html, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
+	doc.Find(`style`).SetAttr("type", "text/css")
 
 	return nil
 }
@@ -232,16 +240,16 @@ func process(content *string) error {
 		return err
 	}
 
+	if err := addKoboStyles(doc); err != nil {
+		return err
+	}
+
+	if err := cleanHTML(doc); err != nil {
+		return err
+	}
+
 	h, err := doc.Html()
 	if err != nil {
-		return err
-	}
-
-	if err := openSelfClosingPs(&h); err != nil {
-		return err
-	}
-
-	if err := cleanHTML(&h); err != nil {
 		return err
 	}
 
@@ -249,8 +257,12 @@ func process(content *string) error {
 		return err
 	}
 
-	// Kobo style fixes
-	h = strings.Replace(h, "</head>", "<style type=\"text/css\">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head>", 1)
+	// Remove unicode replacement chars
+	h = strings.Replace(h, "�", "", -1)
+
+	// Fix commented xml tag
+	h = strings.Replace(h, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
+	h = strings.Replace(h, `<!--?xml version="1.0" encoding="utf-8"?-->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
 
 	*content = h
 
