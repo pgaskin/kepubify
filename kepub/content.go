@@ -14,15 +14,22 @@ import (
 )
 
 func cleanFiles(basepath string) error {
-	_ = os.Remove(filepath.Join(basepath, "META-INF", "calibre_bookmarks.txt"))
-	_ = os.Remove(filepath.Join(basepath, "META-INF", "iTunesMetadata.plist"))
-	_ = os.Remove(filepath.Join(basepath, "iTunesMetadata.plist"))
-	_ = os.Remove(filepath.Join(basepath, "META-INF", "iTunesArtwork.plist"))
-	_ = os.Remove(filepath.Join(basepath, "iTunesArtwork.plist"))
-	_ = os.Remove(filepath.Join(basepath, "META-INF", ".DS_STORE"))
-	_ = os.Remove(filepath.Join(basepath, ".DS_STORE"))
-	_ = os.Remove(filepath.Join(basepath, "META-INF", "thumbs.db"))
-	_ = os.Remove(filepath.Join(basepath, "thumbs.db"))
+	toRemove := []string{
+		"META-INF/calibre_bookmarks.txt",
+		"META-INF/iTunesMetadata.plist",
+		"META-INF/iTunesArtwork.plist",
+		"META-INF/.DS_STORE",
+		"META-INF/thumbs.db",
+		".DS_STORE",
+		"thumbs.db",
+		"iTunesMetadata.plist",
+		"iTunesArtwork.plist",
+	}
+
+	for _, file := range toRemove {
+		os.Remove(filepath.Join(basepath, file))
+	}
+
 	return nil
 }
 
