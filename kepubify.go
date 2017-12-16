@@ -36,7 +36,7 @@ func isDir(path string) bool {
 
 func convert(c *cli.Context) error {
 	if len(c.Args()) < 1 || len(c.Args()) > 2 {
-		return fmt.Errorf("Invalid number of arguments. Usage: kepubify EPUB_INPUT_PATH [KEPUB_OUTPUT_PATH]")
+		return fmt.Errorf("Invalid number of arguments.\n\n%s", helpText)
 	}
 
 	infile := c.Args().Get(0)
@@ -162,15 +162,38 @@ func convert(c *cli.Context) error {
 	return nil
 }
 
+var helpText = `USAGE: kepubify INPUT_PATH [OUTPUT_PATH]
+
+VERSION: {{.Version}}
+
+INPUT_PATH:
+   The input file or directory. If it is a directory,
+   OUTPUT_PATH must be a nonexistent directory.
+
+OUTPUT_PATH:
+   The path to place the converted ebook(s). Can only
+   be a directory if INPUT_PATH is a directory.
+
+   By default, this is the basename of the input file, 
+   with the extension .kepub.epub
+
+The full documentation is available at:
+   https://geek1011.github.io/kepubify
+`
+
 func main() {
+	helpText = strings.Replace(helpText, "{{.Version}}", version, 1)
+
 	app := cli.NewApp()
 
 	app.Name = "kepubify"
-	app.Usage = "Convert epub to kepub"
+	app.Usage = "An epub to kepub converter"
 	app.Description = "Convert your ePubs into kepubs, with a easy-to-use command-line tool."
 	app.Version = version
 
 	app.ArgsUsage = "EPUB_INPUT_PATH [KEPUB_OUTPUT_PATH]"
+	cli.AppHelpTemplate = helpText
+
 	app.Action = func(c *cli.Context) error {
 		err := convert(c)
 		if err != nil {
