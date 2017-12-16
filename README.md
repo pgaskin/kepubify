@@ -4,7 +4,7 @@
 Convert your ePubs into kepubs, with an easy-to-use tool. Kepubify can also be embedded into your own apps with the import path `github.com/geek1011/kepubify/kepub`.
 
 # [Docs](https://geek1011.github.io/kepubify)
-Documentation is [here](https://geek1011.github.io/kepubify).
+Documentation is [here](https://geek1011.github.io/kepubify#docs).
 
 ## Screenshots
 | ![](docs/kepubify.gif) | ![](docs/kepubify-windows.gif) |
