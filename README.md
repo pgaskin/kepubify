@@ -3,40 +3,8 @@
 
 Convert your ePubs into kepubs, with an easy-to-use tool. Kepubify can also be embedded into your own apps with the import path `github.com/geek1011/kepubify/kepub`.
 
-## Installation
-- You can install kepubify from the [releases](https://github.com/geek1011/kepubify/releases/latest) page.
-- On macOS, you can also use the [Homebrew](https://brew.sh) package contributed by [@vitorgalvao](https://github.com/vitorgalvao) with the command `brew install vitorgalvao/kepubify/kepubify`
-
-## Usage
-- On Windows, you can drag your book on top of `kepubify.exe`
-- `kepubify /path/to/my/book.epub` will output to `./book.kepub.epub`
-- `kepubify /path/to/my/book.epub /path/to/another/folder/` will output to `/path/to/another/folder/book.kepub.epub`
-- `kepubify /path/to/my/book.epub /path/to/another/folder/newname.kepub.epub` will output to `/path/to/another/folder/newname.kepub.epub`
-- `kepubify /path/to/my/books /path/to/place/converted/books` will convert all books in `/path/to/my/books`, and output to `/path/to/place/converted/books/`. Errors will be shown at the end, if any.
-
-## Features
-- Conversion
-    - Adds kobo spans to allow notes and highlighting
-    - Adds kobo divs
-    - Smartens punctuation
-    - Cleans up html
-        - Removes extra characters
-        - Removes MS Word tags
-        - Removes ADEPT encryption leftover tags
-    - Kobo style fixes
-    - Clean up extra files from ePub
-    - Remove extra calibre tags from content opf
-    - Convert whole folder of epubs
-- Coming soon:
-    - Output
-        - Automatically find kobo and import book
-
-## Why would I use kepubify rather than calibre-kobo-driver
-- Works from the command line
-- Faster processing
-- Standalone
-- Does not add extra calibre meta tags
-- Command-line batch processing
+# [Docs](https://geek1011.github.io/kepubify)
+Documentation is [here](https://geek1011.github.io/kepubify).
 
 ## Screenshots
 | ![](docs/kepubify.gif) | ![](docs/kepubify-windows.gif) |
