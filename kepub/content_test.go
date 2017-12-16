@@ -111,3 +111,37 @@ func TestAddDivs(t *testing.T) {
 
 	assert.Equal(t, "d24ae5a8f438358828d50b036007fe06c9e24b55d6aa238f4628a24d77a15485", hxs, "hash of content should be equal if processed correctly")
 }
+
+func TestProcess(t *testing.T) {
+	h := `<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Test Book 1</title>
+    <meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/>
+    <style type="text/css">
+        @page { margin-bottom: 5.000000pt; margin-top: 5.000000pt; }
+    </style>
+</head>
+<body id="p1">
+	<p>This is the first sentence. This is the second sentence. This is the third sentence.</p>
+	<p>This is the first sentence. This is the second sentence? This is the third sentence!</p>
+	<p>This is the first <b>sentence</b>. This is the second sentence? This is the third sentence!</p>
+	<p>This is the first <b>sentence. This is the </b>second sentence? This is the third sentence!</p>
+	<p>This is <i>t<b>h</b>e</i> first <a href="test.html">sentence <b>here</b></a>. This is the second sentence? This is the third sentence!</p>
+	<ul>
+		<li>test</li>
+		<li>test</li>
+	</ul>
+    </div>
+</body>
+</html>`
+
+	process(&h)
+
+	hs := sha256.New()
+	hs.Write([]byte(h))
+
+	hxs := fmt.Sprintf("%x", hs.Sum(nil))
+
+	assert.Equal(t, "3abc0810906b322e3860b3d7fd1bafd5133a4a66ced286497eaafb40c94612fd", hxs, "hash of content should be equal if processed correctly")
+}
