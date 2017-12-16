@@ -1,7 +1,6 @@
 package kepub
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,18 +62,39 @@ func addDivs(doc *goquery.Document) error {
 	return nil
 }
 
+// createSpan creates a Kobo span
+func createSpan(paragraph, segment int, text string) *html.Node {
+	span := &html.Node{
+		Type: html.ElementNode,
+		Data: "span",
+		Attr: []html.Attribute{
+			html.Attribute{
+				Key: "class",
+				Val: "koboSpan",
+			},
+			html.Attribute{
+				Key: "id",
+				Val: fmt.Sprintf("kobo.%v.%v", paragraph, segment),
+			},
+		},
+	}
+
+	span.AppendChild(&html.Node{
+		Type: html.TextNode,
+		Data: text,
+	})
+
+	return span
+}
+
 // addSpansToNode is a recursive helper function for addSpans.
 func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
-	sentencere := regexp.MustCompile(`((?m).*?[\.\!\?\:]['"”’“…]?\s*)`)
+	sentencere := regexp.MustCompile(`((?ms).*?[\.\!\?\:]['"”’“…]?\s*)`)
 
-	// Part 2 of hacky way of setting innerhtml of a textnode by double escaping everything, and deescaping once afterwards
-	newAttr := []html.Attribute{}
-	for _, a := range node.Attr {
-		a.Key = html.EscapeString(a.Key)
-		a.Val = html.EscapeString(a.Val)
-		newAttr = append(newAttr, a)
+	nextNodes := []*html.Node{}
+	for c := node.FirstChild; c != nil; c = c.NextSibling {
+		nextNodes = append(nextNodes, c)
 	}
-	node.Attr = newAttr
 
 	if node.Type == html.TextNode {
 		if node.Parent.Data == "pre" {
@@ -99,20 +119,18 @@ func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
 			sentences = append(sentences, node.Data[lasti[1]:len(node.Data)])
 		}
 
-		var newhtml bytes.Buffer
-
 		for _, sentence := range sentences {
 			if strings.TrimSpace(sentence) != "" {
-				newhtml.WriteString(fmt.Sprintf(`<span class="koboSpan" id="kobo.%v.%v">%s</span>`, *paragraph, *segment, html.EscapeString(sentence)))
+				node.Parent.InsertBefore(createSpan(*paragraph, *segment, sentence), node)
 				*segment++
 			}
 		}
 
-		// Part 1 of hacky way of setting innerhtml of a textnode by double escaping everything, and deescaping once afterwards
-		node.Data = newhtml.String()
+		node.Parent.RemoveChild(node)
 
 		return
 	}
+
 	if node.Type != html.ElementNode {
 		return
 	}
@@ -123,7 +141,8 @@ func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
 		*segment = 0
 		*paragraph++
 	}
-	for c := node.FirstChild; c != nil; c = c.NextSibling {
+
+	for _, c := range nextNodes {
 		addSpansToNode(c, paragraph, segment)
 	}
 }
@@ -217,9 +236,6 @@ func process(content *string) error {
 	if err != nil {
 		return err
 	}
-
-	// Part 3 of hacky way of setting innerhtml of a textnode by double escaping everything, and deescaping once afterwards. Must be done before further html processing
-	h = html.UnescapeString(h)
 
 	if err := openSelfClosingPs(&h); err != nil {
 		return err
