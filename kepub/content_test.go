@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/net/html"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,12 +62,14 @@ func TestAddSpans(t *testing.T) {
 	nh, err := doc.Html()
 	assert.Nil(t, err, "err should be nil")
 
+	nh = html.UnescapeString(nh)
+
 	hs := sha256.New()
 	hs.Write([]byte(nh))
 
 	hxs := fmt.Sprintf("%x", hs.Sum(nil))
 
-	assert.Equal(t, "4ceea1bd4124d51902ba7f220046a0bd9d706cd9afa2343b60d8344231ea248e", hxs, "hash of content should be equal if processed correctly")
+	assert.Equal(t, "ae78fe3c38c263e2ad43879cb6c2eaf3c0e8dafdf1fdf877bff449f2c2c44eee", hxs, "hash of content should be equal if processed correctly")
 }
 
 func TestAddDivs(t *testing.T) {
