@@ -34,34 +34,40 @@ func cleanFiles(basepath string) error {
 }
 
 // processOPF cleans up extra calibre metadata from the content.opf file, and adds a reference to the cover image.
-func processOPF(opftext *string) error {
+func processOPF(opfText *string) error {
 	opf := etree.NewDocument()
-	err := opf.ReadFromString(*opftext)
+	err := opf.ReadFromString(*opfText)
 	if err != nil {
 		return err
 	}
 
-	for _, e := range opf.FindElements("//meta[@name='cover']") {
-		coverid := e.SelectAttrValue("content", "")
-		if coverid == "" {
-			coverid = "cover"
+	// Add properties="cover-image" to cover file item entry to enable the kobo
+	// to find the cover image.
+	for _, meta := range opf.FindElements("//meta[@name='cover']") {
+		coverID := meta.SelectAttrValue("content", "")
+		if coverID == "" {
+			coverID = "cover"
 		}
-		for _, f := range opf.FindElements("//[@id='" + coverid + "']") {
-			f.CreateAttr("properties", "cover-image")
+		for _, item := range opf.FindElements("//[@id='" + coverID + "']") {
+			item.CreateAttr("properties", "cover-image")
 		}
 	}
 
-	for _, e := range opf.FindElements("//meta[@name='calibre:timestamp']") {
-		e.Parent().RemoveChild(e)
+	// Remove calibre:timestamp
+	for _, meta := range opf.FindElements("//meta[@name='calibre:timestamp']") {
+		meta.Parent().RemoveChild(meta)
 	}
 
-	for _, e := range opf.FindElements("//dc:contributor[@role='bkp']") {
-		e.Parent().RemoveChild(e)
+	// Remove calibre contributor tag
+	for _, contributor := range opf.FindElements("//dc:contributor[@role='bkp']") {
+		contributor.Parent().RemoveChild(contributor)
 	}
 
+	// Pretty print OPF
 	opf.Indent(4)
 
-	*opftext, err = opf.WriteToString()
+	// Write OPF
+	*opfText, err = opf.WriteToString()
 	if err != nil {
 		return err
 	}
@@ -71,17 +77,21 @@ func processOPF(opftext *string) error {
 
 // addDivs adds kobo divs.
 func addDivs(doc *goquery.Document) error {
+	// If there are more divs than ps, divs are probably being used as paragraphs, and adding the kobo divs will most likely break the book.
 	if len(doc.Find("div").Nodes) > len(doc.Find("p").Nodes) {
-		// If there are more divs than ps, divs are probably being used as paragraphs, and adding the kobo divs will most likely break the book.
 		return nil
 	}
+
+	// Add the kobo divs
 	doc.Find("body>*").WrapAllHtml(`<div class="book-inner"></div>`)
 	doc.Find("body>*").WrapAllHtml(`<div class="book-columns"></div>`)
+
 	return nil
 }
 
 // createSpan creates a Kobo span
 func createSpan(paragraph, segment int, text string) *html.Node {
+	// Create the span
 	span := &html.Node{
 		Type: html.ElementNode,
 		Data: "span",
@@ -97,6 +107,7 @@ func createSpan(paragraph, segment int, text string) *html.Node {
 		},
 	}
 
+	// Add the text
 	span.AppendChild(&html.Node{
 		Type: html.TextNode,
 		Data: text,
