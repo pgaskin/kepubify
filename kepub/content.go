@@ -36,10 +36,11 @@ func cleanOPF(opftext *string) error {
 
 	for _, e := range opf.FindElements("//meta[@name='cover']") {
 		coverid := e.SelectAttrValue("content", "")
-		if coverid != "" {
-			*opftext = strings.Replace(*opftext, `id="`+coverid+`"`, `id="`+coverid+`" properties="cover-image"`, -1)
-		} else {
-			*opftext = strings.Replace(*opftext, `id="cover"`, `id="cover" properties="cover-image"`, -1)
+		if coverid == "" {
+			coverid = "cover"
+		}
+		for _, f := range opf.FindElements("//[@id='" + coverid + "']") {
+			f.CreateAttr("properties", "cover-image")
 		}
 	}
 
