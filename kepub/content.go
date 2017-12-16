@@ -28,12 +28,6 @@ func cleanFiles(basepath string) error {
 
 // cleanOPF cleans up extra calibre metadata from the content.opf file
 func cleanOPF(opftext *string) error {
-	calibreTimestampRe := regexp.MustCompile(`<meta\s+name="calibre:timestamp"\s+content=".+"\s*\/>`)
-	*opftext = calibreTimestampRe.ReplaceAllString(*opftext, "")
-
-	calibreContributorRe := regexp.MustCompile(`<dc:contributor\s+opf:role="bkp"\s*>calibre .+<\/dc:contributor>`)
-	*opftext = calibreContributorRe.ReplaceAllString(*opftext, "")
-
 	opf := etree.NewDocument()
 	err := opf.ReadFromString(*opftext)
 	if err != nil {
@@ -48,6 +42,22 @@ func cleanOPF(opftext *string) error {
 			*opftext = strings.Replace(*opftext, `id="cover"`, `id="cover" properties="cover-image"`, -1)
 		}
 	}
+
+	for _, e := range opf.FindElements("//meta[@name='calibre:timestamp']") {
+		e.Parent().RemoveChild(e)
+	}
+
+	for _, e := range opf.FindElements("//dc:contributor[@role='bkp']") {
+		e.Parent().RemoveChild(e)
+	}
+
+	opf.Indent(4)
+
+	*opftext, err = opf.WriteToString()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
