@@ -148,7 +148,7 @@ func TestProcess(t *testing.T) {
 	assert.Equal(t, "3abc0810906b322e3860b3d7fd1bafd5133a4a66ced286497eaafb40c94612fd", hxs, "hash of content should be equal if processed correctly")
 }
 
-func TestCleanOPF(t *testing.T) {
+func TestProcessOPF(t *testing.T) {
 	opf := `<?xml version='1.0' encoding='utf-8'?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uuid_id">
 	<metadata xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata" xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -176,7 +176,7 @@ func TestCleanOPF(t *testing.T) {
 		<itemref idref="p1"/>
 	</spine>
 </package>`
-	cleanOPF(&opf)
+	processOPF(&opf)
 
 	assert.Equal(t, "<?xml version='1.0' encoding='utf-8'?>\n<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"2.0\" unique-identifier=\"uuid_id\">\n    <metadata xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:opf=\"http://www.idpf.org/2007/opf\" xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:calibre=\"http://calibre.kovidgoyal.net/2009/metadata\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n        <dc:publisher>Patrick G</dc:publisher>\n        <dc:description>&lt;p&gt;This is a test book for &lt;i&gt;kepubify&lt;/i&gt;.&lt;/p&gt;</dc:description>\n        <meta name=\"calibre:series\" content=\"Test Series\"/>\n        <meta name=\"calibre:series_index\" content=\"1\"/>\n        <dc:language>en</dc:language>\n        <dc:creator opf:role=\"aut\">Patrick G</dc:creator>\n        <dc:title>epubtool Test Book 1</dc:title>\n        <meta name=\"cover\" content=\"cover\"/>\n        <dc:date>2017-07-26T14:00:00+00:00</dc:date>\n        <dc:identifier id=\"uuid_id\" opf:scheme=\"uuid\">cf8fd6fa-3998-4e25-bfc0-8e9b529f8556</dc:identifier>\n    </metadata>\n    <manifest>\n        <item href=\"cover.jpeg\" id=\"cover\" media-type=\"image/jpeg\" properties=\"cover-image\"/>\n        <item href=\"title.html\" id=\"p0\" media-type=\"application/xhtml+xml\"/>\n        <item href=\"text01.html\" id=\"p1\" media-type=\"application/xhtml+xml\"/>\n        <item href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\" id=\"ncx\"/>\n    </manifest>\n    <spine toc=\"ncx\">\n        <itemref idref=\"p0\"/>\n        <itemref idref=\"p1\"/>\n    </spine>\n</package>\n", opf, "should be equal if cleaned correctly")
 }

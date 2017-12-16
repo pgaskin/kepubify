@@ -26,8 +26,8 @@ func cleanFiles(basepath string) error {
 	return nil
 }
 
-// cleanOPF cleans up extra calibre metadata from the content.opf file
-func cleanOPF(opftext *string) error {
+// processOPF cleans up extra calibre metadata from the content.opf file, and adds a reference to the cover image.
+func processOPF(opftext *string) error {
 	opf := etree.NewDocument()
 	err := opf.ReadFromString(*opftext)
 	if err != nil {

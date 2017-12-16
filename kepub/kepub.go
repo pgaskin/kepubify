@@ -140,7 +140,7 @@ func Kepubify(src, dest string, printlog bool) error {
 
 	opf := string(buf)
 
-	err = cleanOPF(&opf)
+	err = processOPF(&opf)
 	if err != nil {
 		return fmt.Errorf("Error cleaning content.opf: %s", err)
 	}
