@@ -16,36 +16,39 @@ import (
 
 // Kepubify converts a .epub into a .kepub.epub
 func Kepubify(src, dest string, printlog bool) error {
+	defer func() {
+		if printlog {
+			fmt.Printf("\n")
+		}
+	}()
+
 	td, err := ioutil.TempDir("", "kepubify")
 	if err != nil {
-		return fmt.Errorf("Could not create temp dir: %s", err)
+		return fmt.Errorf("could not create temp dir: %s", err)
 	}
 	defer os.RemoveAll(td)
 
 	if printlog {
-		fmt.Println("Unpacking ePub.")
+		fmt.Printf("Unpacking ePub")
 	}
 	UnpackEPUB(src, td, true)
-	if printlog {
-		fmt.Println()
-	}
 
 	a, err := zglob.Glob(filepath.Join(td, "**", "*.html"))
 	if err != nil {
-		return fmt.Errorf("Could not create find content files: %s", err)
+		return fmt.Errorf("could not create find content files: %s", err)
 	}
 	b, err := zglob.Glob(filepath.Join(td, "**", "*.xhtml"))
 	if err != nil {
-		return fmt.Errorf("Could not create find content files: %s", err)
+		return fmt.Errorf("could not create find content files: %s", err)
 	}
 	c, err := zglob.Glob(filepath.Join(td, "**", "*.htm"))
 	if err != nil {
-		return fmt.Errorf("Could not create find content files: %s", err)
+		return fmt.Errorf("could not create find content files: %s", err)
 	}
 	contentfiles := append(append(a, b...), c...)
 
 	if printlog {
-		fmt.Printf("Processing %v content files.\n", len(contentfiles))
+		fmt.Printf("\rProcessing %v content files              \n", len(contentfiles))
 	}
 
 	var bar *pb.ProgressBar
@@ -57,6 +60,11 @@ func Kepubify(src, dest string, printlog bool) error {
 		bar.Format("[=> ]")
 		bar.Start()
 	}
+	defer func() {
+		if printlog && bar != nil {
+			bar.Finish()
+		}
+	}()
 
 	runtime.GOMAXPROCS(runtime.NumCPU() + 1)
 	wg := sync.WaitGroup{}
@@ -98,31 +106,24 @@ func Kepubify(src, dest string, printlog bool) error {
 	}
 	wg.Wait()
 	if len(cerr) > 0 {
-		if printlog {
-			bar.Finish()
-		}
-		fmt.Println()
 		return <-cerr
 	}
 
 	if printlog {
 		bar.Finish()
-		fmt.Println()
-
-		fmt.Println("Cleaning content.opf.")
-		fmt.Println()
+		fmt.Printf("\rCleaning content.opf              ")
 	}
 
 	rsk, err := os.Open(filepath.Join(td, "META-INF", "container.xml"))
 	if err != nil {
-		return fmt.Errorf("Error parsing container.xml: %s", err)
+		return fmt.Errorf("error opening container.xml: %s", err)
 	}
 	defer rsk.Close()
 
 	container := etree.NewDocument()
 	_, err = container.ReadFrom(rsk)
 	if err != nil {
-		return fmt.Errorf("Error parsing container.xml: %s", err)
+		return fmt.Errorf("error parsing container.xml: %s", err)
 	}
 
 	rootfile := ""
@@ -130,35 +131,33 @@ func Kepubify(src, dest string, printlog bool) error {
 		rootfile = e.SelectAttrValue("full-path", "")
 	}
 	if rootfile == "" {
-		return fmt.Errorf("Error parsing container.xml")
+		return fmt.Errorf("error parsing container.xml")
 	}
 
 	buf, err := ioutil.ReadFile(filepath.Join(td, rootfile))
 	if err != nil {
-		return fmt.Errorf("Error parsing content.opf: %s", err)
+		return fmt.Errorf("error parsing content.opf: %s", err)
 	}
 
 	opf := string(buf)
 
 	err = processOPF(&opf)
 	if err != nil {
-		return fmt.Errorf("Error cleaning content.opf: %s", err)
+		return fmt.Errorf("error cleaning content.opf: %s", err)
 	}
 
 	err = ioutil.WriteFile(filepath.Join(td, rootfile), []byte(opf), 0644)
 	if err != nil {
-		return fmt.Errorf("Error writing new content.opf: %s", err)
+		return fmt.Errorf("error writing new content.opf: %s", err)
 	}
 
 	if printlog {
-		fmt.Println("Cleaning epub files.")
-		fmt.Println()
+		fmt.Printf("\rCleaning epub files             ")
 	}
 	cleanFiles(td)
 
 	if printlog {
-		fmt.Println("Packing ePub.")
-		fmt.Println()
+		fmt.Printf("\rPacking ePub                    ")
 	}
 	PackEPUB(td, dest, true)
 	return nil

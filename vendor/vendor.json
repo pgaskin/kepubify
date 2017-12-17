@@ -127,12 +127,6 @@
 			"path": "golang.org/x/tools/godoc/vfs/zipfs",
 			"revision": "9bd2f442688b66c5289262d70f537c2ecf81d7de",
 			"revisionTime": "2017-10-07T19:42:05Z"
-		},
-		{
-			"checksumSHA1": "Yx1MU40fyGe7hhqW9+dkv8kXa60=",
-			"path": "gopkg.in/urfave/cli.v1",
-			"revision": "cfb38830724cc34fedffe9a2a29fb54fa9169cd1",
-			"revisionTime": "2017-08-11T01:42:03Z"
 		}
 	],
 	"rootPath": "github.com/geek1011/kepubify"
