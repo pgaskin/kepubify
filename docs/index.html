@@ -88,18 +88,21 @@
         <div class="name">Usage</div>
         <div class="text">
             <pre>
-    USAGE: kepubify INPUT_PATH [OUTPUT_PATH]
+USAGE: kepubify INPUT_PATH [OUTPUT_PATH]
     
-    INPUT_PATH:
-        The input file or directory. If it is a directory,
-        OUTPUT_PATH must be a nonexistent directory.
-    
-    OUTPUT_PATH:
-        The path to place the converted ebook(s). Can only
-        be a directory if INPUT_PATH is a directory.
-    
-        By default, this is the basename of the input file, 
-        with the extension .kepub.epub</pre>
+INPUT_PATH:
+    The input file or directory.
+ 
+ OUTPUT_PATH:
+    The path to place the converted ebook(s). This path must not exist
+    already.
+ 
+    By default, for a file input, this is the basename of the input file, 
+    with the extension .kepub.epub. For a directory input, this is the 
+    directory name, with the suffix _converted.
+ 
+ The full documentation is available at:
+    https://geek1011.github.io/kepubify</pre>
         </div>
     </div>
     <div class="section">

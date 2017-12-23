@@ -18,15 +18,15 @@ var helpText = `USAGE: kepubify INPUT_PATH [OUTPUT_PATH]
 VERSION: {{.Version}}
 
 INPUT_PATH:
-   The input file or directory. If it is a directory,
-   OUTPUT_PATH must be a nonexistent directory.
+   The input file or directory.
 
 OUTPUT_PATH:
-   The path to place the converted ebook(s). Can only
-   be a directory if INPUT_PATH is a directory.
+   The path to place the converted ebook(s). This path must not exist
+   already.
 
-   By default, this is the basename of the input file, 
-   with the extension .kepub.epub
+   By default, for a file input, this is the basename of the input file, 
+   with the extension .kepub.epub. For a directory input, this is the 
+   directory name, with the suffix _converted.
 
 The full documentation is available at:
    https://geek1011.github.io/kepubify
@@ -102,7 +102,65 @@ func main() {
 				errExit("Input file must end with .epub. See kepubify --help for more details.\n")
 			}
 		} else if isDir(src) {
-			errExit("To batch convert, a second argument must be supplied with an output dir. See kepubify --help for more details.\n")
+			dest := fmt.Sprintf("%s_converted", filepath.Base(src))
+
+			if !exists(dest) {
+				err := os.Mkdir(dest, os.ModePerm)
+				if err != nil {
+					errExit("Error creating output dir: %s\n", err)
+				}
+			}
+
+			lst, err := zglob.Glob(filepath.Join(src, "**", "*.epub"))
+			if err != nil {
+				errExit("Error searching for epubs in input dir: %s\n", err)
+			}
+
+			epubs := []string{}
+			for _, f := range lst {
+				if !strings.HasSuffix(f, ".kepub.epub") {
+					epubs = append(epubs, f)
+				}
+			}
+
+			fmt.Printf("%v books found\n", len(epubs))
+
+			errs := map[string]error{}
+			for i, epub := range epubs {
+				rel, err := filepath.Rel(src, epub)
+				if err != nil {
+					fmt.Printf("[%v/%v] Error resolving relative path of %s: %v\n", i+1, len(epubs), epub, err)
+					errs[epub] = err
+					continue
+				}
+
+				err = os.MkdirAll(filepath.Join(dest, filepath.Dir(rel)), os.ModePerm)
+				if err != nil {
+					fmt.Printf("[%v/%v] Error creating output dir for %s: %v\n", i+1, len(epubs), epub, err)
+					errs[rel] = err
+					continue
+				}
+
+				outfile := fmt.Sprintf("%s.kepub.epub", filepath.Join(dest, strings.Replace(rel, ".epub", "", -1)))
+				fmt.Printf("[%v/%v] Converting %s\n", i+1, len(epubs), rel)
+
+				err = kepub.Kepubify(epub, outfile, false)
+				if err != nil {
+					fmt.Printf("[%v/%v] Error converting %s: %v\n", i+1, len(epubs), rel, err)
+					errs[rel] = err
+					continue
+				}
+			}
+
+			fmt.Printf("\nSucessfully converted %v of %v ebooks\n", len(epubs)-len(errs), len(epubs))
+			if len(errs) > 0 {
+				fmt.Printf("Errors:\n")
+				for epub, err := range errs {
+					fmt.Printf("%s: %v\n", epub, err)
+				}
+			}
+
+			os.Exit(0)
 		} else if !exists(src) {
 			errExit("Input file '%s' does not exist.\n", src)
 		} else {
@@ -123,34 +181,38 @@ func main() {
 		}
 
 		if isFile(src) {
-			if strings.HasSuffix(src, ".kepub.epub") {
-				errExit("Input file is already a kepub.\n")
-			} else if strings.HasSuffix(src, ".epub") {
-				if isDir(dest) {
-					dest = filepath.Join(dest, fmt.Sprintf("%s.kepub.epub", strings.Replace(filepath.Base(src), ".epub", "", -1)))
-
-					fmt.Printf("Converting '%s' to '%s'\n\n", os.Args[1], dest)
-
-					err = kepub.Kepubify(src, dest, true)
-					if err != nil {
-						errExit("Error converting file: %v\n", err)
-					}
-
-					msgExit("\nSuccessfully converted '%s' to '%s'\n", os.Args[1], dest)
-				} else if strings.HasSuffix(dest, ".kepub.epub") {
-					fmt.Printf("Converting '%s' to '%s'\n\n", os.Args[1], os.Args[2])
-
-					err = kepub.Kepubify(src, dest, true)
-					if err != nil {
-						errExit("Error converting file: %v\n", err)
-					}
-
-					msgExit("\nSuccessfully converted '%s' to '%s'\n", os.Args[1], os.Args[2])
-				} else {
-					errExit("Output file must end with .kepub.epub. See kepubify --help for more details.\n")
-				}
+			if exists(dest) {
+				errExit("Output must not already exist. See kepubify --help for more details.\n\n")
 			} else {
-				errExit("Input file must end with .epub. See kepubify --help for more details.\n")
+				if strings.HasSuffix(src, ".kepub.epub") {
+					errExit("Input file is already a kepub.\n")
+				} else if strings.HasSuffix(src, ".epub") {
+					if isDir(dest) {
+						dest = filepath.Join(dest, fmt.Sprintf("%s.kepub.epub", strings.Replace(filepath.Base(src), ".epub", "", -1)))
+
+						fmt.Printf("Converting '%s' to '%s'\n\n", os.Args[1], dest)
+
+						err = kepub.Kepubify(src, dest, true)
+						if err != nil {
+							errExit("Error converting file: %v\n", err)
+						}
+
+						msgExit("\nSuccessfully converted '%s' to '%s'\n", os.Args[1], dest)
+					} else if strings.HasSuffix(dest, ".kepub.epub") {
+						fmt.Printf("Converting '%s' to '%s'\n\n", os.Args[1], os.Args[2])
+
+						err = kepub.Kepubify(src, dest, true)
+						if err != nil {
+							errExit("Error converting file: %v\n", err)
+						}
+
+						msgExit("\nSuccessfully converted '%s' to '%s'\n", os.Args[1], os.Args[2])
+					} else {
+						errExit("Output file must end with .kepub.epub. See kepubify --help for more details.\n")
+					}
+				} else {
+					errExit("Input file must end with .epub. See kepubify --help for more details.\n")
+				}
 			}
 		} else if isDir(src) {
 			if !exists(dest) || isEmptyDir(dest) {
