@@ -127,6 +127,12 @@ OUTPUT_PATH:
             </p>
 
             <p>
+                <b>To convert a folder of books by dragging and dropping on Windows</b>:
+                <br>Just drag the folder over
+                <tt>kepubify.exe</tt>. The resulting file will be saved to the same directory as the originals, but with the suffix <tt>_converted</tt>.
+            </p>
+
+            <p>
                 <b>To convert a single book</b>:
                 <br>
                 <tt>kepubify /path/to/the/book.epub</tt>
@@ -149,6 +155,14 @@ OUTPUT_PATH:
 
             <p>
                 <b>To batch convert a whole directory of ebooks</b>:
+                <br>
+                <tt>kepubify /path/to/the/books/</tt>
+                <br>The converted books will be saved to the original dir with the suffix <tt>_converted</tt> (e.g. /path/to/the/books_converted).The directory structure of the source
+                is preserved in the output.
+            </p>
+
+            <p>
+                <b>To batch convert a whole directory of ebooks with a different output folder</b>:
                 <br>
                 <tt>kepubify /path/to/the/books/ /path/to/output/the/converted/books</tt>
                 <br>The output directory must not exist, as it will be created by kepubify. The directory structure of the source
