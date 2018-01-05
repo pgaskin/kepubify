@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/net/html"
-
 	"github.com/PuerkitoBio/goquery"
 	"github.com/stretchr/testify/assert"
 )
@@ -63,8 +61,6 @@ func TestAddSpans(t *testing.T) {
 
 	nh, err := doc.Html()
 	assert.Nil(t, err, "err should be nil")
-
-	nh = html.UnescapeString(nh)
 
 	hs := sha256.New()
 	hs.Write([]byte(nh))
@@ -179,4 +175,50 @@ func TestProcessOPF(t *testing.T) {
 	processOPF(&opf)
 
 	assert.Equal(t, "<?xml version='1.0' encoding='utf-8'?>\n<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"2.0\" unique-identifier=\"uuid_id\">\n    <metadata xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:opf=\"http://www.idpf.org/2007/opf\" xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:calibre=\"http://calibre.kovidgoyal.net/2009/metadata\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n        <dc:publisher>Patrick G</dc:publisher>\n        <dc:description>&lt;p&gt;This is a test book for &lt;i&gt;kepubify&lt;/i&gt;.&lt;/p&gt;</dc:description>\n        <meta name=\"calibre:series\" content=\"Test Series\"/>\n        <meta name=\"calibre:series_index\" content=\"1\"/>\n        <dc:language>en</dc:language>\n        <dc:creator opf:role=\"aut\">Patrick G</dc:creator>\n        <dc:title>epubtool Test Book 1</dc:title>\n        <meta name=\"cover\" content=\"cover\"/>\n        <dc:date>2017-07-26T14:00:00+00:00</dc:date>\n        <dc:identifier id=\"uuid_id\" opf:scheme=\"uuid\">cf8fd6fa-3998-4e25-bfc0-8e9b529f8556</dc:identifier>\n    </metadata>\n    <manifest>\n        <item href=\"cover.jpeg\" id=\"cover\" media-type=\"image/jpeg\" properties=\"cover-image\"/>\n        <item href=\"title.html\" id=\"p0\" media-type=\"application/xhtml+xml\"/>\n        <item href=\"text01.html\" id=\"p1\" media-type=\"application/xhtml+xml\"/>\n        <item href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\" id=\"ncx\"/>\n    </manifest>\n    <spine toc=\"ncx\">\n        <itemref idref=\"p0\"/>\n        <itemref idref=\"p1\"/>\n    </spine>\n</package>\n", opf, "should be equal if cleaned correctly")
+}
+
+func TestSpans(t *testing.T) {
+	cases := []struct {
+		Message string
+		In      string
+		Out     string
+	}{
+		{
+			"should add a span to text",
+			"test",
+			"<span class=\"koboSpan\" id=\"kobo.0.1\">test</span>",
+		},
+		{
+			"should add a span to text in a paragraph",
+			"<p>test</p>",
+			"<p><span class=\"koboSpan\" id=\"kobo.1.1\">test</span></p>",
+		},
+		{
+			"should add a span to text in between elements",
+			"<p>test <b>test test</b> test</p>",
+			"<p><span class=\"koboSpan\" id=\"kobo.1.1\">test </span><b><span class=\"koboSpan\" id=\"kobo.1.3\">test test</span></b><span class=\"koboSpan\" id=\"kobo.1.5\"> test</span></p>",
+		},
+		{
+			"should not add a span to an empty element",
+			"<p>test <b></b> test</p>",
+			"<p><span class=\"koboSpan\" id=\"kobo.1.1\">test </span><b></b><span class=\"koboSpan\" id=\"kobo.1.3\"> test</span></p>",
+		},
+		{
+			"should preserve an element with only whitespace (issue #14)",
+			"<p>test<b> </b>test</p>",
+			"<p><span class=\"koboSpan\" id=\"kobo.1.1\">test</span><b><span class=\"koboSpan\" id=\"kobo.1.3\"> </span></b><span class=\"koboSpan\" id=\"kobo.1.5\">test</span></p>",
+		},
+	}
+
+	for _, c := range cases {
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><head></head><body>" + c.In + "</body></html>"))
+		assert.Nil(t, err, "should not err when parsing")
+
+		addSpans(doc)
+
+		nh, err := doc.Html()
+		assert.Nil(t, err, "should not err when writing output")
+
+		assert.Equal(t, "<html><head></head><body>"+c.Out+"</body></html>", nh, c.Message)
+	}
 }

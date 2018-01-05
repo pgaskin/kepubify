@@ -130,6 +130,7 @@ func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
 			// Do not add spans to pre elements
 			return
 		}
+
 		*segment++
 
 		sentencesindexes := sentencere.FindAllStringIndex(node.Data, -1)
@@ -148,8 +149,9 @@ func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
 			sentences = append(sentences, node.Data[lasti[1]:len(node.Data)])
 		}
 
-		for _, sentence := range sentences {
-			if strings.TrimSpace(sentence) != "" {
+		for i, sentence := range sentences {
+			// if only 1 space, don't remove the element (issue #14)
+			if (i == 0 && node.Data == " ") || strings.TrimSpace(sentence) != "" {
 				node.Parent.InsertBefore(createSpan(*paragraph, *segment, sentence), node)
 				*segment++
 			}
