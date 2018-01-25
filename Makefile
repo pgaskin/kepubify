@@ -25,9 +25,5 @@ test:
 .PHONY: build
 build:
 	mkdir -p build
-	go build -ldflags "-X main.version=dev" -o "build/kepubify"
-	go build -ldflags "-X main.version=dev" -o "build/seriesmeta"
-
-.PHONY: install
-install:
-	go install
+	go build -ldflags "-X main.version=$(shell git describe --tags --always)" -o "build/kepubify"
+	go build -ldflags "-X main.version=$(shell git describe --tags --always)" -o "build/seriesmeta"
