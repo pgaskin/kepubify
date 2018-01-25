@@ -235,7 +235,8 @@ func cleanHTML(doc *goquery.Document) error {
 
 	// Remove empty headings
 	doc.Find(`h1,h2,h3,h4,h5,h6`).FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return strings.Trim(s.Text(), "\t \n") == ""
+		h, _ := s.Html()
+		return strings.Trim(h, "\t \n") == ""
 	}).Remove()
 
 	// Remove MS <st1:whatever> tags
