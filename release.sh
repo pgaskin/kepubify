@@ -28,6 +28,9 @@ fi
 echo "APP_VERSION: $APP_VERSION"
 
 echo "## Changelog" | tee -a build/release-notes.md
+if [[ -f "./docs/notes/$APP_VERSION.md" ]]; then
+    cat "./docs/notes/$APP_VERSION.md" | tee -a build/release-notes.md
+fi
 if [[ "$NO_TAGS" == "true" ]]; then
     echo "$(git log --oneline)" | tee -a build/release-notes.md
 else
