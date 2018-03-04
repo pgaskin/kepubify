@@ -26,4 +26,4 @@ test:
 build:
 	mkdir -p build
 	go build -ldflags "-X main.version=$(shell git describe --tags --always)" -o "build/kepubify"
-	go build -ldflags "-X main.version=$(shell git describe --tags --always)" -o "build/seriesmeta"
+	go build -ldflags "-X main.version=$(shell git describe --tags --always)" -o "build/seriesmeta" ./seriesmeta
