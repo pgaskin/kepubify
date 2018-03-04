@@ -8,20 +8,38 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/briandowns/spinner"
+	"github.com/beevik/etree"
 	"github.com/mattn/go-zglob"
-
 	"golang.org/x/tools/godoc/vfs/zipfs"
 
-	"github.com/beevik/etree"
+	"github.com/ogier/pflag"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var version = "dev"
+
+func helpExit() {
+	fmt.Fprintf(os.Stderr, "Usage: seriesmeta [OPTIONS] KOBO_PATH\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
+	pflag.PrintDefaults()
+	fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader.\n")
+	if runtime.GOOS == "windows" {
+		time.Sleep(time.Second * 2)
+	}
+	os.Exit(1)
+}
+
+func errExit() {
+	if runtime.GOOS == "windows" {
+		time.Sleep(time.Second * 2)
+	}
+	os.Exit(1)
+}
 
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
@@ -43,15 +61,9 @@ func copyFile(src, dst string) error {
 	return out.Close()
 }
 
-func pathToContentID(koboPath, path string) (imageID string, err error) {
-	relPath, err := filepath.Rel(koboPath, path)
-	if err != nil {
-		return "", fmt.Errorf("could not get relative path to file: %v", err)
-	}
-
-	contentID := fmt.Sprintf("file:///mnt/onboard/%s", relPath)
-
-	return contentID, nil
+// pathToContentID gets the content ID for a book. The path needs to be relative to the root of the kobo.
+func pathToContentID(relpath string) string {
+	return fmt.Sprintf("file:///mnt/onboard/%s", relpath)
 }
 
 func contentIDToImageID(contentID string) string {
@@ -65,23 +77,7 @@ func contentIDToImageID(contentID string) string {
 	return imageID
 }
 
-func updateSeriesMeta(db *sql.DB, imageID, series string, seriesNumber float64) (int64, error) {
-	res, err := db.Exec("UPDATE content SET Series=?, SeriesNumber=? WHERE ImageID=?", sql.NullString{
-		String: series,
-		Valid:  series != "",
-	}, sql.NullString{
-		String: fmt.Sprintf("%v", seriesNumber),
-		Valid:  seriesNumber > 0,
-	}, imageID)
-
-	if err != nil {
-		return 0, err
-	}
-
-	return res.RowsAffected()
-}
-
-func getEPUBMeta(path string) (string, float64, error) {
+func getMeta(path string) (string, float64, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
 		return "", 0, err
@@ -139,148 +135,123 @@ func getEPUBMeta(path string) (string, float64, error) {
 	return series, seriesNumber, nil
 }
 
-func updateSeriesMetaFromEPUB(s *spinner.Spinner, db *sql.DB, koboPath, epubPath string) (int64, error) {
-	series, seriesNumber, err := getEPUBMeta(epubPath)
-	if err != nil {
-		return 0, err
-	}
-
-	cid, err := pathToContentID(koboPath, epubPath)
-	if err != nil {
-		return 0, err
-	}
-
-	iid := contentIDToImageID(cid)
-
-	if s != nil {
-		s.Suffix = fmt.Sprintf(" UPDATE %s => [%s %v]\n", iid, series, seriesNumber)
-	} else {
-		fmt.Printf("INFO: UPDATE %s => [%s %v]\n", iid, series, seriesNumber)
-	}
-
-	return updateSeriesMeta(db, iid, series, seriesNumber)
-}
-
-func loadKoboDB(koboPath string) (*sql.DB, error) {
-	koboDBPath := filepath.Join(koboPath, ".kobo/KoboReader.sqlite")
-	koboDBBackupPath := filepath.Join(koboPath, "KoboReader.sqlite.bak")
-
-	if _, err := os.Stat(koboDBPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("Kobo database %s does not exist", koboDBPath)
-	}
-
-	copyFile(koboDBPath, koboDBBackupPath)
-
-	return sql.Open("sqlite3", koboDBPath)
-}
-
 func main() {
-	if len(os.Args) < 2 || len(os.Args) > 3 {
-		fmt.Printf("USAGE: %s KOBO_ROOT_PATH [EPUB_PATH]\n", filepath.Base(os.Args[0]))
-		os.Exit(1)
+	help := pflag.BoolP("help", "h", false, "Show this help message")
+	pflag.Parse()
+
+	if *help || pflag.NArg() != 1 {
+		helpExit()
 	}
 
-	koboPath, err := filepath.Abs(os.Args[1])
+	log := func(format string, a ...interface{}) {
+		fmt.Printf(format, a...)
+	}
+
+	logE := func(format string, a ...interface{}) {
+		fmt.Fprintf(os.Stderr, format, a...)
+	}
+
+	kpath, err := filepath.Abs(pflag.Args()[0])
 	if err != nil {
-		fmt.Printf("FATAL: Could resolve Kobo path %s: %v\n", os.Args[1], err)
-		os.Exit(1)
+		logE("Fatal: Could not resolve path to kobo\n")
+		errExit()
 	}
 
-	if _, err := os.Stat(filepath.Join(koboPath, ".kobo")); os.IsNotExist(err) {
-		fmt.Printf("FATAL: %s is not a valid path to a Kobo eReader.\n", os.Args[1])
-		fmt.Printf("USAGE: %s KOBO_ROOT_PATH [EPUB_PATH]\n", filepath.Base(os.Args[0]))
-		os.Exit(1)
+	kpath = strings.Replace(kpath, ".kobo", "", 1)
+
+	log("Looking for kobo at '%s'\n", kpath)
+
+	dbpath := filepath.Join(kpath, ".kobo", "KoboReader.sqlite")
+	_, err = os.Stat(dbpath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logE("Fatal: '%s' is not a kobo eReader (it does not contain .kobo/KoboReader.sqlite)\n", kpath)
+		} else if os.IsPermission(err) {
+			logE("Fatal: Could not access kobo: %v\n", err)
+		} else {
+			logE("Fatal: Error reading database: %v\n", err)
+		}
+		errExit()
 	}
 
-	if len(os.Args) == 3 {
-		epubPath, err := filepath.Abs(os.Args[2])
+	log("Making backup of KoboReader.sqlite\n")
+	err = copyFile(dbpath, dbpath+".bak")
+	if err != nil {
+		logE("Fatal: Could not make copy of KoboReader.sqlite: %v\n", err)
+		errExit()
+	}
+
+	log("Opening KoboReader.sqlite\n")
+	db, err := sql.Open("sqlite3", dbpath)
+	if err != nil {
+		logE("Fatal: Could not open KoboReader.sqlite: %v\n", err)
+		errExit()
+	}
+
+	log("Searching for sideloaded epubs and kepubs\n")
+	epubs, err := zglob.Glob(filepath.Join(kpath, "**", "*.epub"))
+	if err != nil {
+		logE("Fatal: Could not search for epubs: %v\n", err)
+		errExit()
+	}
+
+	log("\nUpdating metadata for %d books\n", len(epubs))
+	errcount := 0
+	for i, epub := range epubs {
+		rpath, err := filepath.Rel(kpath, epub)
 		if err != nil {
-			fmt.Printf("FATAL: Could resolve ePub path %s: %v\n", os.Args[2], err)
-			os.Exit(1)
+			log("[%d/%d] Updating '%s'\n", i+1, len(epubs), epub)
+			logE("  Error: could not resolve path: %v\n", err)
+			errcount++
+			continue
 		}
 
-		if !strings.HasPrefix(epubPath, koboPath) {
-			fmt.Printf("FATAL: ePub file not in the specified Kobo path.\n")
-			os.Exit(1)
+		log("[%d/%d] Updating '%s'\n", i+1, len(epubs), rpath)
+		series, seriesNumber, err := getMeta(epub)
+		if err != nil {
+			logE("  Error: could not read metadata: %v\n", err)
+			errcount++
+			continue
 		}
 
-		db, err := loadKoboDB(koboPath)
-		if err != nil {
-			fmt.Printf("FATAL: Could not open Kobo database: %v\n", err)
-			os.Exit(1)
+		if series == "" && seriesNumber == 0 {
+			log("  No series\n")
+			continue
 		}
 
-		ra, err := updateSeriesMetaFromEPUB(nil, db, koboPath, epubPath)
+		log("  Series: '%s' Number: %v\n", series, seriesNumber)
+
+		iid := contentIDToImageID(pathToContentID(rpath))
+
+		res, err := db.Exec("UPDATE content SET Series=?, SeriesNumber=? WHERE ImageID=?", sql.NullString{
+			String: series,
+			Valid:  series != "",
+		}, sql.NullString{
+			String: fmt.Sprintf("%v", seriesNumber),
+			Valid:  seriesNumber > 0,
+		}, iid)
 		if err != nil {
-			fmt.Printf("ERROR: Could not update series metadata: %v\n", err)
-			os.Exit(1)
+			logE("  Error: could not update database: %v\n", err)
+			errcount++
+			continue
+		}
+
+		ra, err := res.RowsAffected()
+		if err != nil {
+			logE("  Error: could not update database: %v\n", err)
+			errcount++
+			continue
+		}
+
+		if ra > 1 {
+			logE("  Warn: more than one match in database for ImageID\n")
 		} else if ra < 1 {
-			fmt.Printf("ERROR: Could not update series metadata: no database entry for book. Please let the kobo import the book before using this tool.\n")
-		} else if ra > 1 {
-			fmt.Printf("WARN: More than 1 match for book in database.\n")
+			logE("  Error: could not update database: no entry in database for book (the kobo may still need to import the book)\n")
+			errcount++
+			continue
 		}
-	} else {
-		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-		s.Start()
-
-		s.Suffix = " Opening Kobo database"
-		db, err := loadKoboDB(koboPath)
-		if err != nil {
-			s.Stop()
-			fmt.Printf("FATAL: Could not open Kobo database: %v\n", err)
-			os.Exit(1)
-		}
-
-		s.Suffix = " Searching for epub files"
-		matches, err := zglob.Glob(filepath.Join(koboPath, "**/*.epub"))
-		if err != nil {
-			s.Stop()
-			fmt.Printf("FATAL: Error searching for epub files: %v\n", err)
-			os.Exit(1)
-		}
-
-		s.Suffix = " Filtering epub files"
-		epubs := []string{}
-		for _, match := range matches {
-			if strings.HasPrefix(filepath.Base(match), ".") {
-				continue
-			}
-			epubs = append(epubs, match)
-		}
-
-		s.Stop()
-		fmt.Printf("INFO: Found %v epub files\n\n", len(epubs))
-		s.Start()
-
-		errcount := 0
-		for _, epub := range epubs {
-			ra, err := updateSeriesMetaFromEPUB(s, db, koboPath, epub)
-
-			b, err := filepath.Rel(koboPath, epub)
-			if err != nil {
-				b = filepath.Base(epub)
-			}
-
-			if err != nil {
-				s.Stop()
-				fmt.Printf("ERROR: Could not update series metadata for %s: %v\n", b, err)
-				s.Start()
-				errcount++
-			} else if ra < 1 {
-				s.Stop()
-				fmt.Printf("ERROR: Could not update series metadata for %s: no entry in database for book. Please let the kobo import the book before using this tool.\n", b)
-				s.Start()
-				errcount++
-			} else if ra > 1 {
-				s.Stop()
-				fmt.Printf("WARN: More than 1 match for book in database: %s.\n", b)
-				s.Start()
-			}
-		}
-
-		time.Sleep(time.Second)
-		s.Stop()
-		fmt.Println()
-		fmt.Printf("INFO: Finished updating metadata. %v books processed. %v errors.\n", len(epubs), errcount)
 	}
+
+	time.Sleep(time.Second)
+	log("\nFinished updating metadata. %v books processed. %v errors.\n", len(epubs), errcount)
 }
