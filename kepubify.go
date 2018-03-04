@@ -35,10 +35,16 @@ func errExit() {
 
 func main() {
 	help := pflag.BoolP("help", "h", false, "Show this help text")
+	sversion := pflag.Bool("version", false, "Show the version")
 	update := pflag.BoolP("update", "u", false, "Don't reconvert files which have already been converted")
 	verbose := pflag.BoolP("verbose", "v", false, "Show extra information in output")
 	output := pflag.StringP("output", "o", ".", "The directory to place the converted files")
 	pflag.Parse()
+
+	if *sversion {
+		fmt.Printf("kepubify %s\n", version)
+		os.Exit(0)
+	}
 
 	if *help || pflag.NArg() == 0 {
 		helpExit()
@@ -126,7 +132,7 @@ func main() {
 					errExit()
 				}
 
-				paths[abs] = filepath.Join(out, filepath.Base(arg) + "_converted", rel)
+				paths[abs] = filepath.Join(out, filepath.Base(arg)+"_converted", rel)
 				logV("    dir-result: %s -> %s\n", abs, paths[abs])
 			}
 		} else {
