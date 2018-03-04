@@ -126,7 +126,7 @@ func main() {
 					errExit()
 				}
 
-				paths[abs] = filepath.Join(out, rel)
+				paths[abs] = filepath.Join(out, filepath.Base(arg) + "_converted", rel)
 				logV("    dir-result: %s -> %s\n", abs, paths[abs])
 			}
 		} else {
