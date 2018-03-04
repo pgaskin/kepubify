@@ -116,10 +116,11 @@ func createSpan(paragraph, segment int, text string) *html.Node {
 	return span
 }
 
+var sentencere = regexp.MustCompile(`((?ms).*?[\.\!\?\:]['"”’“…]?\s*)`)
+var nbspre = regexp.MustCompile(`^\xa0+$`)
+
 // addSpansToNode is a recursive helper function for addSpans.
 func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
-	sentencere := regexp.MustCompile(`((?ms).*?[\.\!\?\:]['"”’“…]?\s*)`)
-
 	nextNodes := []*html.Node{}
 	for c := node.FirstChild; c != nil; c = c.NextSibling {
 		nextNodes = append(nextNodes, c)
@@ -150,8 +151,8 @@ func addSpansToNode(node *html.Node, paragraph *int, segment *int) {
 		}
 
 		for i, sentence := range sentences {
-			// if only 1 space, don't remove the element (issue #14)
-			if (i == 0 && node.Data == " ") || strings.TrimSpace(sentence) != "" {
+			// if only 1 space, don't remove the element (issue #14) (issue #21)
+			if (i == 0 && node.Data == " ") || (i == 0 && nbspre.MatchString(node.Data)) || strings.TrimSpace(sentence) != "" {
 				node.Parent.InsertBefore(createSpan(*paragraph, *segment, sentence), node)
 				*segment++
 			}
@@ -295,6 +296,9 @@ func process(content *string) error {
 	// Fix commented xml tag
 	h = strings.Replace(h, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
 	h = strings.Replace(h, `<!--?xml version="1.0" encoding="utf-8"?-->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
+
+	// Fix nbsps removed
+	h = strings.Replace(h, "\u00a0", "&nbsp;", -1)
 
 	*content = h
 

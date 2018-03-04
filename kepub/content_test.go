@@ -142,6 +142,11 @@ func TestProcess(t *testing.T) {
 	hxs := fmt.Sprintf("%x", hs.Sum(nil))
 
 	assert.Equal(t, "3abc0810906b322e3860b3d7fd1bafd5133a4a66ced286497eaafb40c94612fd", hxs, "hash of content should be equal if processed correctly")
+
+	ha := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/></head><body><p>Test&nbsp;&nbsp;Test</p><p>&nbsp;&#160;</p><p>Test</p></body></html>`
+	hax := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">Test&nbsp;&nbsp;Test</span></p><p><span class="koboSpan" id="kobo.2.1">&nbsp;&nbsp;</span></p><p><span class="koboSpan" id="kobo.3.1">Test</span></p></div></div></body></html>`
+	process(&ha)
+	assert.Equal(t, hax, ha, "should process nbsps correctly")
 }
 
 func TestProcessOPF(t *testing.T) {
