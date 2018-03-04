@@ -138,6 +138,7 @@ func main() {
 	logV("\n")
 
 	log("Kepubify %s: Converting %d books\n", version, len(paths))
+	log("Output folder: %s\n", out)
 
 	n := 0
 	errs := [][]string{}
