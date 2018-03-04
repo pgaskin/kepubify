@@ -21,3 +21,14 @@ func TestIsFile(t *testing.T) {
 	assert.False(t, isFile("sdfsdfsdf"), "sdfsdfsdf should not be a file")
 	assert.True(t, isFile("kepubify.go"), "kepubify.go should be a file")
 }
+
+func TestUniq(t *testing.T) {
+	for i, e := range map[*[]string][]string{
+		{}:                   {},
+		{"a", "b", "c"}:      {"a", "b", "c"},
+		{"a", "b", "c", "a"}: {"a", "b", "c"},
+		{"a", "a", "a"}:      {"a"},
+	} {
+		assert.Equal(t, e, uniq(*i))
+	}
+}

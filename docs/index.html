@@ -8,7 +8,7 @@
     <title>Kepubify</title>
     <link rel="stylesheet" href="style.css">
     <meta name="author" content="Patrick G">
-    <meta name="description" content="Kepubify is a epub to kepub conversion tool. Kepubify is fast, easy-to-use, and cross platform. Kepubify is written in Go, and released under the MIT license.">
+    <meta name="description" content="Kepubify is the best way to convert epubs to kepubs. Kepubify is fast, easy-to-use, and cross platform. Kepubify is written in Go, and released under the MIT license.">
 </head>
 
 <body>
@@ -87,29 +87,23 @@
     <div class="section">
         <div class="name">Usage</div>
         <div class="text">
-            <pre>
-USAGE: kepubify INPUT_PATH [OUTPUT_PATH]
-    
-INPUT_PATH:
-   The input file or directory.
+            <pre>Usage: kepubify [OPTIONS] PATH [PATH]...
 
-   For single converting, this must be an existing file with
-   the extension .epub.
-   
-   For batch converting, this must be a existing directory.
+Options:
+  -h, --help
+        Show this help text
+  -o, --output string
+        The directory to place the converted files (default ".")
+  -u, --update
+        Don't reconvert files which have already been converted
+  -v, --verbose
+        Show extra information in output
 
-OUTPUT_PATH:
-   The path to place the converted ebook(s).
-   
-   If single converting, this path will be overwritten if it exists. It
-   must also end with .kepub.epub.
-   
-   If batch converting, this path must not exist, and will be automatically
-   created.
-
-   If not specified, then for a single converting, this is the basename
-   of the input file with the extension .kepub.epub. For batch converting,
-   this is the directory name, with the suffix _converted.</pre>
+Arguments:
+  PATH is the path to an epub file or directory to convert. If it
+  is a directory, the converted dir is the name of the dir with 
+  the suffix _converted. If the path is a file, the converted file
+  has the extension .kepub.epub.</pre>
         </div>
     </div>
     <div class="section">
@@ -140,21 +134,20 @@ OUTPUT_PATH:
             </p>
 
             <p>
-                <b>To convert a single book with a different output filename</b>:
-                <br>
-                <tt>kepubify /path/to/the/book.epub /path/to/save/the/new/book.kepub.epub</tt>
-                <br>The resulting file will be saved to the specified file.
-            </p>
-
-            <p>
                 <b>To convert a single book with a different output folder</b>:
                 <br>
-                <tt>kepubify /path/to/the/book.epub /path/to/save/the/book/</tt>
-                <br>The resulting file will be saved to specified folder.
+                <tt>kepubify --output "/path/to/save/the/book/" /path/to/the/book.epub</tt>
+                <br>The resulting file will be saved to specified folder (in this example <tt>/path/to/save/the/book/</tt>).
             </p>
 
             <p>
-                <b>To batch convert a whole directory of ebooks</b>:
+                <b>To convert all books in the current folder into a folder called converted</b>:
+                <br>
+                <tt>kepubify -o "converted" *.epub</tt>
+            </p>
+
+            <p>
+                <b>To batch convert a directory of ebooks</b>:
                 <br>
                 <tt>kepubify /path/to/the/books/</tt>
                 <br>The converted books will be saved to the original dir with the suffix <tt>_converted</tt> (e.g. /path/to/the/books_converted).The directory structure of the source
@@ -162,11 +155,16 @@ OUTPUT_PATH:
             </p>
 
             <p>
-                <b>To batch convert a whole directory of ebooks with a different output folder</b>:
+                <b>To batch convert a directory of ebooks with a different output folder</b>:
                 <br>
-                <tt>kepubify /path/to/the/books/ /path/to/output/the/converted/books</tt>
-                <br>The output directory must not exist, as it will be created by kepubify. The directory structure of the source
-                is preserved in the output.
+                <tt>kepubify -o "/path/to/output/the/converted/books" /path/to/the/books/</tt>
+                <br>The directory structure of the source is preserved in the output.
+            </p>
+
+            <p>
+                <b>To convert a directory of ebooks, but skipping ones which have already been converted</b>:
+                <br>
+                <tt>kepubify --update /path/to/the/books/</tt>
             </p>
         </div>
     </div>

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// isDir checks if a exists and is a dir
+// isDir checks if a path exists and is a dir
 func isDir(path string) bool {
 	if fi, err := os.Stat(path); err == nil && fi.IsDir() {
 		return true
@@ -14,7 +14,7 @@ func isDir(path string) bool {
 	return false
 }
 
-// isFile checks if a exists and is a file
+// isFile checks if a path exists and is a file
 func isFile(path string) bool {
 	if exists(path) && !isDir(path) {
 		return true
@@ -50,4 +50,19 @@ func isEmptyDir(path string) bool {
 	}
 
 	return true
+}
+
+// uniq removes duplicates from a string slice
+func uniq(s []string) []string {
+	seen := make(map[string]struct{}, len(s))
+	j := 0
+	for _, v := range s {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		s[j] = v
+		j++
+	}
+	return s[:j]
 }

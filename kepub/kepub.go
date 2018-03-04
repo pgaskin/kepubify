@@ -10,26 +10,19 @@ import (
 	"time"
 
 	"github.com/beevik/etree"
-	"github.com/cheggaaa/pb"
 	zglob "github.com/mattn/go-zglob"
 )
 
 // Kepubify converts a .epub into a .kepub.epub
-func Kepubify(src, dest string, printlog bool) error {
-	defer func() {
-		if printlog {
-			fmt.Printf("\n")
-		}
-	}()
-
+func Kepubify(src, dest string, verbose bool) error {
 	td, err := ioutil.TempDir("", "kepubify")
 	if err != nil {
 		return fmt.Errorf("could not create temp dir: %s", err)
 	}
 	defer os.RemoveAll(td)
 
-	if printlog {
-		fmt.Printf("Unpacking ePub")
+	if verbose {
+		fmt.Printf("  Unpacking ePub\n")
 	}
 	UnpackEPUB(src, td, true)
 
@@ -47,24 +40,9 @@ func Kepubify(src, dest string, printlog bool) error {
 	}
 	contentfiles := append(append(a, b...), c...)
 
-	if printlog {
-		fmt.Printf("\rProcessing %v content files              \n", len(contentfiles))
+	if verbose {
+		fmt.Printf("  Processing %v content files\n  ", len(contentfiles))
 	}
-
-	var bar *pb.ProgressBar
-
-	if printlog {
-		bar = pb.New(len(contentfiles))
-		bar.SetRefreshRate(time.Millisecond * 60)
-		bar.SetMaxWidth(60)
-		bar.Format("[=> ]")
-		bar.Start()
-	}
-	defer func() {
-		if printlog && bar != nil {
-			bar.Finish()
-		}
-	}()
 
 	runtime.GOMAXPROCS(runtime.NumCPU() + 1)
 	wg := sync.WaitGroup{}
@@ -98,10 +76,10 @@ func Kepubify(src, dest string, printlog bool) error {
 				}
 				return
 			}
-			time.Sleep(time.Millisecond * 5)
-			if printlog {
-				bar.Increment()
+			if verbose {
+				fmt.Print(".")
 			}
+			time.Sleep(time.Millisecond * 5)
 		}(f)
 	}
 	wg.Wait()
@@ -109,9 +87,8 @@ func Kepubify(src, dest string, printlog bool) error {
 		return <-cerr
 	}
 
-	if printlog {
-		bar.Finish()
-		fmt.Printf("\rCleaning content.opf              ")
+	if verbose {
+		fmt.Printf("\n  Cleaning content.opf\n")
 	}
 
 	rsk, err := os.Open(filepath.Join(td, "META-INF", "container.xml"))
@@ -151,13 +128,13 @@ func Kepubify(src, dest string, printlog bool) error {
 		return fmt.Errorf("error writing new content.opf: %s", err)
 	}
 
-	if printlog {
-		fmt.Printf("\rCleaning epub files             ")
+	if verbose {
+		fmt.Printf("  Cleaning epub files\n")
 	}
 	cleanFiles(td)
 
-	if printlog {
-		fmt.Printf("\rPacking ePub                    ")
+	if verbose {
+		fmt.Printf("  Packing ePub\n")
 	}
 	PackEPUB(td, dest, true)
 	return nil
