@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
+
 	"github.com/geek1011/kepubify/kepub"
 	isatty "github.com/mattn/go-isatty"
 	zglob "github.com/mattn/go-zglob"
@@ -39,6 +42,7 @@ func main() {
 	update := pflag.BoolP("update", "u", false, "Don't reconvert files which have already been converted")
 	verbose := pflag.BoolP("verbose", "v", false, "Show extra information in output")
 	output := pflag.StringP("output", "o", ".", "The directory to place the converted files")
+	css := pflag.StringP("css", "c", "", "Custom CSS to add to ebook")
 	pflag.Parse()
 
 	if *sversion {
@@ -83,6 +87,7 @@ func main() {
 	logV("help: %t\n", *help)
 	logV("update: %t\n", *update)
 	logV("verbose: %t\n\n", *verbose)
+	logV("css: %s\n\n", *css)
 
 	paths := map[string]string{}
 	for _, arg := range uniq(pflag.Args()) {
@@ -190,7 +195,30 @@ func main() {
 			}
 		}
 
-		err := kepub.Kepubify(i, o, *verbose, nil, nil)
+		postDoc := func(doc *goquery.Document) error {
+			if css != nil && *css != "" {
+				style := &html.Node{
+					Type: html.ElementNode,
+					Data: "style",
+					Attr: []html.Attribute{
+						html.Attribute{
+							Key: "type",
+							Val: "text/css",
+						},
+					},
+				}
+
+				style.AppendChild(&html.Node{
+					Type: html.TextNode,
+					Data: *css,
+				})
+
+				doc.Find("body").AppendNodes(style)
+			}
+			return nil
+		}
+
+		err := kepub.Kepubify(i, o, *verbose, &postDoc, nil)
 		if err != nil {
 			errs = append(errs, []string{i, o, err.Error()})
 			logV("  err: %v\n", err)
