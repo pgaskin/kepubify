@@ -43,6 +43,8 @@ func main() {
 	verbose := pflag.BoolP("verbose", "v", false, "Show extra information in output")
 	output := pflag.StringP("output", "o", ".", "The directory to place the converted files")
 	css := pflag.StringP("css", "c", "", "Custom CSS to add to ebook")
+	hyphenate := pflag.Bool("hyphenate", false, "Force enable hyphenation")
+	nohyphenate := pflag.Bool("no-hyphenate", false, "Force disable hyphenation")
 	pflag.Parse()
 
 	if *sversion {
@@ -51,6 +53,11 @@ func main() {
 	}
 
 	if *help || pflag.NArg() == 0 {
+		helpExit()
+	}
+
+	if *hyphenate && *nohyphenate {
+		fmt.Printf("--hyphenate and --no-hyphenate are mutally exclusive\n")
 		helpExit()
 	}
 
@@ -86,8 +93,10 @@ func main() {
 	logV("output-abs: %s\n", out)
 	logV("help: %t\n", *help)
 	logV("update: %t\n", *update)
-	logV("verbose: %t\n\n", *verbose)
-	logV("css: %s\n\n", *css)
+	logV("verbose: %t\n", *verbose)
+	logV("css: %s\n", *css)
+	logV("hyphenate: %t\n", *hyphenate)
+	logV("nohyphenate: %t\n\n", *nohyphenate)
 
 	paths := map[string]string{}
 	for _, arg := range uniq(pflag.Args()) {
@@ -196,7 +205,7 @@ func main() {
 		}
 
 		postDoc := func(doc *goquery.Document) error {
-			if css != nil && *css != "" {
+			addStyle := func(cssstr, class string) {
 				style := &html.Node{
 					Type: html.ElementNode,
 					Data: "style",
@@ -205,16 +214,54 @@ func main() {
 							Key: "type",
 							Val: "text/css",
 						},
+						html.Attribute{
+							Key: "class",
+							Val: class,
+						},
 					},
 				}
 
 				style.AppendChild(&html.Node{
 					Type: html.TextNode,
-					Data: *css,
+					Data: cssstr,
 				})
 
 				doc.Find("body").AppendNodes(style)
 			}
+
+			if css != nil && *css != "" {
+				addStyle(*css, "kepubify-custom")
+			}
+
+			if *hyphenate {
+				addStyle(`* {
+					-webkit-hyphens: auto;
+					-moz-hyphens: auto;
+					hyphens: auto;
+				
+					-webkit-hyphenate-after: 3;
+					-webkit-hyphenate-before: 3;
+					-webkit-hyphenate-lines: 2;
+					hyphenate-after: 3;
+					hyphenate-before: 3;
+					hyphenate-lines: 2;
+				}
+				
+				h1, h2, h3, h4, h5, h6, td {
+					-moz-hyphens: none !important;
+					-webkit-hyphens: none !important;
+					hyphens: none !important;
+				}`, "kepubify-hyphenate")
+			}
+
+			if *nohyphenate {
+				addStyle(`* {
+					-moz-hyphens: none !important;
+					-webkit-hyphens: none !important;
+					hyphens: none !important;
+				}`, "kepubify-nohyphenate")
+			}
+
 			return nil
 		}
 
