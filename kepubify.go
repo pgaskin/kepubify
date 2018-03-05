@@ -185,7 +185,7 @@ func main() {
 			}
 		}
 
-		err := kepub.Kepubify(i, o, *verbose)
+		err := kepub.Kepubify(i, o, *verbose, nil, nil)
 		if err != nil {
 			errs = append(errs, []string{i, o, err.Error()})
 			logV("  err: %v\n", err)
