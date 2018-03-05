@@ -45,6 +45,7 @@ func main() {
 	css := pflag.StringP("css", "c", "", "Custom CSS to add to ebook")
 	hyphenate := pflag.Bool("hyphenate", false, "Force enable hyphenation")
 	nohyphenate := pflag.Bool("no-hyphenate", false, "Force disable hyphenation")
+	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
 	pflag.Parse()
 
 	if *sversion {
@@ -96,7 +97,8 @@ func main() {
 	logV("verbose: %t\n", *verbose)
 	logV("css: %s\n", *css)
 	logV("hyphenate: %t\n", *hyphenate)
-	logV("nohyphenate: %t\n\n", *nohyphenate)
+	logV("nohyphenate: %t\n", *nohyphenate)
+	logV("fullscreenfixes: %t\n\n", *fullscreenfixes)
 
 	paths := map[string]string{}
 	for _, arg := range uniq(pflag.Args()) {
@@ -260,6 +262,19 @@ func main() {
 					-webkit-hyphens: none !important;
 					hyphens: none !important;
 				}`, "kepubify-nohyphenate")
+			}
+
+			if *fullscreenfixes {
+				// Based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
+				addStyle(`body {
+					margin: 0 !important;
+					padding: 0 !important;
+				}
+				
+				body>div {
+					padding-left: 0.2em !important;
+					padding-right: 0.2em !important;
+				}`, "kepubify-fullscreenfixes")
 			}
 
 			return nil
