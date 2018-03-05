@@ -39,6 +39,7 @@
                 <li>Works from the command line</li>
                 <li>Update Kobo series metadata</li>
                 <li>Does not add any extra metadata (unlike Calibre)</li>
+                <li>Supports many different CSS tweaks</li>
             </ul>
             <a style="display:none;font-size:12px;" target="_blank" id="other-platforms" href="https://github.com/geek1011/kepubify/releases/latest">Download for other platforms</a>
         </div>
@@ -90,14 +91,24 @@
             <pre>Usage: kepubify [OPTIONS] PATH [PATH]...
 
 Options:
-  -h, --help
-        Show this help text
-  -o, --output string
-        The directory to place the converted files (default ".")
-  -u, --update
-        Don't reconvert files which have already been converted
-  -v, --verbose
-        Show extra information in output
+-c, --css string
+      Custom CSS to add to ebook
+--fullscreen-reading-fixes
+      Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
+-h, --help
+      Show this help text
+--hyphenate
+      Force enable hyphenation
+--no-hyphenate
+      Force disable hyphenation
+-o, --output string
+      The directory to place the converted files (default ".")
+-u, --update
+      Don't reconvert files which have already been converted
+-v, --verbose
+      Show extra information in output
+--version
+      Show the version
 
 Arguments:
   PATH is the path to an epub file or directory to convert. If it
@@ -175,8 +186,7 @@ Arguments:
                 On Linux, you can update the series metadata on the Kobo using seriesmeta. Seriesmeta is available
                 <a href="https://github.com/geek1011/kepubify/releases/latest">here</a>. It is used as follows:
             </p>
-            <pre>
-    seriesmeta /path/to/KOBOeReader</pre>
+            <pre>seriesmeta /path/to/KOBOeReader</pre>
         </div>
     </div>
     <div class="section">
@@ -200,6 +210,7 @@ Arguments:
                 <li>Calibre is an enourmous program, which is unnecessary if all you want to do is convert books</li>
                 <li>Kepubify is written in Go, which is a compiled language</li>
                 <li>Kepubify can update the series metadata on your Kobo without managing your whole library</li>
+                <li>Kepubify is easier to customize</li>
             </ul>
         </div>
     </div>
