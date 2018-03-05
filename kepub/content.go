@@ -259,7 +259,8 @@ func cleanHTML(doc *goquery.Document) error {
 }
 
 // process processes the html of a content file in an ordinary epub and converts it into a kobo epub by adding kobo divs, kobo spans, smartening punctuation, and cleaning html.
-func process(content *string) error {
+// It can also optionally run a postprocessor on the goquery.Document, or the html string.
+func process(content *string, postDoc *func(doc *goquery.Document) error, postHTML *func(h *string) error) error {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(*content))
 	if err != nil {
 		return err
@@ -281,6 +282,12 @@ func process(content *string) error {
 		return err
 	}
 
+	if postDoc != nil {
+		if err := (*postDoc)(doc); err != nil {
+			return err
+		}
+	}
+
 	h, err := doc.Html()
 	if err != nil {
 		return err
@@ -299,6 +306,12 @@ func process(content *string) error {
 
 	// Fix nbsps removed
 	h = strings.Replace(h, "\u00a0", "&nbsp;", -1)
+
+	if postHTML != nil {
+		if err := (*postHTML)(&h); err != nil {
+			return err
+		}
+	}
 
 	*content = h
 

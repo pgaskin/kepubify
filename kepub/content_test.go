@@ -134,7 +134,7 @@ func TestProcess(t *testing.T) {
 </body>
 </html>`
 
-	process(&h)
+	process(&h, nil, nil)
 
 	hs := sha256.New()
 	hs.Write([]byte(h))
@@ -145,8 +145,21 @@ func TestProcess(t *testing.T) {
 
 	ha := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/></head><body><p>Test&nbsp;&nbsp;Test</p><p>&nbsp;&#160;</p><p>Test</p></body></html>`
 	hax := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">Test&nbsp;&nbsp;Test</span></p><p><span class="koboSpan" id="kobo.2.1">&nbsp;&nbsp;</span></p><p><span class="koboSpan" id="kobo.3.1">Test</span></p></div></div></body></html>`
-	process(&ha)
+	process(&ha, nil, nil)
 	assert.Equal(t, hax, ha, "should process nbsps correctly")
+
+	ha1 := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/></head><body><p>test</p></body></html>`
+	hax1 := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Replaced Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">replaced</span></p></div></div></body></html>`
+	postDoc := func(doc *goquery.Document) error {
+		doc.Find("title").SetText("Replaced Book 1")
+		return nil
+	}
+	postHTML := func(h *string) error {
+		*h = strings.Replace(*h, "test", "replaced", -1)
+		return nil
+	}
+	process(&ha1, &postDoc, &postHTML)
+	assert.Equal(t, hax1, ha1, "should run post-processing correctly")
 }
 
 func TestProcessOPF(t *testing.T) {

@@ -9,12 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/beevik/etree"
 	zglob "github.com/mattn/go-zglob"
 )
 
-// Kepubify converts a .epub into a .kepub.epub
-func Kepubify(src, dest string, verbose bool) error {
+// Kepubify converts a .epub into a .kepub.epub.
+// It can also optionally run a postprocessor for each file on the goquery.Document, or the html string.
+func Kepubify(src, dest string, verbose bool, postDoc *func(doc *goquery.Document) error, postHTML *func(h *string) error) error {
 	td, err := ioutil.TempDir("", "kepubify")
 	if err != nil {
 		return fmt.Errorf("could not create temp dir: %s", err)
@@ -60,7 +62,7 @@ func Kepubify(src, dest string, verbose bool) error {
 				return
 			}
 			str := string(buf)
-			err = process(&str)
+			err = process(&str, postDoc, postHTML)
 			if err != nil {
 				select {
 				case cerr <- fmt.Errorf("Error processing content file \"%s\": %s", cf, err): // Put err in the channel unless it is full
