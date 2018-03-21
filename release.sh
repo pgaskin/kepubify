@@ -40,7 +40,7 @@ fi
 for GOOS in linux windows darwin; do
     for GOARCH in amd64 386; do
         echo "Building kepubify $APP_VERSION for $GOOS $GOARCH"
-        GOOS=$GOOS GOARCH=$GOOARCH go build -ldflags "-X main.version=$APP_VERSION" -o "build/kepubify-$GOOS-$(echo $GOARCH|sed 's/386/32bit/g'|sed 's/amd64/64bit/g')$(echo $GOOS|sed 's/windows/.exe/g'|sed 's/linux//g'|sed 's/darwin//g')"
+        GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "-X main.version=$APP_VERSION" -o "build/kepubify-$GOOS-$(echo $GOARCH|sed 's/386/32bit/g'|sed 's/amd64/64bit/g')$(echo $GOOS|sed 's/windows/.exe/g'|sed 's/linux//g'|sed 's/darwin//g')"
     done
 done
 
