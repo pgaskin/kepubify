@@ -305,7 +305,7 @@ func process(content *string, postDoc *func(doc *goquery.Document) error, postHT
 	h = strings.Replace(h, `<!--?xml version="1.0" encoding="utf-8"?-->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
 
 	// Fix nbsps removed
-	h = strings.Replace(h, "\u00a0", "&nbsp;", -1)
+	h = strings.Replace(h, "\u00a0", "&#160;", -1)
 
 	if postHTML != nil {
 		if err := (*postHTML)(&h); err != nil {
