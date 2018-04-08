@@ -3,10 +3,10 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "LlvQPCCJxa/4kNQDPBM5fZrtAnU=",
+			"checksumSHA1": "uvutHOxcwOHqLNLbHcTz5cI3fEA=",
 			"path": "github.com/PuerkitoBio/goquery",
-			"revision": "1a71cc719d0d5b9e4f14ae072bef08b576b0bab5",
-			"revisionTime": "2017-10-07T14:12:28Z"
+			"revision": "ea1bc64a63088ac2bbf1a2edcae38413794a7710",
+			"revisionTime": "2018-03-24T16:22:12Z"
 		},
 		{
 			"checksumSHA1": "2rWSos1D+xqNSGkvEMOG3pntod8=",
@@ -75,10 +75,10 @@
 			"revisionTime": "2017-10-17T20:25:22Z"
 		},
 		{
-			"checksumSHA1": "/PGQlVbw8jILX3tLQaYAg6bTAFI=",
+			"checksumSHA1": "L68uqaYKEOxkq2xwnNV2bRP7yO4=",
 			"path": "golang.org/x/net/html",
-			"revision": "a04bdaca5b32abe1c069418fb7088ae607de5bd0",
-			"revisionTime": "2017-10-03T05:09:24Z"
+			"revision": "61147c48b25b599e5b561d2e9c4f3e1ef489ca41",
+			"revisionTime": "2017-03-19T02:15:06Z"
 		},
 		{
 			"checksumSHA1": "uMRr2bnIJS+9Xm0FqMBYUTzaSGs=",
