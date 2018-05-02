@@ -160,6 +160,11 @@ func TestProcess(t *testing.T) {
 	}
 	process(&ha1, &postDoc, &postHTML)
 	assert.Equal(t, hax1, ha1, "should run post-processing correctly")
+
+	ha2 := `<!DOCTYPE html><html><head><title /><title/></head><body><p>test</p></body></html>`
+	hax2 := `<!DOCTYPE html><html><head><title>book</title><title>book</title><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">test</span></p></div></div></body></html>`
+	process(&ha2, nil, nil)
+	assert.Equal(t, hax2, ha2, "should fix invalid self-closing title tags")
 }
 
 func TestProcessOPF(t *testing.T) {

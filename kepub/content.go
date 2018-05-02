@@ -258,9 +258,13 @@ func cleanHTML(doc *goquery.Document) error {
 	return nil
 }
 
+var selfClosingTitleRe = regexp.MustCompile("<title ?/>")
+
 // process processes the html of a content file in an ordinary epub and converts it into a kobo epub by adding kobo divs, kobo spans, smartening punctuation, and cleaning html.
 // It can also optionally run a postprocessor on the goquery.Document, or the html string.
 func process(content *string, postDoc *func(doc *goquery.Document) error, postHTML *func(h *string) error) error {
+	*content = selfClosingTitleRe.ReplaceAllString(*content, "<title>book</title>")
+
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(*content))
 	if err != nil {
 		return err
