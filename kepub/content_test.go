@@ -245,3 +245,31 @@ func TestSpans(t *testing.T) {
 		assert.Equal(t, "<html><head></head><body>"+c.Out+"</body></html>", nh, c.Message)
 	}
 }
+
+func BenchmarkProcess(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		h := `<!DOCTYPE html>
+		<html xmlns="http://www.w3.org/1999/xhtml">
+		<head>
+			<title>Test Book 1</title>
+			<meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/>
+			<style type="text/css">
+				@page { margin-bottom: 5.000000pt; margin-top: 5.000000pt; }
+			</style>
+		</head>
+		<body id="p1">
+			<p>This is the first sentence. This is the second sentence. This is the third sentence.</p>
+			<p>This is the first sentence. This is the second sentence? This is the third sentence!</p>
+			<p>This is the first <b>sentence</b>. This is the second sentence? This is the third sentence!</p>
+			<p>This is the first <b>sentence. This is the </b>second sentence? This is the third sentence!</p>
+			<p>This is <i>t<b>h</b>e</i> first <a href="test.html">sentence <b>here</b></a>. This is the second sentence? This is the third sentence!</p>
+			<ul>
+				<li>test</li>
+				<li>test</li>
+			</ul>
+			</div>
+		</body>
+		</html>`
+		process(&h, nil, nil)
+	}
+}
