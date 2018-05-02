@@ -252,6 +252,10 @@ func cleanHTML(doc *goquery.Document) error {
 		}
 	})
 
+	doc.Find("svg").SetAttr("xmlns:xlink", "http://www.w3.org/1999/xlink")
+	doc.Find("svg a").RemoveAttr("xmlns:xlink")
+	doc.Find("svg image").RemoveAttr("xmlns:xlink")
+
 	// Add type to style tags
 	doc.Find(`style`).SetAttr("type", "text/css")
 

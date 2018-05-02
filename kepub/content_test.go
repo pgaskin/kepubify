@@ -11,7 +11,7 @@ import (
 )
 
 func TestCleanHTML(t *testing.T) {
-	h := `<html><head></head><body><p /><p>test</p><p /><p  /><p>test</p><meta  content="urn:uuid:asd--asdasd-asdasdas-dasdasd234234"   name="Adept.expected.resource"   /><st1:asd></st1:asd><o:p></o:p><h1></h1><h3></h3><h2>test</h2><p>test</p><style></style></body></html>`
+	h := `<html><head></head><body><p /><p>test</p><p /><p  /><p>test</p><meta  content="urn:uuid:asd--asdasd-asdasdas-dasdasd234234"   name="Adept.expected.resource"   /><st1:asd></st1:asd><o:p></o:p><h1></h1><h3></h3><h2>test</h2><p>test</p><style></style><svg><image xlink:href="image.jpg"/></svg></body></html>`
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(h))
 	assert.Nil(t, err, "err should be nil")
@@ -21,7 +21,7 @@ func TestCleanHTML(t *testing.T) {
 	nh, err := doc.Html()
 	assert.Nil(t, err, "err should be nil")
 
-	assert.Equal(t, `<html><head></head><body><p></p><p>test</p><p></p><p></p><p>test</p><h2>test</h2><p>test</p><style type="text/css"></style></body></html>`, nh, "should be equal if cleaned correctly")
+	assert.Equal(t, `<html><head></head><body><p></p><p>test</p><p></p><p></p><p>test</p><h2>test</h2><p>test</p><style type="text/css"></style><svg xmlns:xlink="http://www.w3.org/1999/xlink"><image xlink:href="image.jpg"></image></svg></body></html>`, nh, "should be equal if cleaned correctly")
 }
 
 func TestSmartenPunctuation(t *testing.T) {
