@@ -95,16 +95,13 @@ func createSpan(paragraph, segment int, text string) *html.Node {
 	span := &html.Node{
 		Type: html.ElementNode,
 		Data: "span",
-		Attr: []html.Attribute{
-			html.Attribute{
-				Key: "class",
-				Val: "koboSpan",
-			},
-			html.Attribute{
-				Key: "id",
-				Val: fmt.Sprintf("kobo.%v.%v", paragraph, segment),
-			},
-		},
+		Attr: []html.Attribute{{
+			Key: "class",
+			Val: "koboSpan",
+		}, {
+			Key: "id",
+			Val: fmt.Sprintf("kobo.%v.%v", paragraph, segment),
+		}},
 	}
 
 	// Add the text
