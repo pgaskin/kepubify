@@ -246,6 +246,79 @@ func TestSpans(t *testing.T) {
 	}
 }
 
+func TestFixInvalidSelfClosingTags(t *testing.T) {
+	for _, c := range []struct {
+		What string
+		In   string
+		Out  string
+	}{
+		{
+			"should not modify correct title tag",
+			"<title>test</title>",
+			"<title>test</title>",
+		},
+		{
+			"should fix self-closing title tag",
+			"<title/>",
+			"<title>book</title>",
+		},
+		{
+			"should fix self-closing title tag with spaces and trim extra spaces",
+			"<title    />",
+			"<title>book</title>",
+		},
+		{
+			"should not modify correct script tag",
+			"<script>test</script>",
+			"<script>test</script>",
+		},
+		{
+			"should fix self-closing script tag",
+			"<script/>",
+			"<script> </script>",
+		},
+		{
+			"should fix self-closing script tag with spaces and trim extra spaces",
+			"<script    />",
+			"<script    > </script>",
+		},
+		{
+			"should fix self-closing script tag with attributes",
+			"<script src=\"test\"/>",
+			"<script src=\"test\"> </script>",
+		},
+		{
+			"should not intefere with other script tags",
+			"<script/><script src=\"whatever\"></script>",
+			"<script> </script><script src=\"whatever\"></script>",
+		},
+		{
+			"should work with complex attributes",
+			`<script xmlns="http://www.w3.org/1999/xhtml" type="text/javascript" src="../script.js"/>`,
+			`<script xmlns="http://www.w3.org/1999/xhtml" type="text/javascript" src="../script.js"> </script>`,
+		},
+	} {
+		c.In = fmt.Sprintf("<html><head>%s</head><body></body></html>", c.In)
+		c.Out = fmt.Sprintf("<html><head>%s</head><body></body></html>", c.Out)
+
+		h := c.In
+		err := fixInvalidSelfClosingTags(&h)
+		assert.NoError(t, err, "should not error")
+		assert.Equalf(t, c.Out, h, "%s (after replacement)", c.What)
+
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(h))
+		assert.NoError(t, err, "should not error when parsing modified document")
+
+		if c.Out == "<html><head><script    > </script></head><body></body></html>" {
+			c.Out = "<html><head><script> </script></head><body></body></html>"
+		}
+
+		h, err = doc.Html()
+		assert.NoError(t, err, "should not error when creating new html")
+		assert.Equalf(t, c.Out, h, "%s (after passing through goquery)", c.What)
+	}
+}
+
 func BenchmarkProcess(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		h := `<!DOCTYPE html>
