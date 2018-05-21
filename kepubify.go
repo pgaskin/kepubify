@@ -211,16 +211,13 @@ func main() {
 				style := &html.Node{
 					Type: html.ElementNode,
 					Data: "style",
-					Attr: []html.Attribute{
-						html.Attribute{
-							Key: "type",
-							Val: "text/css",
-						},
-						html.Attribute{
-							Key: "class",
-							Val: class,
-						},
-					},
+					Attr: []html.Attribute{{
+						Key: "type",
+						Val: "text/css",
+					}, {
+						Key: "class",
+						Val: class,
+					}},
 				}
 
 				style.AppendChild(&html.Node{
