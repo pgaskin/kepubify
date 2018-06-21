@@ -17,7 +17,7 @@ import (
 	"github.com/mattn/go-zglob"
 	"golang.org/x/tools/godoc/vfs/zipfs"
 
-	"github.com/ogier/pflag"
+	"github.com/spf13/pflag"
 
 	_ "github.com/mattn/go-sqlite3"
 )

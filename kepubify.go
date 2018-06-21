@@ -14,7 +14,7 @@ import (
 	"github.com/geek1011/kepubify/kepub"
 	isatty "github.com/mattn/go-isatty"
 	zglob "github.com/mattn/go-zglob"
-	"github.com/ogier/pflag"
+	"github.com/spf13/pflag"
 )
 
 var version = "dev"
