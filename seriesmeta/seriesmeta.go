@@ -204,30 +204,32 @@ func main() {
 	}
 
 	log("\nUpdating metadata for %d books\n", len(epubs))
-	errcount := 0
+	var updated, nometa, errcount int
+	digits := len(fmt.Sprint(len(epubs)))
+	numFmt, spFmt := fmt.Sprintf("[%%%dd/%d] ", digits, len(epubs)), strings.Repeat(" ", (digits*2)+4)
 	for i, epub := range epubs {
 		rpath, err := filepath.Rel(kpath, epub)
 		if err != nil {
-			log("[%d/%d] Updating '%s'\n", i+1, len(epubs), epub)
-			logE("  Error: could not resolve path: %v\n", err)
+			log(numFmt+"%s\n", i+1, epub)
+			logE(spFmt+"Error: could not resolve path: %v\n", err)
 			errcount++
 			continue
 		}
 
-		log("[%d/%d] Updating '%s'\n", i+1, len(epubs), rpath)
+		log(numFmt+"%s\n", i+1, rpath)
 		series, seriesNumber, err := getMeta(epub)
 		if err != nil {
-			logE("  Error: could not read metadata: %v\n", err)
+			logE(spFmt+"Error: could not read metadata: %v\n", err)
 			errcount++
 			continue
 		}
 
 		if series == "" && seriesNumber == 0 {
-			log("  No series\n")
+			nometa++
 			continue
 		}
 
-		log("  Series: '%s' Number: %v\n", series, seriesNumber)
+		log(spFmt+"(%s, %v)\n", series, seriesNumber)
 
 		iid := contentIDToImageID(pathToContentID(rpath))
 
@@ -239,27 +241,29 @@ func main() {
 			Valid:  seriesNumber > 0,
 		}, iid)
 		if err != nil {
-			logE("  Error: could not update database: %v\n", err)
+			logE(spFmt+"Error: could not update database: %v\n", err)
 			errcount++
 			continue
 		}
 
 		ra, err := res.RowsAffected()
 		if err != nil {
-			logE("  Error: could not update database: %v\n", err)
+			logE(spFmt+"Error: could not update database: %v\n", err)
 			errcount++
 			continue
 		}
 
 		if ra > 1 {
-			logE("  Warn: more than one match in database for ImageID\n")
+			logE(spFmt + "Warn: more than one match in database for ImageID\n")
 		} else if ra < 1 {
-			logE("  Error: could not update database: no entry in database for book (the kobo may still need to import the book)\n")
+			logE(spFmt + "Error: could not update database: no entry in database for book (the kobo may still need to import the book)\n")
 			errcount++
 			continue
 		}
+
+		updated++
 	}
 
 	time.Sleep(time.Second)
-	log("\nFinished updating metadata. %v books processed. %v errors.\n", len(epubs), errcount)
+	log("\nFinished updating metadata. %d updated, %d without metadata, %d errored.\n", updated, nometa, errcount)
 }
