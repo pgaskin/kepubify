@@ -266,4 +266,8 @@ func main() {
 
 	time.Sleep(time.Second)
 	log("\nFinished updating metadata. %d updated, %d without metadata, %d errored.\n", updated, nometa, errcount)
+
+	if runtime.GOOS == "windows" {
+		time.Sleep(time.Second * 2)
+	}
 }
