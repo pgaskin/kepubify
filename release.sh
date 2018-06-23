@@ -50,7 +50,10 @@ for GOOS in linux; do
         GOOS=$GOOS GOARCH=$GOOARCH go build -ldflags "-X main.version=$APP_VERSION" -o "build/seriesmeta-$GOOS-$(echo $GOARCH|sed 's/386/32bit/g'|sed 's/amd64/64bit/g')$(echo $GOOS|sed 's/windows/.exe/g'|sed 's/linux//g'|sed 's/darwin//g')" seriesmeta/seriesmeta.go
     done
 done
-
+# needs libsqlite3-dev, gcc-mingw-w64-i686
+echo "Building seriesmeta $APP_VERSION for windows 386"
+GOOS=windows GOARCH=386 CGO_ENABLED=1 CC=i686-w64-mingw32-gcc go build -ldflags "-linkmode external -extldflags -static -X main.version=$APP_VERSION" -o "build/seriesmeta-windows.exe" seriesmeta/seriesmeta.go
+# GOOS=windows GOARCH=386 CGO_ENABLED=1 CC=i686-w64-mingw32-gcc go build -ldflags "-linkmode external -extldflags -static" -x -v -o seriesmeta-windows.exe ./seriesmeta/seriesmeta.go
 
 if [[ "$SKIP_UPLOAD" != "true" ]]; then
     echo "Creating release"
