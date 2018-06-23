@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/geek1011/koboutils/kobo"
+
 	"github.com/beevik/etree"
 	"github.com/mattn/go-zglob"
 	"golang.org/x/tools/godoc/vfs/zipfs"
@@ -25,9 +27,9 @@ import (
 var version = "dev"
 
 func helpExit() {
-	fmt.Fprintf(os.Stderr, "Usage: seriesmeta [OPTIONS] KOBO_PATH\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
+	fmt.Fprintf(os.Stderr, "Usage: seriesmeta [OPTIONS] [KOBO_PATH]\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
 	pflag.PrintDefaults()
-	fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader.\n")
+	fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader. If not specified, seriesmeta will try to automatically detect the Kobo.\n")
 	if runtime.GOOS == "windows" {
 		time.Sleep(time.Second * 2)
 	}
@@ -63,7 +65,7 @@ func copyFile(src, dst string) error {
 
 // pathToContentID gets the content ID for a book. The path needs to be relative to the root of the kobo.
 func pathToContentID(relpath string) string {
-	return fmt.Sprintf("file:///mnt/onboard/%s", relpath)
+	return fmt.Sprintf("file:///mnt/onboard/%s", filepath.ToSlash(relpath))
 }
 
 func contentIDToImageID(contentID string) string {
@@ -139,7 +141,7 @@ func main() {
 	help := pflag.BoolP("help", "h", false, "Show this help message")
 	pflag.Parse()
 
-	if *help || pflag.NArg() != 1 {
+	if *help || pflag.NArg() > 1 {
 		helpExit()
 	}
 
@@ -151,28 +153,34 @@ func main() {
 		fmt.Fprintf(os.Stderr, format, a...)
 	}
 
-	kpath, err := filepath.Abs(pflag.Args()[0])
+	var kpath string
+	if pflag.NArg() == 1 {
+		kpath = strings.Replace(pflag.Arg(0), ".kobo", "", 1)
+	} else {
+		log("No kobo specified, attempting to detect one\n")
+		kobos, err := kobo.Find()
+		if err != nil {
+			logE("Fatal: could not automatically detect a kobo: %v\n", err)
+			errExit()
+		} else if len(kobos) < 1 {
+			logE("Fatal: could not automatically detect a kobo\n")
+			errExit()
+		}
+		kpath = kobos[0]
+	}
+
+	log("Checking kobo at '%s'\n", kpath)
+	if !kobo.IsKobo(kpath) {
+		logE("Fatal: '%s' is not a valid kobo\n", kpath)
+	}
+
+	kpath, err := filepath.Abs(kpath)
 	if err != nil {
 		logE("Fatal: Could not resolve path to kobo\n")
 		errExit()
 	}
 
-	kpath = strings.Replace(kpath, ".kobo", "", 1)
-
-	log("Looking for kobo at '%s'\n", kpath)
-
 	dbpath := filepath.Join(kpath, ".kobo", "KoboReader.sqlite")
-	_, err = os.Stat(dbpath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			logE("Fatal: '%s' is not a kobo eReader (it does not contain .kobo/KoboReader.sqlite)\n", kpath)
-		} else if os.IsPermission(err) {
-			logE("Fatal: Could not access kobo: %v\n", err)
-		} else {
-			logE("Fatal: Error reading database: %v\n", err)
-		}
-		errExit()
-	}
 
 	log("Making backup of KoboReader.sqlite\n")
 	err = copyFile(dbpath, dbpath+".bak")

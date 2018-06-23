@@ -27,6 +27,12 @@
 			"revisionTime": "2018-02-21T22:46:20Z"
 		},
 		{
+			"checksumSHA1": "8Vy7ZS3gmDM3yuJGEQyVFGeIlLI=",
+			"path": "github.com/geek1011/koboutils/kobo",
+			"revision": "16c84cdf74838934438c5fa76966ff5e1c34082e",
+			"revisionTime": "2018-06-23T15:26:23Z"
+		},
+		{
 			"checksumSHA1": "w5RcOnfv5YDr3j2bd1YydkPiZx4=",
 			"path": "github.com/mattn/go-isatty",
 			"revision": "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c",
