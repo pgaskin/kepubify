@@ -124,7 +124,7 @@ func main() {
 			paths[f] = filepath.Join(out, strings.Replace(filepath.Base(f), ".epub", "", -1)+".kepub.epub")
 			logV("  file-result: %s -> %s\n", f, paths[f])
 		} else if isDir(arg) {
-			argabs, err := filepath.Abs(arg)
+			_, err := filepath.Abs(arg)
 			if err != nil {
 				logE("Error resolving path for dir '%s'\n", arg)
 				errExit()
@@ -153,7 +153,7 @@ func main() {
 					errExit()
 				}
 
-				paths[abs] = filepath.Join(out, filepath.Base(argabs)+"_converted", rel)
+				paths[abs] = filepath.Join(out, rel)
 				logV("    dir-result: %s -> %s\n", abs, paths[abs])
 			}
 		} else {
