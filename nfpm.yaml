@@ -1,0 +1,26 @@
+name: kepubify
+arch: amd64
+platform: linux
+version: ${APP_VERSION_NO_V}
+section: utils
+priority: optional
+
+replaces:
+provides:
+depends:
+recommends:
+suggests:
+conflicts:
+
+maintainer: Patrick Gaskin <geek1011@outlook.com>
+description: |
+  Kepubify converts epubs to kepubs.
+vendor: Patrick Gaskin
+homepage: https://pgaskin.net/kepubify
+license: MIT
+
+bindir: /usr/bin
+files:
+  ./build/kepubify-linux-64bit: /usr/bin/kepubify
+  ./build/seriesmeta-linux-64bit: /usr/bin/seriesmeta
+config_files:
