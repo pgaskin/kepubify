@@ -91,30 +91,21 @@
             <pre>Usage: kepubify [OPTIONS] PATH [PATH]...
 
 Options:
--c, --css string
-      Custom CSS to add to ebook
---fullscreen-reading-fixes
-      Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
--h, --help
-      Show this help text
---hyphenate
-      Force enable hyphenation
---no-hyphenate
-      Force disable hyphenation
--o, --output string
-      The directory to place the converted files (default ".")
--u, --update
-      Don't reconvert files which have already been converted
--v, --verbose
-      Show extra information in output
---version
-      Show the version
+  -c, --css string                 custom CSS to add to ebook
+      --fullscreen-reading-fixes   enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
+  -h, --help                       show this help text
+      --hyphenate                  force enable hyphenation
+      --inline-styles              inline all stylesheets (for working around certain bugs)
+      --no-hyphenate               force disable hyphenation
+  -o, --output string              the directory to place the converted files (default ".")
+  -u, --update                     don't reconvert files which have already been converted
+  -v, --verbose                    show extra information in output
+      --version                    show the version
 
 Arguments:
-  PATH is the path to an epub file or directory to convert. If it
-  is a directory, the converted dir is the name of the dir with 
-  the suffix _converted. If the path is a file, the converted file
-  has the extension .kepub.epub.</pre>
+  PATH is the path to an epub file or directory to convert. If it is a directory, the converted
+  dir is the name of the dir with the suffix _converted. If the path is a file, the converted
+  file has the extension .kepub.epub.</pre>
         </div>
     </div>
     <div class="section">

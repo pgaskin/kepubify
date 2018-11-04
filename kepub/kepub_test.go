@@ -25,7 +25,7 @@ func TestKepubify(t *testing.T) {
 	kepub := filepath.Join(td, "test1.kepub.epub")
 	kepubunp := filepath.Join(td, "test1.kepub.epub_unpacked")
 
-	err = Kepubify(filepath.Join(wd, "testdata", "books", "test1.epub"), kepub, false, nil, nil)
+	err = Kepubify(filepath.Join(wd, "testdata", "books", "test1.epub"), kepub, false, nil, nil, false)
 	assert.Nil(t, err, "should not error when converting book")
 	assert.True(t, exists(kepub), "converted kepub should exist")
 

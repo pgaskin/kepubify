@@ -2,6 +2,7 @@ package kepub
 
 import (
 	"fmt"
+	"html"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,7 +17,7 @@ import (
 
 // Kepubify converts a .epub into a .kepub.epub.
 // It can also optionally run a postprocessor for each file on the goquery.Document, or the html string.
-func Kepubify(src, dest string, verbose bool, postDoc *func(doc *goquery.Document) error, postHTML *func(h *string) error) error {
+func Kepubify(src, dest string, verbose bool, postDoc *func(doc *goquery.Document) error, postHTML *func(h *string) error, inlinestyles bool) error {
 	td, err := ioutil.TempDir("", "kepubify")
 	if err != nil {
 		return fmt.Errorf("could not create temp dir: %s", err)
@@ -62,7 +63,24 @@ func Kepubify(src, dest string, verbose bool, postDoc *func(doc *goquery.Documen
 				return
 			}
 			str := string(buf)
-			err = process(&str, postDoc, postHTML)
+			pd := func(doc *goquery.Document) error {
+				if postDoc != nil {
+					(*postDoc)(doc)
+				}
+				if inlinestyles {
+					doc.Find("link[rel='stylesheet'][href$='.css']").Each(func(_ int, s *goquery.Selection) {
+						href := s.AttrOr("href", "")
+						fp := filepath.Join(filepath.Dir(cf), href)
+						buf, err := ioutil.ReadFile(fp)
+						if err != nil {
+							return
+						}
+						s.ReplaceWithHtml(`<style type="text/css">` + html.EscapeString(string(buf)) + `</style>`)
+					})
+				}
+				return nil
+			}
+			err = process(&str, &pd, postHTML)
 			if err != nil {
 				select {
 				case cerr <- fmt.Errorf("Error processing content file \"%s\": %s", cf, err): // Put err in the channel unless it is full

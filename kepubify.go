@@ -37,15 +37,16 @@ func errExit() {
 }
 
 func main() {
-	help := pflag.BoolP("help", "h", false, "Show this help text")
-	sversion := pflag.Bool("version", false, "Show the version")
-	update := pflag.BoolP("update", "u", false, "Don't reconvert files which have already been converted")
-	verbose := pflag.BoolP("verbose", "v", false, "Show extra information in output")
-	output := pflag.StringP("output", "o", ".", "The directory to place the converted files")
-	css := pflag.StringP("css", "c", "", "Custom CSS to add to ebook")
-	hyphenate := pflag.Bool("hyphenate", false, "Force enable hyphenation")
-	nohyphenate := pflag.Bool("no-hyphenate", false, "Force disable hyphenation")
-	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
+	help := pflag.BoolP("help", "h", false, "show this help text")
+	sversion := pflag.Bool("version", false, "show the version")
+	update := pflag.BoolP("update", "u", false, "don't reconvert files which have already been converted")
+	verbose := pflag.BoolP("verbose", "v", false, "show extra information in output")
+	output := pflag.StringP("output", "o", ".", "the directory to place the converted files")
+	css := pflag.StringP("css", "c", "", "custom CSS to add to ebook")
+	hyphenate := pflag.Bool("hyphenate", false, "force enable hyphenation")
+	nohyphenate := pflag.Bool("no-hyphenate", false, "force disable hyphenation")
+	inlinestyles := pflag.Bool("inline-styles", false, "inline all stylesheets (for working around certain bugs)")
+	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
 	pflag.Parse()
 
 	if *sversion {
@@ -98,6 +99,7 @@ func main() {
 	logV("css: %s\n", *css)
 	logV("hyphenate: %t\n", *hyphenate)
 	logV("nohyphenate: %t\n", *nohyphenate)
+	logV("inlinestyles: %t\n\n", *inlinestyles)
 	logV("fullscreenfixes: %t\n\n", *fullscreenfixes)
 
 	paths := map[string]string{}
@@ -277,7 +279,7 @@ func main() {
 			return nil
 		}
 
-		err := kepub.Kepubify(i, o, *verbose, &postDoc, nil)
+		err := kepub.Kepubify(i, o, *verbose, &postDoc, nil, *inlinestyles)
 		if err != nil {
 			errs = append(errs, []string{i, o, err.Error()})
 			logV("  err: %v\n", err)
