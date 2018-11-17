@@ -8,9 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
-	"golang.org/x/net/html"
-
 	"github.com/geek1011/kepubify/kepub"
 	isatty "github.com/mattn/go-isatty"
 	zglob "github.com/mattn/go-zglob"
@@ -101,6 +98,15 @@ func main() {
 	logV("nohyphenate: %t\n", *nohyphenate)
 	logV("inlinestyles: %t\n\n", *inlinestyles)
 	logV("fullscreenfixes: %t\n\n", *fullscreenfixes)
+
+	converter := &kepub.Converter{
+		ExtraCSS:        *css,
+		Hyphenate:       *hyphenate,
+		NoHyphenate:     *nohyphenate,
+		InlineStyles:    *inlinestyles,
+		FullScreenFixes: *fullscreenfixes,
+		Verbose:         *verbose,
+	}
 
 	paths := map[string]string{}
 	for _, arg := range uniq(pflag.Args()) {
@@ -208,78 +214,7 @@ func main() {
 			}
 		}
 
-		postDoc := func(doc *goquery.Document) error {
-			addStyle := func(cssstr, class string) {
-				style := &html.Node{
-					Type: html.ElementNode,
-					Data: "style",
-					Attr: []html.Attribute{{
-						Key: "type",
-						Val: "text/css",
-					}, {
-						Key: "class",
-						Val: class,
-					}},
-				}
-
-				style.AppendChild(&html.Node{
-					Type: html.TextNode,
-					Data: cssstr,
-				})
-
-				doc.Find("body").AppendNodes(style)
-			}
-
-			if css != nil && *css != "" {
-				addStyle(*css, "kepubify-custom")
-			}
-
-			if *hyphenate {
-				addStyle(`* {
-					-webkit-hyphens: auto;
-					-moz-hyphens: auto;
-					hyphens: auto;
-				
-					-webkit-hyphenate-after: 3;
-					-webkit-hyphenate-before: 3;
-					-webkit-hyphenate-lines: 2;
-					hyphenate-after: 3;
-					hyphenate-before: 3;
-					hyphenate-lines: 2;
-				}
-				
-				h1, h2, h3, h4, h5, h6, td {
-					-moz-hyphens: none !important;
-					-webkit-hyphens: none !important;
-					hyphens: none !important;
-				}`, "kepubify-hyphenate")
-			}
-
-			if *nohyphenate {
-				addStyle(`* {
-					-moz-hyphens: none !important;
-					-webkit-hyphens: none !important;
-					hyphens: none !important;
-				}`, "kepubify-nohyphenate")
-			}
-
-			if *fullscreenfixes {
-				// Based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
-				addStyle(`body {
-					margin: 0 !important;
-					padding: 0 !important;
-				}
-				
-				body>div {
-					padding-left: 0.2em !important;
-					padding-right: 0.2em !important;
-				}`, "kepubify-fullscreenfixes")
-			}
-
-			return nil
-		}
-
-		err := kepub.Kepubify(i, o, *verbose, &postDoc, nil, *inlinestyles)
+		err := converter.Convert(i, o)
 		if err != nil {
 			errs = append(errs, []string{i, o, err.Error()})
 			logV("  err: %v\n", err)

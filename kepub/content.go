@@ -2,78 +2,13 @@ package kepub
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
 	"golang.org/x/net/html"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/beevik/etree"
 )
-
-func cleanFiles(basepath string) error {
-	toRemove := []string{
-		"META-INF/calibre_bookmarks.txt",
-		"META-INF/iTunesMetadata.plist",
-		"META-INF/iTunesArtwork.plist",
-		"META-INF/.DS_STORE",
-		"META-INF/thumbs.db",
-		".DS_STORE",
-		"thumbs.db",
-		"iTunesMetadata.plist",
-		"iTunesArtwork.plist",
-	}
-
-	for _, file := range toRemove {
-		os.Remove(filepath.Join(basepath, file))
-	}
-
-	return nil
-}
-
-// processOPF cleans up extra calibre metadata from the content.opf file, and adds a reference to the cover image.
-func processOPF(opfText *string) error {
-	opf := etree.NewDocument()
-	err := opf.ReadFromString(*opfText)
-	if err != nil {
-		return err
-	}
-
-	// Add properties="cover-image" to cover file item entry to enable the kobo
-	// to find the cover image.
-	for _, meta := range opf.FindElements("//meta[@name='cover']") {
-		coverID := meta.SelectAttrValue("content", "")
-		if coverID == "" {
-			coverID = "cover"
-		}
-		for _, item := range opf.FindElements("//[@id='" + coverID + "']") {
-			item.CreateAttr("properties", "cover-image")
-		}
-	}
-
-	// Remove calibre:timestamp
-	for _, meta := range opf.FindElements("//meta[@name='calibre:timestamp']") {
-		meta.Parent().RemoveChild(meta)
-	}
-
-	// Remove calibre contributor tag
-	for _, contributor := range opf.FindElements("//dc:contributor[@role='bkp']") {
-		contributor.Parent().RemoveChild(contributor)
-	}
-
-	// Pretty print OPF
-	opf.Indent(4)
-
-	// Write OPF
-	*opfText, err = opf.WriteToString()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // addDivs adds kobo divs.
 func addDivs(doc *goquery.Document) error {
@@ -208,17 +143,17 @@ func addKoboStyles(doc *goquery.Document) error {
 }
 
 // smartenPunctuation smartens punctuation in html code. It must be run last.
-func smartenPunctuation(html *string) error {
+func smartenPunctuation(html string) string {
 	// em and en dashes
-	*html = strings.Replace(*html, "---", " &#x2013; ", -1)
-	*html = strings.Replace(*html, "--", " &#x2014; ", -1)
+	html = strings.Replace(html, "---", " &#x2013; ", -1)
+	html = strings.Replace(html, "--", " &#x2014; ", -1)
 
 	// TODO: smart quotes
 
 	// Fix comments
-	*html = strings.Replace(*html, "<! &#x2014; ", "<!-- ", -1)
-	*html = strings.Replace(*html, " &#x2014; >", " -->", -1)
-	return nil
+	html = strings.Replace(html, "<! &#x2014; ", "<!-- ", -1)
+	html = strings.Replace(html, " &#x2014; >", " -->", -1)
+	return html
 }
 
 // cleanHTML cleans up html for a kobo epub.
@@ -263,72 +198,8 @@ var selfClosingScriptRe = regexp.MustCompile(`<(script)([^>]*?)\/>`)
 var selfClosingTitleRe = regexp.MustCompile("<title */>")
 
 // fixInvalidSelfClosingTags fixes invalid self-closing tags which cause breakages. It must be run first.
-func fixInvalidSelfClosingTags(html *string) error {
-	*html = selfClosingTitleRe.ReplaceAllString(*html, "<title>book</title>")
-	*html = selfClosingScriptRe.ReplaceAllString(*html, "<$1$2> </$1>")
-	return nil
-}
-
-// process processes the html of a content file in an ordinary epub and converts it into a kobo epub by adding kobo divs, kobo spans, smartening punctuation, and cleaning html.
-// It can also optionally run a postprocessor on the goquery.Document, or the html string.
-func process(content *string, postDoc *func(doc *goquery.Document) error, postHTML *func(h *string) error) error {
-	if err := fixInvalidSelfClosingTags(content); err != nil {
-		return err
-	}
-
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(*content))
-	if err != nil {
-		return err
-	}
-
-	if err := addDivs(doc); err != nil {
-		return err
-	}
-
-	if err := addSpans(doc); err != nil {
-		return err
-	}
-
-	if err := addKoboStyles(doc); err != nil {
-		return err
-	}
-
-	if err := cleanHTML(doc); err != nil {
-		return err
-	}
-
-	if postDoc != nil {
-		if err := (*postDoc)(doc); err != nil {
-			return err
-		}
-	}
-
-	h, err := doc.Html()
-	if err != nil {
-		return err
-	}
-
-	if err := smartenPunctuation(&h); err != nil {
-		return err
-	}
-
-	// Remove unicode replacement chars
-	h = strings.Replace(h, "�", "", -1)
-
-	// Fix commented xml tag
-	h = strings.Replace(h, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
-	h = strings.Replace(h, `<!--?xml version="1.0" encoding="utf-8"?-->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)
-
-	// Fix nbsps removed
-	h = strings.Replace(h, "\u00a0", "&#160;", -1)
-
-	if postHTML != nil {
-		if err := (*postHTML)(&h); err != nil {
-			return err
-		}
-	}
-
-	*content = h
-
-	return nil
+func fixInvalidSelfClosingTags(html string) string {
+	html = selfClosingTitleRe.ReplaceAllString(html, "<title>book</title>")
+	html = selfClosingScriptRe.ReplaceAllString(html, "<$1$2> </$1>")
+	return html
 }

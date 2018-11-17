@@ -26,7 +26,7 @@ func TestCleanHTML(t *testing.T) {
 
 func TestSmartenPunctuation(t *testing.T) {
 	h := `-- --- <!--test-->`
-	smartenPunctuation(&h)
+	h = smartenPunctuation(h)
 	assert.Equal(t, " &#x2014;   &#x2013;  <!-- test -->", h, "should be equal if smartened correctly")
 }
 
@@ -134,7 +134,8 @@ func TestProcess(t *testing.T) {
 </body>
 </html>`
 
-	process(&h, nil, nil)
+	h, err := new(Converter).ProcessHTML(h, "")
+	assert.NoError(t, err)
 
 	hs := sha256.New()
 	hs.Write([]byte(h))
@@ -145,7 +146,8 @@ func TestProcess(t *testing.T) {
 
 	ha := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/></head><body><p>Test&#160;&nbsp;Test</p><p>&nbsp;&#160;</p><p>Test</p></body></html>`
 	hax := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">Test&#160;&#160;Test</span></p><p><span class="koboSpan" id="kobo.2.1">&#160;&#160;</span></p><p><span class="koboSpan" id="kobo.3.1">Test</span></p></div></div></body></html>`
-	process(&ha, nil, nil)
+	ha, err = new(Converter).ProcessHTML(ha, "")
+	assert.NoError(t, err)
 	assert.Equal(t, hax, ha, "should process nbsps correctly")
 
 	ha1 := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/></head><body><p>test</p></body></html>`
@@ -154,16 +156,18 @@ func TestProcess(t *testing.T) {
 		doc.Find("title").SetText("Replaced Book 1")
 		return nil
 	}
-	postHTML := func(h *string) error {
-		*h = strings.Replace(*h, "test", "replaced", -1)
-		return nil
+	postHTML := func(h string) (string, error) {
+		h = strings.Replace(h, "test", "replaced", -1)
+		return h, nil
 	}
-	process(&ha1, &postDoc, &postHTML)
+	ha1, err = (&Converter{PostDoc: postDoc, PostHTML: postHTML}).ProcessHTML(ha1, "")
+	assert.NoError(t, err)
 	assert.Equal(t, hax1, ha1, "should run post-processing correctly")
 
 	ha2 := `<!DOCTYPE html><html><head><title /><title/></head><body><p>test</p></body></html>`
 	hax2 := `<!DOCTYPE html><html><head><title>book</title><title>book</title><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">test</span></p></div></div></body></html>`
-	process(&ha2, nil, nil)
+	ha2, err = new(Converter).ProcessHTML(ha2, "")
+	assert.NoError(t, err)
 	assert.Equal(t, hax2, ha2, "should fix invalid self-closing title tags")
 }
 
@@ -195,7 +199,7 @@ func TestProcessOPF(t *testing.T) {
 		<itemref idref="p1"/>
 	</spine>
 </package>`
-	processOPF(&opf)
+	opf, _ = new(Converter).ProcessOPF(opf)
 
 	assert.Equal(t, "<?xml version='1.0' encoding='utf-8'?>\n<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"2.0\" unique-identifier=\"uuid_id\">\n    <metadata xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:opf=\"http://www.idpf.org/2007/opf\" xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:calibre=\"http://calibre.kovidgoyal.net/2009/metadata\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n        <dc:publisher>Patrick G</dc:publisher>\n        <dc:description>&lt;p&gt;This is a test book for &lt;i&gt;kepubify&lt;/i&gt;.&lt;/p&gt;</dc:description>\n        <meta name=\"calibre:series\" content=\"Test Series\"/>\n        <meta name=\"calibre:series_index\" content=\"1\"/>\n        <dc:language>en</dc:language>\n        <dc:creator opf:role=\"aut\">Patrick G</dc:creator>\n        <dc:title>epubtool Test Book 1</dc:title>\n        <meta name=\"cover\" content=\"cover\"/>\n        <dc:date>2017-07-26T14:00:00+00:00</dc:date>\n        <dc:identifier id=\"uuid_id\" opf:scheme=\"uuid\">cf8fd6fa-3998-4e25-bfc0-8e9b529f8556</dc:identifier>\n    </metadata>\n    <manifest>\n        <item href=\"cover.jpeg\" id=\"cover\" media-type=\"image/jpeg\" properties=\"cover-image\"/>\n        <item href=\"title.html\" id=\"p0\" media-type=\"application/xhtml+xml\"/>\n        <item href=\"text01.html\" id=\"p1\" media-type=\"application/xhtml+xml\"/>\n        <item href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\" id=\"ncx\"/>\n    </manifest>\n    <spine toc=\"ncx\">\n        <itemref idref=\"p0\"/>\n        <itemref idref=\"p1\"/>\n    </spine>\n</package>\n", opf, "should be equal if cleaned correctly")
 }
@@ -302,8 +306,7 @@ func TestFixInvalidSelfClosingTags(t *testing.T) {
 		c.Out = fmt.Sprintf("<html><head>%s</head><body></body></html>", c.Out)
 
 		h := c.In
-		err := fixInvalidSelfClosingTags(&h)
-		assert.NoError(t, err, "should not error")
+		h = fixInvalidSelfClosingTags(h)
 		assert.Equalf(t, c.Out, h, "%s (after replacement)", c.What)
 
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(h))
@@ -343,6 +346,6 @@ func BenchmarkProcess(b *testing.B) {
 			</div>
 		</body>
 		</html>`
-		process(&h, nil, nil)
+		h, _ = new(Converter).ProcessHTML(h, "")
 	}
 }
