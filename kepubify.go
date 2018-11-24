@@ -44,6 +44,7 @@ func main() {
 	nohyphenate := pflag.Bool("no-hyphenate", false, "force disable hyphenation")
 	inlinestyles := pflag.Bool("inline-styles", false, "inline all stylesheets (for working around certain bugs)")
 	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
+	replace := pflag.StringArrayP("replace", "r", nil, "find and replace on all html files (repeat any number of times) (format: find|replace)")
 	pflag.Parse()
 
 	if *sversion {
@@ -98,6 +99,17 @@ func main() {
 	logV("nohyphenate: %t\n", *nohyphenate)
 	logV("inlinestyles: %t\n\n", *inlinestyles)
 	logV("fullscreenfixes: %t\n\n", *fullscreenfixes)
+	logV("replace: %s\n\n", strings.Join(*replace, ","))
+
+	findReplace := map[string]string{}
+	for _, r := range *replace {
+		spl := strings.SplitN(r, "|", 2)
+		if len(spl) != 2 {
+			logE("Error parsing replacement '%s': must be in format `find|replace`\n", r)
+			errExit()
+		}
+		findReplace[spl[0]] = spl[1]
+	}
 
 	converter := &kepub.Converter{
 		ExtraCSS:        *css,
@@ -105,6 +117,7 @@ func main() {
 		NoHyphenate:     *nohyphenate,
 		InlineStyles:    *inlinestyles,
 		FullScreenFixes: *fullscreenfixes,
+		FindReplace:     findReplace,
 		Verbose:         *verbose,
 	}
 

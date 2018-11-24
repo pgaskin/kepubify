@@ -60,6 +60,7 @@ type Converter struct {
 	Hyphenate       bool                              // force enable hyphenation
 	InlineStyles    bool                              // inline all stylesheets
 	FullScreenFixes bool                              // add css to fix FullScreenReading (probably not needed since 4.11.11911)
+	FindReplace     map[string]string                 // find and replace on the html of all content files
 	Verbose         bool                              // verbose output to stdout during conversion
 }
 
@@ -209,6 +210,12 @@ func (c *Converter) ProcessHTML(html, filename string) (string, error) {
 	html = strings.Replace(html, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1) // Fix commented xml tag
 	html = strings.Replace(html, `<!--?xml version="1.0" encoding="utf-8"?-->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)   // Fix commented xml tag
 	html = strings.Replace(html, "\u00a0", "&#160;", -1)                                                                       // Fix nbsps removed
+
+	if c.FindReplace != nil {
+		for find, replace := range c.FindReplace {
+			html = strings.Replace(html, find, replace, -1)
+		}
+	}
 
 	if c.PostHTML != nil {
 		if html, err = c.PostHTML(html); err != nil {

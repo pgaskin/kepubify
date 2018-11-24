@@ -302,23 +302,27 @@ func TestFixInvalidSelfClosingTags(t *testing.T) {
 			`<script xmlns="http://www.w3.org/1999/xhtml" type="text/javascript" src="../script.js"> </script>`,
 		},
 	} {
-		c.In = fmt.Sprintf("<html><head>%s</head><body></body></html>", c.In)
-		c.Out = fmt.Sprintf("<html><head>%s</head><body></body></html>", c.Out)
+		d := c
+		t.Run(d.What, func(t *testing.T) {
+			t.Parallel()
+			d.In = fmt.Sprintf("<html><head>%s</head><body></body></html>", d.In)
+			d.Out = fmt.Sprintf("<html><head>%s</head><body></body></html>", d.Out)
 
-		h := c.In
-		h = fixInvalidSelfClosingTags(h)
-		assert.Equalf(t, c.Out, h, "%s (after replacement)", c.What)
+			h := d.In
+			h = fixInvalidSelfClosingTags(h)
+			assert.Equalf(t, d.Out, h, "%s (after replacement)", d.What)
 
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(h))
-		assert.NoError(t, err, "should not error when parsing modified document")
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(h))
+			assert.NoError(t, err, "should not error when parsing modified document")
 
-		if c.Out == "<html><head><script    > </script></head><body></body></html>" {
-			c.Out = "<html><head><script> </script></head><body></body></html>"
-		}
+			if d.Out == "<html><head><script    > </script></head><body></body></html>" {
+				d.Out = "<html><head><script> </script></head><body></body></html>"
+			}
 
-		h, err = doc.Html()
-		assert.NoError(t, err, "should not error when creating new html")
-		assert.Equalf(t, c.Out, h, "%s (after passing through goquery)", c.What)
+			h, err = doc.Html()
+			assert.NoError(t, err, "should not error when creating new html")
+			assert.Equalf(t, d.Out, h, "%s (after passing through goquery)", d.What)
+		})
 	}
 }
 
