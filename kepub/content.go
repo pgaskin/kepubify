@@ -18,8 +18,8 @@ func addDivs(doc *goquery.Document) error {
 	}
 
 	// Add the kobo divs
-	doc.Find("body>*").WrapAllHtml(`<div class="book-inner"></div>`)
-	doc.Find("body>*").WrapAllHtml(`<div class="book-columns"></div>`)
+	doc.Find("body>*").WrapAllHtml(`<div id="book-inner"></div>`)
+	doc.Find("body>*").WrapAllHtml(`<div id="book-columns"></div>`)
 
 	return nil
 }

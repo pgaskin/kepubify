@@ -107,7 +107,7 @@ func TestAddDivs(t *testing.T) {
 
 	hxs := fmt.Sprintf("%x", hs.Sum(nil))
 
-	assert.Equal(t, "d24ae5a8f438358828d50b036007fe06c9e24b55d6aa238f4628a24d77a15485", hxs, "hash of content should be equal if processed correctly")
+	assert.Equal(t, "6bccf0973f44b1866d9af46e9b5b1943df6a0c1f8bd5475e9e733fc0ccea627a", hxs, "hash of content should be equal if processed correctly")
 }
 
 func TestProcess(t *testing.T) {
@@ -142,16 +142,16 @@ func TestProcess(t *testing.T) {
 
 	hxs := fmt.Sprintf("%x", hs.Sum(nil))
 
-	assert.Equal(t, "3abc0810906b322e3860b3d7fd1bafd5133a4a66ced286497eaafb40c94612fd", hxs, "hash of content should be equal if processed correctly")
+	assert.Equal(t, "924e4661282d897482de48fbc3dd261e5b89ee2b097c8c465b8f80d76a2ce068", hxs, "hash of content should be equal if processed correctly")
 
 	ha := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/></head><body><p>Test&#160;&nbsp;Test</p><p>&nbsp;&#160;</p><p>Test</p></body></html>`
-	hax := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">Test&#160;&#160;Test</span></p><p><span class="koboSpan" id="kobo.2.1">&#160;&#160;</span></p><p><span class="koboSpan" id="kobo.3.1">Test</span></p></div></div></body></html>`
+	hax := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">Test&#160;&#160;Test</span></p><p><span class="koboSpan" id="kobo.2.1">&#160;&#160;</span></p><p><span class="koboSpan" id="kobo.3.1">Test</span></p></div></div></body></html>`
 	ha, err = new(Converter).ProcessHTML(ha, "")
 	assert.NoError(t, err)
 	assert.Equal(t, hax, ha, "should process nbsps correctly")
 
 	ha1 := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Test Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/></head><body><p>test</p></body></html>`
-	hax1 := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Replaced Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">replaced</span></p></div></div></body></html>`
+	hax1 := `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Replaced Book 1</title><meta content="http://www.w3.org/1999/xhtml; charset=utf-8" http-equiv="Content-Type"/><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">replaced</span></p></div></div></body></html>`
 	postDoc := func(doc *goquery.Document) error {
 		doc.Find("title").SetText("Replaced Book 1")
 		return nil
@@ -165,7 +165,7 @@ func TestProcess(t *testing.T) {
 	assert.Equal(t, hax1, ha1, "should run post-processing correctly")
 
 	ha2 := `<!DOCTYPE html><html><head><title /><title/></head><body><p>test</p></body></html>`
-	hax2 := `<!DOCTYPE html><html><head><title>book</title><title>book</title><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div class="book-columns"><div class="book-inner"><p><span class="koboSpan" id="kobo.1.1">test</span></p></div></div></body></html>`
+	hax2 := `<!DOCTYPE html><html><head><title>book</title><title>book</title><style type="text/css">div#book-inner{margin-top: 0;margin-bottom: 0;}</style></head><body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">test</span></p></div></div></body></html>`
 	ha2, err = new(Converter).ProcessHTML(ha2, "")
 	assert.NoError(t, err)
 	assert.Equal(t, hax2, ha2, "should fix invalid self-closing title tags")
