@@ -7,13 +7,8 @@ clean:
 
 .PHONY: build-deps
 build-deps:
-	go get -v "github.com/kardianos/govendor"
 	go get -v "github.com/aktau/github-release"
 	go get -v "github.com/goreleaser/nfpm/cmd/nfpm"
-
-.PHONY: deps
-deps:
-	govendor sync
 
 .PHONY: generate
 generate:
