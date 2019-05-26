@@ -9,12 +9,10 @@ addons:
      - gcc-mingw-w64-i686
 
 script:
- - make clean
- - make build-deps
- - make deps
- - make generate
- - make test
- - make build
+ - go get -v "github.com/aktau/github-release"
+ - go get -v "github.com/goreleaser/nfpm/cmd/nfpm"
+ - go generate ./...
+ - go test -v ./...
 
 deploy:
   provider: script
