@@ -9,6 +9,7 @@ addons:
      - gcc-mingw-w64-i686
 
 script:
+ - export GO111MODULE=on
  - go get -v "github.com/aktau/github-release"
  - go get -v "github.com/goreleaser/nfpm/cmd/nfpm"
  - go generate ./...
