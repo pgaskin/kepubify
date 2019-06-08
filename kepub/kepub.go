@@ -84,8 +84,6 @@ func (c *Converter) Convert(src, dest string) error {
 		}
 	}
 
-	runtime.GOMAXPROCS(runtime.NumCPU() + 1)
-	var wg sync.WaitGroup
 	err = nil
 	var errOnce sync.Once // this is a slightly less efficient method for handling errors, but it is way cleaner
 	errfn := func(ferr error) {
@@ -93,9 +91,14 @@ func (c *Converter) Convert(src, dest string) error {
 			err = ferr
 		})
 	}
+	var wg sync.WaitGroup
+	runtime.GOMAXPROCS(runtime.NumCPU()*2 + 2)
+	sem := make(chan struct{}, runtime.NumCPU()*2)
 	for _, f := range contentFiles {
 		wg.Add(1)
 		go func(f string) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			defer wg.Done()
 			if buf, err := ioutil.ReadFile(f); err != nil {
 				errfn(err)
