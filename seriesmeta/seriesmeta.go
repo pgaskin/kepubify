@@ -5,269 +5,251 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/geek1011/koboutils/kobo"
 
 	"github.com/beevik/etree"
-	"github.com/mattn/go-zglob"
-	"golang.org/x/tools/godoc/vfs/zipfs"
-
-	"github.com/spf13/pflag"
-
+	"github.com/geek1011/koboutils/kobo"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-zglob"
+	"github.com/spf13/pflag"
 )
 
 var version = "dev"
-
-func helpExit() {
-	fmt.Fprintf(os.Stderr, "Usage: seriesmeta [OPTIONS] [KOBO_PATH]\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
-	pflag.PrintDefaults()
-	fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader. If not specified, seriesmeta will try to automatically detect the Kobo.\n")
-	if runtime.GOOS == "windows" {
-		time.Sleep(time.Second * 2)
-	}
-	os.Exit(1)
-}
-
-func errExit() {
-	if runtime.GOOS == "windows" {
-		time.Sleep(time.Second * 2)
-	}
-	os.Exit(1)
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	return out.Close()
-}
-
-// pathToContentID gets the content ID for a book. The path needs to be relative to the root of the kobo.
-func pathToContentID(relpath string) string {
-	return fmt.Sprintf("file:///mnt/onboard/%s", filepath.ToSlash(relpath))
-}
-
-func contentIDToImageID(contentID string) string {
-	imageID := contentID
-
-	imageID = strings.Replace(imageID, " ", "_", -1)
-	imageID = strings.Replace(imageID, "/", "_", -1)
-	imageID = strings.Replace(imageID, ":", "_", -1)
-	imageID = strings.Replace(imageID, ".", "_", -1)
-
-	return imageID
-}
-
-func getMeta(path string) (string, float64, error) {
-	zr, err := zip.OpenReader(path)
-	if err != nil {
-		return "", 0, err
-	}
-
-	zfs := zipfs.New(zr, "epub")
-	rsk, err := zfs.Open("/META-INF/container.xml")
-	if err != nil {
-		return "", 0, err
-	}
-	defer rsk.Close()
-
-	container := etree.NewDocument()
-	_, err = container.ReadFrom(rsk)
-	if err != nil {
-		return "", 0, err
-	}
-
-	rootfile := ""
-	for _, e := range container.FindElements("//rootfiles/rootfile[@full-path]") {
-		rootfile = e.SelectAttrValue("full-path", "")
-	}
-
-	if rootfile == "" {
-		return "", 0, errors.New("Cannot parse container")
-	}
-
-	rrsk, err := zfs.Open("/" + rootfile)
-	if err != nil {
-		return "", 0, err
-	}
-	defer rrsk.Close()
-
-	opf := etree.NewDocument()
-	_, err = opf.ReadFrom(rrsk)
-	if err != nil {
-		return "", 0, err
-	}
-
-	var series string
-	for _, e := range opf.FindElements("//meta[@name='calibre:series']") {
-		series = e.SelectAttrValue("content", "")
-		break
-	}
-
-	var seriesNumber float64
-	for _, e := range opf.FindElements("//meta[@name='calibre:series_index']") {
-		i, err := strconv.ParseFloat(e.SelectAttrValue("content", "0"), 64)
-		if err == nil {
-			seriesNumber = i
-			break
-		}
-	}
-
-	return series, seriesNumber, nil
-}
 
 func main() {
 	help := pflag.BoolP("help", "h", false, "Show this help message")
 	pflag.Parse()
 
 	if *help || pflag.NArg() > 1 {
-		helpExit()
+		fmt.Fprintf(os.Stderr, "Usage: seriesmeta [OPTIONS] [KOBO_PATH]\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
+		pflag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader. If not specified, seriesmeta will try to automatically detect the Kobo.\n")
+		os.Exit(2)
 	}
 
-	log := func(format string, a ...interface{}) {
-		fmt.Printf(format, a...)
-	}
-
-	logE := func(format string, a ...interface{}) {
-		fmt.Fprintf(os.Stderr, format, a...)
-	}
-
-	var kpath string
+	fmt.Println("Finding kobo")
+	var kp string
 	if pflag.NArg() == 1 {
-		kpath = strings.Replace(pflag.Arg(0), ".kobo", "", 1)
+		kp = pflag.Arg(0)
 	} else {
-		log("No kobo specified, attempting to detect one\n")
 		kobos, err := kobo.Find()
 		if err != nil {
-			logE("Fatal: could not automatically detect a kobo: %v\n", err)
-			errExit()
-		} else if len(kobos) < 1 {
-			logE("Fatal: could not automatically detect a kobo\n")
-			errExit()
+			fmt.Fprintf(os.Stderr, "Could not automatically detect a Kobo eReader: %v.\n", err)
+			os.Exit(1)
+		} else if len(kobos) == 0 {
+			fmt.Fprintf(os.Stderr, "Could not automatically detect a Kobo eReader.\n")
+			os.Exit(1)
 		}
-		kpath = kobos[0]
+		kp = kobos[0]
 	}
 
-	log("Checking kobo at '%s'\n", kpath)
-	if !kobo.IsKobo(kpath) {
-		logE("Fatal: '%s' is not a valid kobo\n", kpath)
-	}
-
-	kpath, err := filepath.Abs(kpath)
+	fmt.Println("Opening kobo")
+	k, err := OpenKobo(kp)
 	if err != nil {
-		logE("Fatal: Could not resolve path to kobo\n")
-		errExit()
+		fmt.Fprintf(os.Stderr, "Could not open Kobo eReader: %v.\n", err)
+		os.Exit(1)
 	}
 
-	dbpath := filepath.Join(kpath, ".kobo", "KoboReader.sqlite")
-
-	log("Making backup of KoboReader.sqlite\n")
-	err = copyFile(dbpath, dbpath+".bak")
-	if err != nil {
-		logE("Fatal: Could not make copy of KoboReader.sqlite: %v\n", err)
-		errExit()
-	}
-
-	log("Opening KoboReader.sqlite\n")
-	db, err := sql.Open("sqlite3", dbpath)
-	if err != nil {
-		logE("Fatal: Could not open KoboReader.sqlite: %v\n", err)
-		errExit()
-	}
-
-	log("Searching for sideloaded epubs and kepubs\n")
-	epubs, err := zglob.Glob(filepath.Join(kpath, "**", "*.epub"))
-	if err != nil {
-		logE("Fatal: Could not search for epubs: %v\n", err)
-		errExit()
-	}
-
-	log("\nUpdating metadata for %d books\n", len(epubs))
-	var updated, nometa, errcount int
-	digits := len(fmt.Sprint(len(epubs)))
-	numFmt, spFmt := fmt.Sprintf("[%%%dd/%d] ", digits, len(epubs)), strings.Repeat(" ", (digits*2)+4)
-	for i, epub := range epubs {
-		rpath, err := filepath.Rel(kpath, epub)
+	fmt.Println("Updating metadata")
+	var nt, nu, ne, nn int
+	if err := k.UpdateSeries(func(filename string, i, total int, series string, index float64, err error) {
+		fmt.Printf("[%3d/%3d] %-40s %s\n", i+1, total, fmt.Sprintf("(%-34s %3v)", series, index), filename)
 		if err != nil {
-			log(numFmt+"%s\n", i+1, epub)
-			logE(spFmt+"Error: could not resolve path: %v\n", err)
-			errcount++
-			continue
+			fmt.Printf("--------- Error: %v\n", err)
+			ne++
+		} else if series == "" {
+			nn++
+		} else {
+			nu++
 		}
-
-		log(numFmt+"%s\n", i+1, rpath)
-		series, seriesNumber, err := getMeta(epub)
-		if err != nil {
-			logE(spFmt+"Error: could not read metadata: %v\n", err)
-			errcount++
-			continue
-		}
-
-		if series == "" && seriesNumber == 0 {
-			nometa++
-			continue
-		}
-
-		log(spFmt+"(%s, %v)\n", series, seriesNumber)
-
-		iid := contentIDToImageID(pathToContentID(rpath))
-
-		res, err := db.Exec("UPDATE content SET Series=?, SeriesNumber=? WHERE ImageID=?", sql.NullString{
-			String: series,
-			Valid:  series != "",
-		}, sql.NullString{
-			String: fmt.Sprintf("%v", seriesNumber),
-			Valid:  seriesNumber > 0,
-		}, iid)
-		if err != nil {
-			logE(spFmt+"Error: could not update database: %v\n", err)
-			errcount++
-			continue
-		}
-
-		ra, err := res.RowsAffected()
-		if err != nil {
-			logE(spFmt+"Error: could not update database: %v\n", err)
-			errcount++
-			continue
-		}
-
-		if ra > 1 {
-			logE(spFmt + "Warn: more than one match in database for ImageID\n")
-		} else if ra < 1 {
-			logE(spFmt + "Error: could not update database: no entry in database for book (the kobo may still need to import the book)\n")
-			errcount++
-			continue
-		}
-
-		updated++
+		nt = total
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not update metadata: %v.\n", err)
+		k.Close()
+		os.Exit(1)
 	}
 
-	time.Sleep(time.Second)
-	log("\nFinished updating metadata. %d updated, %d without metadata, %d errored.\n", updated, nometa, errcount)
-
-	if runtime.GOOS == "windows" {
-		time.Sleep(time.Second * 2)
+	fmt.Printf("%d total: %d updated, %d errored, %d without metadata\n", nt, nu, ne, nn)
+	if ne > 0 {
+		k.Close()
+		os.Exit(1)
 	}
+	k.Close()
 }
+
+// Kobo is a Kobo eReader.
+type Kobo struct {
+	Path string
+	DB   *sql.DB
+}
+
+// OpenKobo opens a Kobo eReader device and the database.
+func OpenKobo(path string) (*Kobo, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	} else if _, err = os.Stat(filepath.Join(path, ".kobo")); err != nil {
+		return nil, fmt.Errorf("could not access .kobo directory, is this a Kobo eReader: %v", err)
+	}
+
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open("sqlite3", filepath.Join(path, ".kobo", "KoboReader.sqlite"))
+	if err != nil {
+		return nil, fmt.Errorf("could not open KoboReader.sqlite: %v", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("could not open KoboReader.sqlite: %v", err)
+	}
+
+	return &Kobo{path, db}, nil
+}
+
+// Close closes the reader and the database.
+func (k *Kobo) Close() error {
+	return k.DB.Close()
+}
+
+// UpdateSeries updates the series metadata for all epub books on the device. All
+// errors from individual books are returned through the log callback.
+func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series string, index float64, err error)) error {
+	epubs, err := zglob.Glob(filepath.Join(k.Path, "**/*.epub"))
+	if err != nil {
+		return err
+	}
+
+	relEpubs := make([]string, len(epubs))
+	for i, epub := range epubs {
+		relEpubs[i], err = filepath.Rel(k.Path, epub)
+		if err != nil {
+			return fmt.Errorf("could not resolve relative path to %#v: %v", epub, err)
+		}
+	}
+
+	tx, err := k.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("could not begin db transaction: %v", err)
+	}
+
+	for i, epub := range epubs {
+		relEpub := relEpubs[i]
+		iid := contentIDToImageID(pathToContentID(relEpub))
+
+		series, index, err := readEPUBSeriesInfo(epub)
+		if err != nil {
+			log(relEpub, i, len(epubs), series, index, err)
+			continue
+		}
+
+		if res, err := tx.Exec(
+			"UPDATE content SET Series=?, SeriesNumber=? WHERE ImageID=?",
+			sql.NullString{String: series, Valid: len(series) > 0},
+			sql.NullString{String: strconv.FormatFloat(index, 'f', -1, 64), Valid: index > 0},
+			iid,
+		); err != nil {
+			log(relEpub, i, len(epubs), series, index, err)
+			continue
+		} else if ra, _ := res.RowsAffected(); ra == 0 {
+			log(relEpub, i, len(epubs), series, index, fmt.Errorf("no entry in database for book with ImageID %#v", iid))
+			continue
+		}
+
+		log(relEpub, i, len(epubs), series, index, nil)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("could not commit db transaction: %v", err)
+	}
+
+	return nil
+}
+
+func pathToContentID(relpath string) string {
+	return fmt.Sprintf("file:///mnt/onboard/%s", filepath.ToSlash(relpath))
+}
+
+func contentIDToImageID(contentID string) string {
+	return strings.NewReplacer(
+		" ", "_",
+		"/", "_",
+		":", "_",
+		".", "_",
+	).Replace(contentID)
+}
+
+// readEPUBSeriesInfo reads the series metadata from an epub book.
+func readEPUBSeriesInfo(filename string) (series string, index float64, err error) {
+	zr, err := zip.OpenReader(filename)
+	if err != nil {
+		return "", 0, fmt.Errorf("could not open ebook: %v", err)
+	}
+	defer zr.Close()
+
+	var rootfile string
+	for _, f := range zr.File {
+		if strings.TrimLeft(strings.ToLower(f.Name), "/") == "meta-inf/container.xml" {
+			rc, err := f.Open()
+			if err != nil {
+				return "", 0, fmt.Errorf("could not open container.xml: %v", err)
+			}
+			doc := etree.NewDocument()
+			_, err = doc.ReadFrom(rc)
+			if err != nil {
+				rc.Close()
+				return "", 0, fmt.Errorf("could not parse container.xml: %v", err)
+			}
+			if el := doc.FindElement("//rootfiles/rootfile[@full-path]"); el != nil {
+				rootfile = el.SelectAttrValue("full-path", "")
+			}
+			rc.Close()
+			break
+		}
+	}
+	if rootfile == "" {
+		return "", 0, errors.New("could not open ebook: could not find package document")
+	}
+
+	for _, f := range zr.File {
+		if strings.TrimLeft(strings.ToLower(f.Name), "/") == strings.TrimLeft(strings.ToLower(rootfile), "/") {
+			rc, err := f.Open()
+			if err != nil {
+				return "", 0, fmt.Errorf("could not open container.xml: %v", err)
+			}
+			doc := etree.NewDocument()
+			_, err = doc.ReadFrom(rc)
+			if err != nil {
+				rc.Close()
+				return "", 0, fmt.Errorf("could not parse container.xml: %v", err)
+			}
+			if el := doc.FindElement("//meta[@name='calibre:series']"); el != nil {
+				series = el.SelectAttrValue("content", "")
+			}
+			if el := doc.FindElement("//meta[@name='calibre:series_index']"); el != nil {
+				index, _ = strconv.ParseFloat(el.SelectAttrValue("content", "0"), 64)
+			}
+			break
+		}
+	}
+	return series, index, nil
+}
+
+/*func readEPUBSeriesInfo(filename string) (series string, index float64, err error) {
+	err = epubtransform.New(epubtransform.Transform{
+		OPFDoc: func(opf *etree.Document) error {
+			if el := opf.FindElement("//meta[@name='calibre:series']"); el != nil {
+				series = el.SelectAttrValue("content", "")
+			}
+			if el := opf.FindElement("//meta[@name='calibre:series_index']"); el != nil {
+				index, _ = strconv.ParseFloat(el.SelectAttrValue("content", "0"), 64)
+			}
+			return nil
+		},
+	}).Run(epubtransform.FileInput(filename), nil, false)
+	return
+}*/
