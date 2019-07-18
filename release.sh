@@ -22,7 +22,7 @@ if [[ -z "$(git describe --abbrev=0 --tags 2>/dev/null)" ]]; then
     export APP_VERSION=v0.0.1
 else
     export NO_TAGS=false
-    export APP_VERSION="$(git describe --tags --always --dirty)"
+    export APP_VERSION="$(git describe --tags --always)"
 fi
 
 echo "APP_VERSION: $APP_VERSION"
