@@ -145,14 +145,14 @@ func addKoboStyles(doc *goquery.Document) error {
 // smartenPunctuation smartens punctuation in html code. It must be run last.
 func smartenPunctuation(html string) string {
 	// em and en dashes
-	html = strings.Replace(html, "---", " &#x2013; ", -1)
-	html = strings.Replace(html, "--", " &#x2014; ", -1)
+	html = strings.ReplaceAll(html, "---", " &#x2013; ")
+	html = strings.ReplaceAll(html, "--", " &#x2014; ")
 
 	// TODO: smart quotes
 
 	// Fix comments
-	html = strings.Replace(html, "<! &#x2014; ", "<!-- ", -1)
-	html = strings.Replace(html, " &#x2014; >", " -->", -1)
+	html = strings.ReplaceAll(html, "<! &#x2014; ", "<!-- ")
+	html = strings.ReplaceAll(html, " &#x2014; >", " -->")
 	return html
 }
 

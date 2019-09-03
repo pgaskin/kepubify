@@ -48,12 +48,12 @@ func UnpackEPUB(src, dest string, overwritedest bool) error {
 
 	src, err := filepath.Abs(src)
 	if err != nil {
-		return fmt.Errorf("error resolving absolute path of source: %s", err)
+		return fmt.Errorf("error resolving absolute path of source: %w", err)
 	}
 
 	dest, err = filepath.Abs(dest)
 	if err != nil {
-		return fmt.Errorf("error resolving absolute path of destination: %s", err)
+		return fmt.Errorf("error resolving absolute path of destination: %w", err)
 	}
 
 	r, err := zip.OpenReader(src)
@@ -133,12 +133,12 @@ func PackEPUB(src, dest string, overwritedest bool) error {
 
 	src, err := filepath.Abs(src)
 	if err != nil {
-		return fmt.Errorf("error resolving absolute path of sourcedir: %s", err)
+		return fmt.Errorf("error resolving absolute path of sourcedir: %w", err)
 	}
 
 	dest, err = filepath.Abs(dest)
 	if err != nil {
-		return fmt.Errorf("error resolving absolute path of destination: %s", err)
+		return fmt.Errorf("error resolving absolute path of destination: %w", err)
 	}
 
 	if !exists(filepath.Join(src, "META-INF", "container.xml")) {
@@ -147,7 +147,7 @@ func PackEPUB(src, dest string, overwritedest bool) error {
 
 	f, err := os.Create(dest)
 	if err != nil {
-		return fmt.Errorf("error creating destination file: %s", err)
+		return fmt.Errorf("error creating destination file: %w", err)
 	}
 	defer f.Close()
 
@@ -186,20 +186,20 @@ func PackEPUB(src, dest string, overwritedest bool) error {
 		// Create file in zip
 		w, err := epub.Create(relativePath)
 		if err != nil {
-			return fmt.Errorf(`error creating file in epub "%s": %s`, relativePath, err)
+			return fmt.Errorf(`error creating file in epub "%s": %w`, relativePath, err)
 		}
 
 		// Open file on disk
 		r, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf(`error reading file "%s": %s`, path, err)
+			return fmt.Errorf(`error reading file "%s": %w`, path, err)
 		}
 		defer r.Close()
 
 		// Write file from disk to epub
 		_, err = io.Copy(w, r)
 		if err != nil {
-			return fmt.Errorf(`error writing file to epub "%s": %s`, relativePath, err)
+			return fmt.Errorf(`error writing file to epub "%s": %w`, relativePath, err)
 		}
 
 		return nil
@@ -222,7 +222,7 @@ func PackEPUB(src, dest string, overwritedest bool) error {
 
 	err = filepath.Walk(src, addFile)
 	if err != nil {
-		return fmt.Errorf("error adding file to epub: %s", err)
+		return fmt.Errorf("error adding file to epub: %w", err)
 	}
 
 	return nil

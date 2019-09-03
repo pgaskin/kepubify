@@ -142,7 +142,7 @@ func main() {
 				logE("File '%s' is already a kepub\n", f)
 				errExit()
 			}
-			paths[f] = filepath.Join(out, strings.Replace(filepath.Base(f), ".epub", "", -1)+".kepub.epub")
+			paths[f] = filepath.Join(out, strings.TrimSuffix(filepath.Base(f), ".epub")+".kepub.epub")
 			logV("  file-result: %s -> %s\n", f, paths[f])
 		} else if isDir(arg) {
 			argabs, err := filepath.Abs(arg)
@@ -162,7 +162,7 @@ func main() {
 					continue
 				}
 
-				rel, err := filepath.Rel(arg, filepath.Join(filepath.Dir(f), strings.Replace(filepath.Base(f), ".epub", "", -1)+".kepub.epub"))
+				rel, err := filepath.Rel(arg, filepath.Join(filepath.Dir(f), strings.TrimSuffix(filepath.Base(f), ".epub")+".kepub.epub"))
 				if err != nil {
 					logE("Error resolving relative path for file '%s'\n", f)
 					errExit()

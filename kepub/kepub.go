@@ -78,7 +78,7 @@ func (c *Converter) Convert(src, dest string) error {
 	var contentFiles []string
 	for _, glob := range []string{"**/*.html", "**/*.xhtml", "**/*.htm"} {
 		if files, err := zglob.Glob(filepath.Join(td, glob)); err != nil {
-			return fmt.Errorf("could not search for content files: %v", err)
+			return fmt.Errorf("could not search for content files: %w", err)
 		} else {
 			contentFiles = append(contentFiles, files...)
 		}
@@ -119,13 +119,13 @@ func (c *Converter) Convert(src, dest string) error {
 
 	rsk, err := os.Open(filepath.Join(td, "META-INF", "container.xml"))
 	if err != nil {
-		return fmt.Errorf("error opening container.xml: %v", err)
+		return fmt.Errorf("error opening container.xml: %w", err)
 	}
 	defer rsk.Close()
 
 	container := etree.NewDocument()
 	if _, err = container.ReadFrom(rsk); err != nil {
-		return fmt.Errorf("error parsing container.xml: %v", err)
+		return fmt.Errorf("error parsing container.xml: %w", err)
 	}
 
 	var rootfile string
@@ -137,19 +137,19 @@ func (c *Converter) Convert(src, dest string) error {
 	}
 
 	if buf, err := ioutil.ReadFile(filepath.Join(td, rootfile)); err != nil {
-		return fmt.Errorf("error parsing content.opf: %v", err)
+		return fmt.Errorf("error parsing content.opf: %w", err)
 	} else if opf, err := c.ProcessOPF(string(buf)); err != nil {
-		return fmt.Errorf("error cleaning content.opf: %v", err)
+		return fmt.Errorf("error cleaning content.opf: %w", err)
 	} else if err := ioutil.WriteFile(filepath.Join(td, rootfile), []byte(opf), 0644); err != nil {
-		return fmt.Errorf("error writing new content.opf: %v", err)
+		return fmt.Errorf("error writing new content.opf: %w", err)
 	}
 
 	if err := c.CleanFiles(td); err != nil {
-		return fmt.Errorf("error cleaning extra files: %v", err)
+		return fmt.Errorf("error cleaning extra files: %w", err)
 	}
 
 	if err := PackEPUB(td, dest, true); err != nil {
-		return fmt.Errorf("error creating new epub: %v", err)
+		return fmt.Errorf("error creating new epub: %w", err)
 	}
 
 	return nil
@@ -209,14 +209,14 @@ func (c *Converter) ProcessHTML(html, filename string) (string, error) {
 	}
 
 	html = smartenPunctuation(html)
-	html = strings.Replace(html, "�", "", -1)                                                                                  // Remove unicode replacement chars
+	html = strings.ReplaceAll(html, "�", "")                                                                                   // Remove unicode replacement chars
 	html = strings.Replace(html, `<!-- ?xml version="1.0" encoding="utf-8"? -->`, `<?xml version="1.0" encoding="utf-8"?>`, 1) // Fix commented xml tag
 	html = strings.Replace(html, `<!--?xml version="1.0" encoding="utf-8"?-->`, `<?xml version="1.0" encoding="utf-8"?>`, 1)   // Fix commented xml tag
-	html = strings.Replace(html, "\u00a0", "&#160;", -1)                                                                       // Fix nbsps removed
+	html = strings.ReplaceAll(html, "\u00a0", "&#160;")                                                                        // Fix nbsps removed
 
 	if c.FindReplace != nil {
 		for find, replace := range c.FindReplace {
-			html = strings.Replace(html, find, replace, -1)
+			html = strings.ReplaceAll(html, find, replace)
 		}
 	}
 

@@ -157,7 +157,7 @@ func TestProcess(t *testing.T) {
 		return nil
 	}
 	postHTML := func(h string) (string, error) {
-		h = strings.Replace(h, "test", "replaced", -1)
+		h = strings.ReplaceAll(h, "test", "replaced")
 		return h, nil
 	}
 	ha1, err = (&Converter{PostDoc: postDoc, PostHTML: postHTML}).ProcessHTML(ha1, "")
