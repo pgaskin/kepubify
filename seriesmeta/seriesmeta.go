@@ -144,7 +144,7 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 		CREATE TABLE IF NOT EXISTS _seriesmeta (
 			ImageId      TEXT NOT NULL UNIQUE,
 			Series       TEXT,
-			SeriesNumber INTEGER,
+			SeriesNumber TEXT,
 			PRIMARY KEY(ImageId)
 		);
 		{{end}}
