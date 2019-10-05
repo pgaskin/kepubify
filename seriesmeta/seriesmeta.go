@@ -22,7 +22,7 @@ import (
 var version = "dev"
 
 func main() {
-	persist := pflag.BoolP("persist", "p", false, "Make sure metadata updates care always applied (don't enable this if also using Calibre)")
+	noPersist := pflag.BoolP("no-persist", "p", false, "Don't ensure metadata is always set (this will cause series metadata to be lost if opening a book after an import but before a reboot)")
 	noReplace := pflag.BoolP("no-replace", "n", false, "Don't replace existing series metadata (you probably don't want this option)")
 	uninstall := pflag.BoolP("uninstall", "u", false, "Uninstall seriesmeta table and hooks (imported series metadata will be left untouched)")
 	help := pflag.BoolP("help", "h", false, "Show this help message")
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	fmt.Println("Setting up database")
-	if err := k.SeriesConfig(*noReplace, !*persist, *uninstall); err != nil {
+	if err := k.SeriesConfig(*noReplace, *noPersist, *uninstall); err != nil {
 		fmt.Fprintf(os.Stderr, "Could not set up database: %v.\n", err)
 		os.Exit(1)
 	}
