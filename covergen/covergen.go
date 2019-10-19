@@ -37,48 +37,27 @@ func main() {
 		os.Exit(2)
 	}
 
-	filter, ok := filters[*method]
-	if !ok {
+	filter := getfilter(*method)
+	if filter == nil {
 		fmt.Fprintf(os.Stderr, "Error: Unknown resize method %s.\n", *method)
 		os.Exit(2)
 	}
 
-	fmt.Println("Finding kobo")
-	var kp string
-	if pflag.NArg() == 1 {
-		kp = pflag.Arg(0)
-	} else {
-		kobos, err := kobo.Find()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Could not automatically detect a Kobo eReader: %v.\n", err)
-			os.Exit(1)
-		} else if len(kobos) == 0 {
-			fmt.Fprintf(os.Stderr, "Error: Could not automatically detect a Kobo eReader.\n")
-			os.Exit(1)
-		}
-		kp = kobos[0]
-	}
-
-	_, _, id, err := kobo.ParseKoboVersion(kp)
+	fmt.Println("Finding kobo reader")
+	kp, dev, err := device(pflag.Arg(0))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Could not parse version info: %v.\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v.\n", err)
 		os.Exit(1)
 	}
-
-	dev, ok := kobo.DeviceByID(id)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "Error: Unsupported device: %s.\n", id)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Found %s at %s\n", dev, kp)
+	fmt.Printf("... Found %s at %s\n", dev, kp)
 
 	fmt.Println("Finding epubs")
-	epubs, err := zglob.Glob(filepath.Join(kp, "**", "*.epub"))
+	epubs, err := scan(kp)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Could not find epubs: %v.\n", err)
 		os.Exit(1)
 	}
+	fmt.Printf("... Found %d epubs\n", len(epubs))
 
 	var nt, ntc, nu, ne, ns, nn int
 	fmt.Println("Generating covers")
@@ -141,11 +120,46 @@ func main() {
 	os.Exit(1)
 }
 
-var filters = map[string]rez.Filter{
-	"bilinear": rez.NewBilinearFilter(),
-	"bicubic":  rez.NewBicubicFilter(),
-	"lanczos2": rez.NewLanczosFilter(2),
-	"lanczos3": rez.NewLanczosFilter(3),
+func getfilter(name string) rez.Filter {
+	switch name {
+	case "bilinear":
+		return rez.NewBilinearFilter()
+	case "bicubic":
+		return rez.NewBicubicFilter()
+	case "lanczos2":
+		return rez.NewLanczosFilter(2)
+	case "lanczos3":
+		return rez.NewLanczosFilter(3)
+	}
+	return nil
+}
+
+func device(root string) (string, kobo.Device, error) {
+	if root == "" {
+		kobos, err := kobo.Find()
+		if err != nil {
+			return "", 0, fmt.Errorf("could not detect a kobo reader: %w", err)
+		} else if len(kobos) == 0 {
+			return "", 0, errors.New("no kobo detected")
+		}
+		root = kobos[0]
+	}
+
+	_, _, id, err := kobo.ParseKoboVersion(root)
+	if err != nil {
+		return root, 0, fmt.Errorf("could not parse kobo version: %w", err)
+	}
+
+	dev, ok := kobo.DeviceByID(id)
+	if !ok {
+		return root, 0, fmt.Errorf("unsupported device model: %s", id)
+	}
+
+	return root, dev, nil
+}
+
+func scan(root string) ([]string, error) {
+	return zglob.Glob(filepath.Join(root, "**", "*.epub"))
 }
 
 func imageID(kp, book string) (string, error) {
