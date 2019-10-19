@@ -3,7 +3,7 @@ Standalone tool to generate Kobo cover thumbnails. Useful for pre-generating thu
 
 Covergen is quite lenient about detecting cover images. The following methods are supported: meta[name=cover] with the path as the content, meta[name=cover] with a manifest id reference as the content, and manifest>item[properties=cover-image] with the image path as the href. Each detected path can be relative to the epub root or to the package document.
 
-The N3_FULL, N3_LIBRARY_LIST, and N3_LIBRARY_GRID images are generated using the same resizing algorithm as nickel.
+The N3_LIBRARY_FULL, N3_LIBRARY_LIST, and N3_LIBRARY_GRID images are generated using the same resizing algorithm as nickel.
 
 A reboot may be necessary for changes to appear.
 

@@ -8,7 +8,7 @@ require (
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b
 	github.com/beevik/etree v1.1.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/geek1011/koboutils v1.1.1-0.20191019152928-2e8ab3a63a67
+	github.com/geek1011/koboutils v1.1.1-0.20191019182239-e2eedacc52bb
 	github.com/mattn/go-isatty v0.0.4
 	github.com/mattn/go-sqlite3 v1.9.0
 	github.com/mattn/go-zglob v0.0.1
