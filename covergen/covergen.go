@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/bamiaux/rez"
 	"github.com/geek1011/koboutils/kobo"
+	"github.com/mattn/go-zglob"
 	"github.com/spf13/pflag"
 )
 
@@ -23,6 +26,12 @@ func main() {
 		os.Exit(2)
 	}
 
+	filter, ok := filters[*method]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Error: Unknown resize method %s.\n", *method)
+		os.Exit(2)
+	}
+
 	fmt.Println("Finding kobo")
 	var kp string
 	if pflag.NArg() == 1 {
@@ -30,16 +39,67 @@ func main() {
 	} else {
 		kobos, err := kobo.Find()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Could not automatically detect a Kobo eReader: %v.\n", err)
+			fmt.Fprintf(os.Stderr, "Error: Could not automatically detect a Kobo eReader: %v.\n", err)
 			os.Exit(1)
 		} else if len(kobos) == 0 {
-			fmt.Fprintf(os.Stderr, "Could not automatically detect a Kobo eReader.\n")
+			fmt.Fprintf(os.Stderr, "Error: Could not automatically detect a Kobo eReader.\n")
 			os.Exit(1)
 		}
 		kp = kobos[0]
 	}
 
+	_, _, id, err := kobo.ParseKoboVersion(kp)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Could not parse version info: %v.\n", err)
+		os.Exit(1)
+	}
+
+	dev, ok := kobo.DeviceByID(id)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Error: Unsupported device: %s.\n", id)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Found %s at %s\n", dev, kp)
+
+	fmt.Println("Finding epubs")
+	epubs, err := zglob.Glob(filepath.Join(kp, "**", "*.epub"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Could not find epubs: %v.\n", err)
+		os.Exit(1)
+	}
+
+	var nt, nu, ne, ns, nn int
 	fmt.Println("Generating covers")
-	// TODO
-	_, _, _, _ = regenerate, method, help, kp
+	nt = len(epubs)
+	for i, epub := range epubs {
+		fmt.Printf("[%3d/%3d] %s\n", i+1, nt, epub)
+		//fmt.Printf("--------- Could not extract cover image\n")
+		//nn++
+
+		rel, err := filepath.Rel(kp, epub)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Could not resolve relative path to epub: %v.\n", err)
+			os.Exit(1) // fatal error, should not ever occur
+		}
+
+		cid := kobo.PathToContentID(rel)
+		iid := kobo.ContentIDToImageID(cid)
+		for _, ct := range kobo.CoverTypes() {
+			fmt.Println(ct, ct.GeneratePath(false, iid))
+		}
+
+		// TODO
+		_, _, _ = regenerate, filter, epubs
+	}
+
+	fmt.Printf("%d total: %d updated, %d errored, %d skipped, %d without covers\n", nt, nu, ne, ns, nn)
+	os.Exit(1)
+}
+
+var filters = map[string]rez.Filter{
+	"bilinear": rez.NewBilinearFilter(),
+	"bicubic":  rez.NewBicubicFilter(),
+	"lanczos2": rez.NewLanczosFilter(2),
+	"lanczos3": rez.NewLanczosFilter(3),
 }
