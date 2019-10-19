@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"os"
 	"path/filepath"
 
@@ -69,31 +72,62 @@ func main() {
 		os.Exit(1)
 	}
 
-	var nt, nu, ne, ns, nn int
+	var nt, ntc, nu, ne, ns, nn int
 	fmt.Println("Generating covers")
 	nt = len(epubs)
+	ntc = nt * len(kobo.CoverTypes())
 	for i, epub := range epubs {
 		fmt.Printf("[%3d/%3d] %s\n", i+1, nt, epub)
-		//fmt.Printf("--------- Could not extract cover image\n")
-		//nn++
 
-		rel, err := filepath.Rel(kp, epub)
+		iid, err := imageID(kp, epub)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Could not resolve relative path to epub: %v.\n", err)
-			os.Exit(1) // fatal error, should not ever occur
+			fmt.Fprintf(os.Stderr, "--------- Could not generate ImageId: %v.\n", err)
+			ne += len(kobo.CoverTypes())
+			continue
 		}
 
-		cid := kobo.PathToContentID(rel)
-		iid := kobo.ContentIDToImageID(cid)
+		var origCover image.Image
 		for _, ct := range kobo.CoverTypes() {
-			fmt.Println(ct, ct.GeneratePath(false, iid))
-		}
+			cp, exists, err := check(ct, kp, iid)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "--------- Could not check if cover exists: %v.\n", err)
+				ne++
+				continue
+			} else if !*regenerate && exists {
+				ns++
+				continue
+			}
 
-		// TODO
-		_, _, _ = regenerate, filter, epubs
+			if origCover == nil {
+				origCover, err = extract(epub)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "--------- Could not extract cover: %v.\n", err)
+					ne++
+					continue
+				} else if origCover == nil {
+					nn++
+					continue
+				}
+			}
+
+			resized, err := resize(dev, ct, filter, origCover)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "--------- Could not resize cover: %v.\n", err)
+				ne++
+				continue
+			}
+
+			if err := save(cp, resized, jpeg.DefaultQuality); err != nil {
+				fmt.Fprintf(os.Stderr, "--------- Could not save cover: %v.\n", err)
+				ne++
+				continue
+			}
+
+			nu++
+		}
 	}
 
-	fmt.Printf("%d total: %d updated, %d errored, %d skipped, %d without covers\n", nt, nu, ne, ns, nn)
+	fmt.Printf("%d covers (%d books): %d updated, %d errored, %d skipped, %d without covers\n", ntc, nt, nu, ne, ns, nn)
 	os.Exit(1)
 }
 
@@ -102,4 +136,41 @@ var filters = map[string]rez.Filter{
 	"bicubic":  rez.NewBicubicFilter(),
 	"lanczos2": rez.NewLanczosFilter(2),
 	"lanczos3": rez.NewLanczosFilter(3),
+}
+
+func imageID(kp, book string) (string, error) {
+	rel, err := filepath.Rel(kp, book)
+	if err != nil {
+		return "", fmt.Errorf("could not resolve book path relative to kobo: %w", err)
+	}
+	return kobo.ContentIDToImageID(kobo.PathToContentID(rel)), nil
+}
+
+func check(ct kobo.CoverType, kp, iid string) (string, bool, error) {
+	cp := ct.GeneratePath(false, iid)
+	if _, err := os.Stat(filepath.Join(kp, cp)); err == nil {
+		return cp, true, nil
+	} else if os.IsNotExist(err) {
+		return cp, false, nil
+	} else {
+		return cp, false, err
+	}
+}
+
+func extract(epub string) (image.Image, error) {
+	return nil, errors.New("not implemented")
+}
+
+func resize(dev kobo.Device, ct kobo.CoverType, filter rez.Filter, orig image.Image) (image.Image, error) {
+	return nil, errors.New("not implemented")
+}
+
+func save(path string, img image.Image, quality int) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return jpeg.Encode(f, img, &jpeg.Options{Quality: quality})
 }
