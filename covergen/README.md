@@ -5,6 +5,8 @@ Covergen is quite lenient about detecting cover images. The following methods ar
 
 The N3_FULL, N3_LIBRARY_LIST, and N3_LIBRARY_GRID images are generated using the same resizing algorithm as nickel.
 
+A reboot may be necessary for changes to appear.
+
 ## Usage
 
 ```
