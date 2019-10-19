@@ -343,13 +343,39 @@ func readEPUBSeriesInfo(filename string) (series string, index float64, err erro
 				rc.Close()
 				return "", 0, fmt.Errorf("could not parse container.xml: %w", err)
 			}
+
+			// Calibre series metadata
 			if el := doc.FindElement("//meta[@name='calibre:series']"); el != nil {
 				series = el.SelectAttrValue("content", "")
+
+				if el := doc.FindElement("//meta[@name='calibre:series_index']"); el != nil {
+					index, _ = strconv.ParseFloat(el.SelectAttrValue("content", "0"), 64)
+				}
 			}
-			if el := doc.FindElement("//meta[@name='calibre:series_index']"); el != nil {
-				index, _ = strconv.ParseFloat(el.SelectAttrValue("content", "0"), 64)
+
+			// EPUB3 series metadata
+			if series == "" {
+				if el := doc.FindElement("//meta[@property='belongs-to-collection']"); el != nil {
+					series = strings.TrimSpace(el.Text())
+
+					var ctype string
+					if id := el.SelectAttrValue("id", ""); id != "" {
+						for _, el := range doc.FindElements("//meta[@refines='#" + id + "']") {
+							val := strings.TrimSpace(el.Text())
+							switch el.SelectAttrValue("property", "") {
+							case "collection-type":
+								ctype = val
+							case "group-position":
+								index, _ = strconv.ParseFloat(val, 64)
+							}
+						}
+					}
+
+					if ctype != "" && ctype != "series" {
+						series, index = "", 0
+					}
+				}
 			}
-			// TODO: EPUB3 series info
 			break
 		}
 	}
