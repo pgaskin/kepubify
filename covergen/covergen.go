@@ -33,7 +33,7 @@ func main() {
 	pflag.Parse()
 
 	if *help || pflag.NArg() > 1 {
-		fmt.Fprintf(os.Stderr, "Usage: covergen [OPTIONS] [KOBO_PATH]\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
+		fmt.Fprintf(os.Stderr, "Usage: covergen [OPTIONS] [KOBO_PATH]\n\nVersion:\n  covergen %s\n\nOptions:\n", version)
 		pflag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader. If not specified, covergen will try to automatically detect the Kobo.\n")
 		os.Exit(2)

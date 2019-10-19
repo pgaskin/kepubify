@@ -13,7 +13,7 @@ A reboot may be necessary for changes to appear.
 Usage: covergen [OPTIONS] [KOBO_PATH]
 
 Version:
-  seriesmeta dev
+  covergen dev
 
 Options:
   -a, --aspect-ratio float   Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)
