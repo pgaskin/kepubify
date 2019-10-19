@@ -4,15 +4,16 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
-	"image"
-	_ "image/gif"
-	"image/jpeg"
-	_ "image/png"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
 
 	"github.com/bamiaux/rez"
 	"github.com/beevik/etree"
@@ -26,6 +27,7 @@ var version = "dev"
 func main() {
 	regenerate := pflag.BoolP("regenerate", "r", false, "Re-generate all covers")
 	method := pflag.StringP("method", "m", "lanczos3", "Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3)")
+	ar := pflag.Float64P("aspect-ratio", "a", 0, "Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)")
 	// TODO: invert, grayscale options
 	help := pflag.BoolP("help", "h", false, "Show this help message")
 	pflag.Parse()
@@ -94,6 +96,15 @@ func main() {
 				} else if origCover == nil {
 					nn++
 					continue
+				}
+
+				if *ar != 0 {
+					origCover, err = stretch(origCover, filter, *ar)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "--------- Could not stretch cover: %v.\n", err)
+						ne++
+						continue
+					}
 				}
 			}
 
@@ -271,25 +282,30 @@ func extract(epub string) (image.Image, error) {
 	return img, nil // img may be nil
 }
 
-func resize(dev kobo.Device, ct kobo.CoverType, filter rez.Filter, orig image.Image) (image.Image, error) {
-	szo := orig.Bounds().Size()
-	szn := dev.CoverSized(ct, szo)
-
-	if szn.Eq(szo) {
-		return orig, nil
+func dimens(img image.Image, filter rez.Filter, sz image.Point) (image.Image, error) {
+	if img.Bounds().Size().Eq(sz) {
+		return img, nil
 	}
 
-	origy, ok := orig.(*image.YCbCr)
+	imgy, ok := img.(*image.YCbCr)
 	if !ok {
-		return nil, fmt.Errorf("unsupported image encoding (not YCbCr): %s", reflect.TypeOf(orig))
+		return nil, fmt.Errorf("unsupported image encoding (not YCbCr): %s", reflect.TypeOf(img))
 	}
 
-	new := image.NewYCbCr(image.Rect(0, 0, szn.X, szn.Y), origy.SubsampleRatio)
-	if err := rez.Convert(new, orig, filter); err != nil {
+	new := image.NewYCbCr(image.Rect(0, 0, sz.X, sz.Y), imgy.SubsampleRatio)
+	if err := rez.Convert(new, img, filter); err != nil {
 		return nil, err
 	}
 
 	return new, nil
+}
+
+func resize(dev kobo.Device, ct kobo.CoverType, filter rez.Filter, orig image.Image) (image.Image, error) {
+	return dimens(orig, filter, dev.CoverSized(ct, orig.Bounds().Size()))
+}
+
+func stretch(orig image.Image, filter rez.Filter, ar float64) (image.Image, error) {
+	return dimens(orig, filter, image.Pt(orig.Bounds().Size().X, int(ar*float64(orig.Bounds().Size().X))))
 }
 
 func save(fn string, img image.Image, quality int) error {

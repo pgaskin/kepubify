@@ -1,5 +1,5 @@
 # covergen
-Standalone tool to generate Kobo cover thumbnails. Useful for pre-generating thumbnails during import to save time or for when Kobo automatically generates the cover incorrectly (for example taking an image of the first page, or using a generic cover).
+Standalone tool to generate Kobo cover thumbnails. Useful for pre-generating thumbnails during import to save time or for when Kobo automatically generates the cover incorrectly (for example taking an image of the first page, or using a generic cover). Covergen can also normalize the aspect ratio of covers for consistency.
 
 Covergen is quite lenient about detecting cover images. The following methods are supported: meta[name=cover] with the path as the content, meta[name=cover] with a manifest id reference as the content, and manifest>item[properties=cover-image] with the image path as the href. Each detected path can be relative to the epub root or to the package document.
 
@@ -16,9 +16,10 @@ Version:
   seriesmeta dev
 
 Options:
-  -h, --help            Show this help message
-  -m, --method string   Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3) (default "lanczos3")
-  -r, --regenerate      Re-generate all covers
+  -a, --aspect-ratio float   Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)
+  -h, --help                 Show this help message
+  -m, --method string        Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3) (default "lanczos3")
+  -r, --regenerate           Re-generate all covers
 
 Arguments:
   KOBO_PATH is the path to the Kobo eReader. If not specified, covergen will try to automatically detect the Kobo.
