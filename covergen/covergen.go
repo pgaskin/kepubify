@@ -227,10 +227,10 @@ func extract(epub string) (image.Image, error) {
 		if strings.TrimLeft(strings.ToLower(f.Name), "/") == strings.TrimLeft(strings.ToLower(rootfile), "/") {
 			doc := etree.NewDocument()
 			if rc, err := f.Open(); err != nil {
-				return nil, fmt.Errorf("could not open container.xml: %w", err)
+				return nil, fmt.Errorf("could not open package document: %w", err)
 			} else if _, err = doc.ReadFrom(rc); err != nil {
 				rc.Close()
-				return nil, fmt.Errorf("could not parse container.xml: %w", err)
+				return nil, fmt.Errorf("could not parse package document: %w", err)
 			} else {
 				rc.Close()
 			}
