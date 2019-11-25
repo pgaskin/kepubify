@@ -37,6 +37,7 @@
                 <li>Batch conversion</li>
                 <li>Fast (about 12x faster than Calibre)</li>
                 <li>Works from the command line</li>
+                <li>Optionally update Kobo series metadata and pre-generate covers</li>
                 <li>Update Kobo series metadata (even before the book is imported)</li>
                 <li>Does not add any extra metadata (unlike Calibre)</li>
                 <li>Supports many different CSS tweaks</li>
@@ -185,6 +186,24 @@ Arguments:
             <p>
                 <b>New:</b> Seriesmeta doesn't require the books to be already imported anymore! You can now run seriesmeta right after you transfer
                 you books, and the metadata will be updated on the next reboot.
+            </p>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">Cover images</div>
+        <div class="text">
+            <p>
+                You can pre-generate/re-generate cover images using covergen. Covergen is available
+                <a href="https://github.com/geek1011/kepubify/releases/latest">here</a>. It will automatically detect your Kobo when you run it.
+            </p>
+            <p>
+                This tool is useful to save time or for when Kobo automatically generates the cover incorrectly (for example taking an image of
+                the first page, or using a generic cover). It can also optionally stretch the covers to a specific aspect ratio for consistency.
+            </p>
+            <p>
+                Covergen is quite lenient about detecting cover images. The following methods are supported: meta[name=cover] with the path as the
+                content, meta[name=cover] with a manifest id reference as the content, and manifest&gt;item[properties=cover-image] with the image
+                path as the href. Each detected path can be relative to the epub root or to the package document.
             </p>
         </div>
     </div>

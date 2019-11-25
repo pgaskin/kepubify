@@ -55,6 +55,13 @@ echo "Building seriesmeta $APP_VERSION for windows 386"
 GOOS=windows GOARCH=386 CGO_ENABLED=1 CC=i686-w64-mingw32-gcc go build -ldflags "-linkmode external -extldflags -static -X main.version=$APP_VERSION" -o "build/seriesmeta-windows.exe" seriesmeta/seriesmeta.go
 # GOOS=windows GOARCH=386 CGO_ENABLED=1 CC=i686-w64-mingw32-gcc go build -ldflags "-linkmode external -extldflags -static" -x -v -o seriesmeta-windows.exe ./seriesmeta/seriesmeta.go
 
+for GOOS in linux windows darwin; do
+    for GOARCH in amd64 386; do
+        echo "Building covergen $APP_VERSION for $GOOS $GOARCH"
+        GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "-X main.version=$APP_VERSION" -o "build/covergen-$GOOS-$(echo $GOARCH|sed 's/386/32bit/g'|sed 's/amd64/64bit/g')$(echo $GOOS|sed 's/windows/.exe/g'|sed 's/linux//g'|sed 's/darwin//g')"
+    done
+done
+
 export APP_VERSION_NO_V="$(echo "$APP_VERSION" | sed "s/v//g")"
 nfpm pkg -f nfpm.yaml -t build/kepubify_${APP_VERSION_NO_V}_amd64.deb
 
@@ -86,6 +93,18 @@ if [[ "$SKIP_UPLOAD" != "true" ]]; then
     done
 
     for f in build/seriesmeta-*; do
+        fn="$(basename $f)"
+        echo "Uploading $fn"
+        GITHUB_TOKEN=$GITHUB_TOKEN github-release upload \
+            --user geek1011 \
+            --repo kepubify \
+            --tag $APP_VERSION \
+            --name "$fn" \
+            --file "$f" \
+            --replace
+    done
+
+    for f in build/covergen-*; do
         fn="$(basename $f)"
         echo "Uploading $fn"
         GITHUB_TOKEN=$GITHUB_TOKEN github-release upload \

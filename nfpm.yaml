@@ -22,5 +22,6 @@ license: MIT
 bindir: /usr/bin
 files:
   ./build/kepubify-linux-64bit: /usr/bin/kepubify
+  ./build/covergen-linux-64bit: /usr/bin/covergen
   ./build/seriesmeta-linux-64bit: /usr/bin/seriesmeta
 config_files:
