@@ -1,0 +1,133 @@
+kind: pipeline
+name: kepubify
+
+steps:
+- name: deps
+  image: golang:1.13-buster
+  commands:
+  - GO111MODULE=on go mod download
+- name: test
+  image: golang:1.13-buster
+  commands:
+  - GO111MODULE=on go test -mod=readonly -v . ./kepub
+- name: run
+  image: golang:1.13-buster
+  commands:
+  - GO111MODULE=on go run -mod=readonly . --help || true
+
+---
+
+kind: pipeline
+name: covergen
+
+steps:
+- name: deps
+  image: golang:1.13-buster
+  commands:
+  - GO111MODULE=on go mod download
+- name: test
+  image: golang:1.13-buster
+  commands:
+  - GO111MODULE=on go test -mod=readonly -v ./covergen
+- name: run
+  image: golang:1.13-buster
+  commands:
+  - GO111MODULE=on go run -mod=readonly ./covergen --help || true
+
+---
+
+kind: pipeline
+name: seriesmeta
+
+steps:
+- name: deps
+  image: golang:1.12-buster
+  commands:
+  - GO111MODULE=on go mod download
+- name: test
+  image: golang:1.12-buster
+  commands:
+  - GO111MODULE=on go test -mod=readonly -v ./seriesmeta
+- name: run
+  image: golang:1.12-buster
+  commands:
+  - GO111MODULE=on go run -mod=readonly ./seriesmeta --help || true
+
+---
+
+kind: pipeline
+name: release
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: cross-kepubify
+  image: golang:1.13-buster
+  commands:
+  - mkdir -p build
+  - GOLDFLAGS="-s -w -X main.version=$(git describe --tags --always)"
+  - GO111MODULE=on GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-linux-64bit"       .
+  - GO111MODULE=on GOOS=linux   GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-linux-32bit"       .
+  - GO111MODULE=on GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-darwin-64bit"      .
+  - GO111MODULE=on GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-windows-64bit.exe" .
+  - GO111MODULE=on GOOS=windows GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/kepubify-windows-32bit.exe" .
+- name: cross-covergen
+  image: golang:1.13-buster
+  commands:
+  - mkdir -p build
+  - GOLDFLAGS="-s -w -X main.version=$(git describe --tags --always)"
+  - GO111MODULE=on GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-linux-64bit"  ./covergen
+  - GO111MODULE=on GOOS=linux   GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-linux-32bit"  ./covergen
+  - GO111MODULE=on GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-darwin-64bit" ./covergen
+  - GO111MODULE=on GOOS=windows GOARCH=386   CGO_ENABLED=0 go build -ldflags "$${GOLDFLAGS}" -o "build/covergen-windows.exe"  ./covergen
+- name: cross-seriesmeta
+  image: dockercore/golang-cross:1.12.7
+  commands:
+  - dpkg --add-architecture i386
+  - apt update
+  - apt install -y libz-mingw-w64-dev zlib1g-dev:i386 zlib1g-dev libc6-dev-armhf-cross libc6-dev-i386 gcc-multilib libsqlite3-dev
+  - mkdir -p build
+  - GOLDFLAGS="-s -w -linkmode external -X main.version=$(git describe --tags --always)"
+  - GO111MODULE=on GOOS=linux   GOARCH=amd64                           CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS}" -o "build/seriesmeta-linux-64bit"       ./seriesmeta
+  - GO111MODULE=on GOOS=linux   GOARCH=386   CC="gcc -m32"             CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS}" -o "build/seriesmeta-linux-32bit"       ./seriesmeta
+  - GO111MODULE=on GOOS=darwin  GOARCH=amd64 CC="o64-clang"            CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS}" -o "build/seriesmeta-darwin-64bit"      ./seriesmeta
+  - GO111MODULE=on GOOS=windows GOARCH=386   CC="i686-w64-mingw32-gcc" CGO_ENABLED=1 go build -ldflags "$${GOLDFLAGS} -extldflags -static" -o "build/seriesmeta-windows.exe" ./seriesmeta
+- name: debian
+  image: golang:1.13-buster
+  commands:
+  - GO111MODULE=on go install "github.com/goreleaser/nfpm/cmd/nfpm"
+  - 'VERSION="$(git describe --tags --always | sed "s/v//g")" nfpm pkg -f nfpm.yaml -t build/kepubify_$(git describe --tags --always | sed "s/v//g")_amd64.deb'
+  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
+- name: ls
+  image: golang:1.13-buster
+  commands:
+  - apt update
+  - apt install -y file
+  - file *
+  - ls -lah build
+  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
+- name: notes
+  image: golang:1.13-buster
+  commands:
+  - git log "$(git describe --tags --abbrev=0 HEAD~1)..HEAD" --oneline --format='%h %s' | tee -a notes.md
+  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
+#- name: release
+#  image: plugins/github-release
+#  settings:
+#    api_key: {from_secret: GITHUB_TOKEN}
+#    title: ${DRONE_TAG}
+#    note: notes.md
+#    files: build/*
+#    draft: true
+#  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta, notes, debian]
+
+#trigger:
+#  ref:
+#  - refs/tags/*
+
+depends_on:
+- kepubify
+- covergen
+- seriesmeta
