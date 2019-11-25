@@ -105,7 +105,7 @@ steps:
   commands:
   - apt update
   - apt install -y file
-  - file *
+  - file build/*
   - ls -lah build
   depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
 - name: notes
@@ -113,19 +113,19 @@ steps:
   commands:
   - git log "$(git describe --tags --abbrev=0 HEAD~1)..HEAD" --oneline --format='%h %s' | tee -a notes.md
   depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
-#- name: release
-#  image: plugins/github-release
-#  settings:
-#    api_key: {from_secret: GITHUB_TOKEN}
-#    title: ${DRONE_TAG}
-#    note: notes.md
-#    files: build/*
-#    draft: true
-#  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta, notes, debian]
+- name: release
+  image: plugins/github-release
+  settings:
+    api_key: {from_secret: GITHUB_TOKEN}
+    title: ${DRONE_TAG}
+    note: notes.md
+    files: build/*
+    draft: true
+  depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta, notes, debian]
 
-#trigger:
-#  ref:
-#  - refs/tags/*
+trigger:
+  ref:
+  - refs/tags/*
 
 depends_on:
 - kepubify
