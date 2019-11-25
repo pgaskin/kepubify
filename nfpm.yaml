@@ -1,7 +1,7 @@
 name: kepubify
 arch: amd64
 platform: linux
-version: ${APP_VERSION_NO_V}
+version: ${VERSION}
 section: utils
 priority: optional
 
