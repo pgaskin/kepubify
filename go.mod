@@ -3,8 +3,8 @@ module github.com/geek1011/kepubify
 go 1.13
 
 require (
-	github.com/PuerkitoBio/goquery v1.4.1
-	github.com/andybalholm/cascadia v1.0.0 // indirect
+	github.com/PuerkitoBio/goquery v1.5.0
+	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b
 	github.com/beevik/etree v1.1.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
