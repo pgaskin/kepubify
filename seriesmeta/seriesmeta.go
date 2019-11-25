@@ -2,9 +2,11 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
+	"html/template"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,6 +22,9 @@ import (
 var version = "dev"
 
 func main() {
+	noPersist := pflag.BoolP("no-persist", "p", false, "Don't ensure metadata is always set (this will cause series metadata to be lost if opening a book after an import but before a reboot)")
+	noReplace := pflag.BoolP("no-replace", "n", false, "Don't replace existing series metadata (you probably don't want this option)")
+	uninstall := pflag.BoolP("uninstall", "u", false, "Uninstall seriesmeta table and hooks (imported series metadata will be left untouched)")
 	help := pflag.BoolP("help", "h", false, "Show this help message")
 	pflag.Parse()
 
@@ -51,6 +56,16 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not open Kobo eReader: %v.\n", err)
 		os.Exit(1)
+	}
+
+	fmt.Println("Setting up database")
+	if err := k.SeriesConfig(*noReplace, *noPersist, *uninstall); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not set up database: %v.\n", err)
+		os.Exit(1)
+	}
+
+	if *uninstall {
+		os.Exit(0)
 	}
 
 	fmt.Println("Updating metadata")
@@ -116,6 +131,111 @@ func (k *Kobo) Close() error {
 	return k.DB.Close()
 }
 
+// SeriesConfig sets up the table and triggers for seriesmeta. noReplace prevents
+// series metadata from seriesmeta from replacing existing metadata, and noPersist
+// allows the series metadata to be changed by something else later. If uninstall
+// is true, the table and triggers will be removed.
+func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
+	buf := bytes.NewBuffer(nil)
+	template.Must(template.New("").Parse(`
+		{{if .Uninstall}}
+		DROP TABLE _seriesmeta;
+		{{else}}
+		CREATE TABLE IF NOT EXISTS _seriesmeta (
+			ImageId      TEXT NOT NULL UNIQUE,
+			Series       TEXT,
+			SeriesNumber TEXT,
+			PRIMARY KEY(ImageId)
+		);
+		{{end}}
+
+		/* Adding series metadata on import */
+
+		DROP TRIGGER IF EXISTS _seriesmeta_content_insert;
+		{{if not .Uninstall}}
+		CREATE TRIGGER _seriesmeta_content_insert
+			AFTER INSERT ON content WHEN
+				{{if .NoReplace}}(new.Series IS NULL) AND{{end}}
+				(new.ImageId LIKE "file____mnt_onboard_%") AND
+				(SELECT count() FROM _seriesmeta WHERE ImageId = new.ImageId)
+			BEGIN
+				UPDATE content
+				SET
+					Series       = (SELECT Series       FROM _seriesmeta WHERE ImageId = new.ImageId),
+					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId)
+				WHERE ImageId = new.ImageId;
+				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
+			END;
+		{{end}}
+
+		DROP TRIGGER IF EXISTS _seriesmeta_content_update;
+		{{if not .Uninstall}}
+		CREATE TRIGGER _seriesmeta_content_update
+			AFTER UPDATE ON content WHEN
+				{{if .NoReplace}}(new.Series IS NULL) AND{{end}}
+				(new.ImageId LIKE "file____mnt_onboard_%") AND
+				(SELECT count() FROM _seriesmeta WHERE ImageId = new.ImageId)
+			BEGIN
+				UPDATE content
+				SET
+					Series       = (SELECT Series       FROM _seriesmeta WHERE ImageId = new.ImageId),
+					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId)
+				WHERE ImageId = new.ImageId;
+				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
+			END;
+		{{end}}
+
+		DROP TRIGGER IF EXISTS _seriesmeta_content_delete;
+		{{if not .Uninstall}}
+		CREATE TRIGGER _seriesmeta_content_delete
+			AFTER DELETE ON content
+			BEGIN
+				DELETE FROM _seriesmeta WHERE ImageId = old.ImageId;
+			END;
+		{{end}}
+
+		/* Adding series metadata directly when already imported */
+
+		{{if not .Uninstall}}
+		DROP TRIGGER IF EXISTS _seriesmeta_seriesmeta_insert;
+		CREATE TRIGGER _seriesmeta_seriesmeta_insert
+			AFTER INSERT ON _seriesmeta WHEN
+				(SELECT count() FROM content WHERE ImageId = new.ImageId)
+				{{if .NoReplace}}AND ((SELECT Series FROM content WHERE ImageId = new.ImageId) IS NULL){{end}}
+			BEGIN
+				UPDATE content
+				SET
+					Series       = new.Series,
+					SeriesNumber = new.SeriesNumber
+				WHERE ImageId = new.ImageId;
+				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
+			END;
+		{{end}}
+
+		DROP TRIGGER IF EXISTS _seriesmeta_seriesmeta_update;
+		{{if not .Uninstall}}
+		CREATE TRIGGER _seriesmeta_seriesmeta_update
+			AFTER UPDATE ON _seriesmeta WHEN
+				(SELECT count() FROM content WHERE ImageId = new.ImageId)
+				{{if .NoReplace}}AND ((SELECT Series FROM content WHERE ImageId = new.ImageId) IS NULL){{end}}
+			BEGIN
+				UPDATE content
+				SET
+					Series       = new.Series,
+					SeriesNumber = new.SeriesNumber
+				WHERE ImageId = new.ImageId;
+				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
+			END;
+		{{end}}
+	`)).Execute(buf, map[string]interface{}{
+		"NoReplace": noReplace,
+		"NoPersist": noPersist,
+		"Uninstall": uninstall,
+	})
+	_, err := k.DB.Exec(buf.String())
+	return err
+}
+
 // UpdateSeries updates the series metadata for all epub books on the device. All
 // errors from individual books are returned through the log callback.
 func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series string, index float64, err error)) error {
@@ -139,7 +259,6 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 
 	for i, epub := range epubs {
 		relEpub := relEpubs[i]
-		iid := contentIDToImageID(pathToContentID(relEpub))
 
 		series, index, err := readEPUBSeriesInfo(epub)
 		if err != nil {
@@ -147,16 +266,13 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 			continue
 		}
 
-		if res, err := tx.Exec(
-			"UPDATE content SET Series=?, SeriesNumber=? WHERE ImageID=?",
+		if _, err := tx.Exec(
+			"INSERT OR REPLACE INTO _seriesmeta (ImageId, Series, SeriesNumber) VALUES (?, ?, ?)",
+			contentIDToImageID(pathToContentID(relEpub)),
 			sql.NullString{String: series, Valid: len(series) > 0},
 			sql.NullString{String: strconv.FormatFloat(index, 'f', -1, 64), Valid: index > 0},
-			iid,
 		); err != nil {
 			log(relEpub, i, len(epubs), series, index, err)
-			continue
-		} else if ra, _ := res.RowsAffected(); ra == 0 {
-			log(relEpub, i, len(epubs), series, index, fmt.Errorf("no entry in database for book with ImageID %#v", iid))
 			continue
 		}
 
@@ -227,29 +343,41 @@ func readEPUBSeriesInfo(filename string) (series string, index float64, err erro
 				rc.Close()
 				return "", 0, fmt.Errorf("could not parse container.xml: %w", err)
 			}
+
+			// Calibre series metadata
 			if el := doc.FindElement("//meta[@name='calibre:series']"); el != nil {
 				series = el.SelectAttrValue("content", "")
+
+				if el := doc.FindElement("//meta[@name='calibre:series_index']"); el != nil {
+					index, _ = strconv.ParseFloat(el.SelectAttrValue("content", "0"), 64)
+				}
 			}
-			if el := doc.FindElement("//meta[@name='calibre:series_index']"); el != nil {
-				index, _ = strconv.ParseFloat(el.SelectAttrValue("content", "0"), 64)
+
+			// EPUB3 series metadata
+			if series == "" {
+				if el := doc.FindElement("//meta[@property='belongs-to-collection']"); el != nil {
+					series = strings.TrimSpace(el.Text())
+
+					var ctype string
+					if id := el.SelectAttrValue("id", ""); id != "" {
+						for _, el := range doc.FindElements("//meta[@refines='#" + id + "']") {
+							val := strings.TrimSpace(el.Text())
+							switch el.SelectAttrValue("property", "") {
+							case "collection-type":
+								ctype = val
+							case "group-position":
+								index, _ = strconv.ParseFloat(val, 64)
+							}
+						}
+					}
+
+					if ctype != "" && ctype != "series" {
+						series, index = "", 0
+					}
+				}
 			}
 			break
 		}
 	}
 	return series, index, nil
 }
-
-/*func readEPUBSeriesInfo(filename string) (series string, index float64, err error) {
-	err = epubtransform.New(epubtransform.Transform{
-		OPFDoc: func(opf *etree.Document) error {
-			if el := opf.FindElement("//meta[@name='calibre:series']"); el != nil {
-				series = el.SelectAttrValue("content", "")
-			}
-			if el := opf.FindElement("//meta[@name='calibre:series_index']"); el != nil {
-				index, _ = strconv.ParseFloat(el.SelectAttrValue("content", "0"), 64)
-			}
-			return nil
-		},
-	}).Run(epubtransform.FileInput(filename), nil, false)
-	return
-}*/
