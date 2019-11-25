@@ -11,6 +11,7 @@ Calibre or EPUB3 series metadata).
 
 See the [releases](https://github.com/geek1011/kepubify/releases/latest) page for
 download links, and the [website](https://pgaskin.net/kepubify) for more information.
+Kepubify can also be installed via Homebrew (kepubify).
 
 ## Usage
 ```

@@ -12,9 +12,9 @@ recommends:
 suggests:
 conflicts:
 
-maintainer: Patrick Gaskin <geek1011@outlook.com>
+maintainer: Patrick Gaskin <patrick@pgaskin.net>
 description: |
-  Kepubify converts epubs to kepubs.
+  Kepubify converts EPUBs to KEPUBs.
 vendor: Patrick Gaskin
 homepage: https://pgaskin.net/kepubify
 license: MIT
