@@ -17,7 +17,7 @@ import (
 
 	"github.com/bamiaux/rez"
 	"github.com/beevik/etree"
-	"github.com/geek1011/koboutils/kobo"
+	"github.com/geek1011/koboutils/v2/kobo"
 	"github.com/mattn/go-zglob"
 	"github.com/spf13/pflag"
 )
