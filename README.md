@@ -63,7 +63,9 @@ Arguments:
 ## covergen
 Covergen (re)generates cover images for nickel, with optional stretching to fit
 a specific aspect ratio (I use 1.5). This speeds up browsing the library, and if
-stretching is used, will also make it more consistent.
+stretching is used, will also make it more consistent. In addition, covergen is
+useful when the automatically generated cover images are not satisfactory (too
+small, white margins, etc).
 
 Covergen works on EPUB and KEPUB books, and does not conflict with Calibre or any
 other tool. It is also quite lenient about the way the cover image is referenced
