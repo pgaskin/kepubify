@@ -7,20 +7,18 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Kepubify</title>
     <link rel="stylesheet" href="style.css">
-    <meta name="author" content="Patrick G">
-    <meta name="description" content="Kepubify is the best way to convert epubs to kepubs. Kepubify is fast, easy-to-use, and cross platform. Kepubify is written in Go, and released under the MIT license.">
+    <meta name="author" content="Patrick Gaskin">
 </head>
 
 <body>
     <div class="nav">
         <div class="brand">
             <div class="name">kepubify</div>
-            <div class="description">Converts epubs to kepubs</div>
+            <div class="description">Converts EPUBs to KEPUBs</div>
         </div>
         <div class="buttons">
             <a href="https://github.com/geek1011/kepubify/releases" class="button">Changelog</a>
             <a href="https://github.com/geek1011/kepubify" class="button">Source Code</a>
-            <a href="#docs" class="button">Documentation</a>
             <a target="_blank" href="https://github.com/geek1011/kepubify/releases/latest" id="download" class="button primary">Download</a>
         </div>
         <div class="clearfix"></div>
@@ -28,8 +26,7 @@
     <div class="about">
         <div class="text">
             <p>
-                Kepubify converts epubs to kepubs. Kepubify is fast, easy-to-use, and cross platform. Kepubify is written in Go,
-                and released under the MIT license.
+                Kepubify converts EPUBs to KEPUBs. Kepubify is fast, lightweight, easy-to-use, and cross platform.
             </p>
             <b>Features</b>
             <ul>
@@ -41,6 +38,8 @@
                 <li>Optionally update Kobo series metadata (even before the book is imported)</li>
                 <li>Does not add any extra metadata (unlike Calibre)</li>
                 <li>Supports many different CSS tweaks</li>
+                <li><b><a href="https://github.com/geek1011/kepubify/releases/latest">Covergen</a>: </b>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
+                <li><b><a href="https://github.com/geek1011/kepubify/releases/latest">Seriesmeta</a>: </b>Optionally update Kobo series metadata (even before the book is imported)</li>
             </ul>
             <a style="display:none;font-size:12px;" target="_blank" id="other-platforms" href="https://github.com/geek1011/kepubify/releases/latest">Download for other platforms</a>
         </div>
@@ -211,10 +210,10 @@ Arguments:
         </div>
     </div>
     <div class="section">
-        <div class="name">What is different about kepubs?</div>
+        <div class="name">What is different about KEPUBs?</div>
         <div class="text">
             <p>
-                Kepubs are Kobo's ebook format based on the epub format. This format enables additional features such as chapter progress
+                KEPUB is Kobo's ebook format based on EPUB. This format enables additional features such as chapter progress
                 stats, time left, faster page turns, page flipping (hold finger in bottom corner of screen), footnote previews, image zooming, and faster text selection. Also, ePub
                 3 is only supported using the kepub reader.
             </p>
@@ -252,11 +251,10 @@ Arguments:
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-66226417-1"></script>
     <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'UA-66226417-1');
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'UA-66226417-1');
     </script>
     
     <script>
