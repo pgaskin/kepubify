@@ -9,11 +9,12 @@ require (
 	github.com/beevik/etree v1.1.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/geek1011/koboutils/v2 v2.0.0
-	github.com/mattn/go-isatty v0.0.4
+	github.com/mattn/go-isatty v0.0.11
 	github.com/mattn/go-sqlite3 v1.9.0
 	github.com/mattn/go-zglob v0.0.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.2.2
-	golang.org/x/net v0.0.0-20190522155817-f3200d17e092
+	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
+	golang.org/x/sys v0.0.0-20200107162124-548cf772de50 // indirect
 )
