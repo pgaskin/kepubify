@@ -203,3 +203,13 @@ func fixInvalidSelfClosingTags(html string) string {
 	html = selfClosingScriptRe.ReplaceAllString(html, "<$1$2> </$1>")
 	return html
 }
+
+// removeBOM removes the UTF-8 BOM, if present. The UTF-8 BOM is not necessary
+// in general, and is not useful at all in EPUBs, which are supposed to use
+// UTF-8 or UTF-16.
+//
+// Having a BOM present causes issues in the HTML encoding (see #36).
+func removeBOM(html string) string {
+	html = strings.TrimPrefix(html, "\xEF\xBB\xBF")
+	return html
+}

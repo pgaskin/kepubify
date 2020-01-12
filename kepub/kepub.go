@@ -158,6 +158,7 @@ func (c *Converter) Convert(src, dest string) error {
 // ProcessHTML processes a html file. filename is the full path to the file and is required if inlining styles.
 func (c *Converter) ProcessHTML(html, filename string) (string, error) {
 	html = fixInvalidSelfClosingTags(html)
+	html = removeBOM(html)
 
 	var doc *goquery.Document
 	var err error

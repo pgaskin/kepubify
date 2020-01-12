@@ -111,7 +111,7 @@ func TestAddDivs(t *testing.T) {
 }
 
 func TestProcess(t *testing.T) {
-	h := `<!DOCTYPE html>
+	h := "\xEF\xBB\xBF" + `<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>Test Book 1</title>
