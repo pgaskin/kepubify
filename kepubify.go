@@ -45,6 +45,7 @@ func main() {
 	inlinestyles := pflag.Bool("inline-styles", false, "inline all stylesheets (for working around certain bugs)")
 	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
 	replace := pflag.StringArrayP("replace", "r", nil, "find and replace on all html files (repeat any number of times) (format: find|replace)")
+	calibre := pflag.Bool("calibre", false, "use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
 	pflag.Parse()
 
 	if *sversion {
@@ -81,6 +82,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, format, a...)
 	}
 
+	ext := ".kepub.epub"
+	if *calibre {
+		ext = ".kepub"
+	}
+
 	out := ""
 	out, err := filepath.Abs(*output)
 	if err != nil || out == "" {
@@ -97,9 +103,10 @@ func main() {
 	logV("css: %s\n", *css)
 	logV("hyphenate: %t\n", *hyphenate)
 	logV("nohyphenate: %t\n", *nohyphenate)
-	logV("inlinestyles: %t\n\n", *inlinestyles)
-	logV("fullscreenfixes: %t\n\n", *fullscreenfixes)
-	logV("replace: %s\n\n", strings.Join(*replace, ","))
+	logV("inlinestyles: %t\n", *inlinestyles)
+	logV("fullscreenfixes: %t\n", *fullscreenfixes)
+	logV("replace: %s\n", strings.Join(*replace, ","))
+	logV("calibre: %t (ext=%s)\n\n", *calibre, ext)
 
 	findReplace := map[string]string{}
 	for _, r := range *replace {
@@ -138,11 +145,11 @@ func main() {
 				logE("File '%s' is not an epub\n", f)
 				errExit()
 			}
-			if strings.HasSuffix(f, ".kepub.epub") {
+			if strings.HasSuffix(f, ".kepub.epub") || strings.HasSuffix(f, ".kepub") {
 				logE("File '%s' is already a kepub\n", f)
 				errExit()
 			}
-			paths[f] = filepath.Join(out, strings.TrimSuffix(filepath.Base(f), ".epub")+".kepub.epub")
+			paths[f] = filepath.Join(out, strings.TrimSuffix(filepath.Base(f), ".epub")+ext)
 			logV("  file-result: %s -> %s\n", f, paths[f])
 		} else if isDir(arg) {
 			argabs, err := filepath.Abs(arg)
@@ -162,7 +169,7 @@ func main() {
 					continue
 				}
 
-				rel, err := filepath.Rel(arg, filepath.Join(filepath.Dir(f), strings.TrimSuffix(filepath.Base(f), ".epub")+".kepub.epub"))
+				rel, err := filepath.Rel(arg, filepath.Join(filepath.Dir(f), strings.TrimSuffix(filepath.Base(f), ".epub")+ext))
 				if err != nil {
 					logE("Error resolving relative path for file '%s'\n", f)
 					errExit()
@@ -187,6 +194,10 @@ func main() {
 
 	log("Kepubify %s: Converting %d books\n", version, len(paths))
 	log("Output folder: %s\n", out)
+
+	if *calibre {
+		log("Using extension %s for Calibre compatibility (this is meant for use with a Calibre library and will not work directly on a Kobo reader)\n", ext)
+	}
 
 	n := 0
 	errs := [][]string{}
