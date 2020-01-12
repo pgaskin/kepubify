@@ -55,6 +55,9 @@ type parser struct {
 	// to be self closing (<whatever ... />). This is mainly for better
 	// compatibility with XHTML found in EPUBs. MOD(pgaskin)
 	lenientSelfClosing bool
+	// ignoreBOM skips the BOM at the beginning of the document, if present.
+	// MOD(pgaskin)
+	ignoreBOM bool
 }
 
 func (p *parser) top() *Node {
@@ -521,6 +524,11 @@ const whitespace = " \t\r\n\f"
 func initialIM(p *parser) bool {
 	switch p.tok.Type {
 	case TextToken:
+		// MOD(pgaskin): Ignore BOM when considering initial data before document.
+		if p.ignoreBOM {
+			p.tok.Data = strings.TrimPrefix(p.tok.Data, "\xEF\xBB\xBF")
+		}
+		// END MOD
 		p.tok.Data = strings.TrimLeft(p.tok.Data, whitespace)
 		if len(p.tok.Data) == 0 {
 			// It was all whitespace, so ignore it.
@@ -2450,6 +2458,17 @@ func ParseOptionEnableScripting(enable bool) ParseOption {
 func ParseOptionLenientSelfClosing(enable bool) ParseOption {
 	return func(p *parser) {
 		p.lenientSelfClosing = enable
+	}
+}
+
+// ParseOptionIgnoreBOM skips reading the UTF-8 BOM (EF BB BF), if present, at
+// the beginning of the document (technically, it makes the parser consider it
+// as whitespace). This option is mainly intended for use with with
+// RenderOptionAllowXMLDeclarations to prevent the XML declaration being moved
+// into the body element. MOD(pgaskin)
+func ParseOptionIgnoreBOM(enable bool) ParseOption {
+	return func(p *parser) {
+		p.ignoreBOM = enable
 	}
 }
 

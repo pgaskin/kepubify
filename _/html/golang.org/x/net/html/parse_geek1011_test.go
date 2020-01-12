@@ -215,3 +215,18 @@ func TestMod_ParseLenientSelfClosing(t *testing.T) {
 		RenderedB:   `<!DOCTYPE html><html><head><title>Title</title></head><body><p>Test</p><span>Test</span><div></div><span>Test</span><p>Test</p></body></html>`,
 	}.Test(t)
 }
+
+func TestMod_ParseIgnoreBOM(t *testing.T) {
+	testModCase{
+		What:     `BOM and comment`,
+		Original: "\xEF\xBB\xBF" + `<!-- Comment Text --><!DOCTYPE html><html><head><title>Title</title></head><body><p>Test 1</p></body></html>`,
+
+		ParseOptsA:  []ParseOption{ParseOptionIgnoreBOM(false)},
+		RenderOptsA: nil,
+		RenderedA:   `<html><head></head><body>` + "\xEF\xBB\xBF" + `<!-- Comment Text --><title>Title</title><p>Test 1</p></body></html>`,
+
+		ParseOptsB:  []ParseOption{ParseOptionIgnoreBOM(true)},
+		RenderOptsB: nil,
+		RenderedB:   `<!-- Comment Text --><!DOCTYPE html><html><head><title>Title</title></head><body><p>Test 1</p></body></html>`,
+	}.Test(t)
+}
