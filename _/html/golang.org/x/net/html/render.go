@@ -12,6 +12,40 @@ import (
 	"strings"
 )
 
+// MOD(pgaskin): Add render options
+type renderOpts struct {
+	// xmlDecl uncomments XML declarations which were commented out during
+	// parsing.
+	xmlDecl bool
+	// polyglot produces HTML which is mostly valid XML/XHTML as well. See the
+	// comment for RenderOptionPolyglot for more details.
+	polyglot bool
+}
+
+// RenderOption configures a renderer.
+type RenderOption func(o *renderOpts)
+
+// RenderWithOptions is like Render, with options.
+func RenderWithOptions(w io.Writer, n *Node, opts ...RenderOption) error {
+	o := &renderOpts{}
+	for _, f := range opts {
+		f(o)
+	}
+
+	// copied from Render
+	if x, ok := w.(writer); ok {
+		return render(x, n, o)
+	}
+	buf := bufio.NewWriter(w)
+	if err := render(buf, n, o); err != nil {
+		return err
+	}
+	return buf.Flush()
+}
+
+// note that the *renderOpts needed to also be added to the render functions
+// END MOD
+
 type writer interface {
 	io.Writer
 	io.ByteWriter
@@ -44,10 +78,10 @@ type writer interface {
 // becomes "<html><head><head/><body>abc</body></html>".
 func Render(w io.Writer, n *Node) error {
 	if x, ok := w.(writer); ok {
-		return render(x, n)
+		return render(x, n, &renderOpts{})
 	}
 	buf := bufio.NewWriter(w)
-	if err := render(buf, n); err != nil {
+	if err := render(buf, n, &renderOpts{}); err != nil {
 		return err
 	}
 	return buf.Flush()
@@ -57,15 +91,15 @@ func Render(w io.Writer, n *Node) error {
 // has been rendered. No more end tags should be rendered after that.
 var plaintextAbort = errors.New("html: internal error (plaintext abort)")
 
-func render(w writer, n *Node) error {
-	err := render1(w, n)
+func render(w writer, n *Node, o *renderOpts) error {
+	err := render1(w, n, o)
 	if err == plaintextAbort {
 		err = nil
 	}
 	return err
 }
 
-func render1(w writer, n *Node) error {
+func render1(w writer, n *Node, o *renderOpts) error {
 	// Render non-element nodes; these are the easy cases.
 	switch n.Type {
 	case ErrorNode:
@@ -74,7 +108,7 @@ func render1(w writer, n *Node) error {
 		return escape(w, n.Data)
 	case DocumentNode:
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if err := render1(w, c); err != nil {
+			if err := render1(w, c, o); err != nil {
 				return err
 			}
 		}
@@ -203,7 +237,7 @@ func render1(w writer, n *Node) error {
 					return err
 				}
 			} else {
-				if err := render1(w, c); err != nil {
+				if err := render1(w, c, o); err != nil {
 					return err
 				}
 			}
@@ -215,7 +249,7 @@ func render1(w writer, n *Node) error {
 		}
 	default:
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if err := render1(w, c); err != nil {
+			if err := render1(w, c, o); err != nil {
 				return err
 			}
 		}
