@@ -268,7 +268,7 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 
 		if _, err := tx.Exec(
 			"INSERT OR REPLACE INTO _seriesmeta (ImageId, Series, SeriesNumber) VALUES (?, ?, ?)",
-			contentIDToImageID(pathToContentID(relEpub)),
+			kobo.ContentIDToImageID(kobo.PathToContentID(relEpub)),
 			sql.NullString{String: series, Valid: len(series) > 0},
 			sql.NullString{String: strconv.FormatFloat(index, 'f', -1, 64), Valid: index > 0},
 		); err != nil {
@@ -284,19 +284,6 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 	}
 
 	return nil
-}
-
-func pathToContentID(relpath string) string {
-	return fmt.Sprintf("file:///mnt/onboard/%s", filepath.ToSlash(relpath))
-}
-
-func contentIDToImageID(contentID string) string {
-	return strings.NewReplacer(
-		" ", "_",
-		"/", "_",
-		":", "_",
-		".", "_",
-	).Replace(contentID)
 }
 
 // readEPUBSeriesInfo reads the series metadata from an epub book.
