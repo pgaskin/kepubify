@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Modifications Copyright 2020 Patrick Gaskin.
+
 package html
 
 import (
@@ -49,6 +51,10 @@ type parser struct {
 	// context is the context element when parsing an HTML fragment
 	// (section 12.4).
 	context *Node
+	// lenientSelfClosing controls whether to allow additional non-void elements
+	// to be self closing (<whatever ... />). This is mainly for better
+	// compatibility with XHTML found in EPUBs. MOD(pgaskin)
+	lenientSelfClosing bool
 }
 
 func (p *parser) top() *Node {
@@ -652,6 +658,36 @@ func inHeadIM(p *parser) bool {
 			p.tokenizer.NextIsNotRawText()
 			return true
 		case a.Script, a.Title:
+			// MOD(pgaskin): Allow title to be self-closing. See the mod below
+			//     for A elements for more details. This is often found in XHTML
+			//     EPUBs, where generators don't add any text to the title tag
+			//     and use an XML renderer (which then self-closes it, which is
+			//     ignored in the HTML5 spec, and results in everything after
+			//     becoming the title when parsed using a compliant HTML5 parser).
+			//
+			//     Also allow script to be self-closing, as I've seen it in quite
+			//     a few cases when HTML is generated using an XML encoder and
+			//     it's a script[src].
+			if p.lenientSelfClosing && p.hasSelfClosingToken {
+				// Add the element, but immediately remove it from the stack (
+				// this is necessary because it would usually be removed after
+				// the raw text, which we're skipping).
+				p.addElement()
+				p.oe.pop()
+
+				// This doesn't actually do anything here, but we acknowledge it
+				// for consistency.
+				p.acknowledgeSelfClosingTag()
+
+				// There isn't an end tag for Title, so it considers it raw text
+				// afterwards (even if we don't add the element) unless we tell
+				// it not to consider it as such.
+				p.tokenizer.NextIsNotRawText()
+
+				return true
+			}
+			// END MOD
+
 			p.addElement()
 			p.setOriginalIM()
 			p.im = textIM
@@ -923,6 +959,14 @@ func inBodyIM(p *parser) bool {
 		case a.Address, a.Article, a.Aside, a.Blockquote, a.Center, a.Details, a.Dialog, a.Dir, a.Div, a.Dl, a.Fieldset, a.Figcaption, a.Figure, a.Footer, a.Header, a.Hgroup, a.Main, a.Menu, a.Nav, a.Ol, a.P, a.Section, a.Summary, a.Ul:
 			p.popUntil(buttonScope, a.P)
 			p.addElement()
+			// MOD(pgaskin): Allow div and p to be self-closing. See the mod above
+			//     for A elements for more details.
+			if p.lenientSelfClosing && (p.tok.DataAtom == a.P || p.tok.DataAtom == a.Div) && p.hasSelfClosingToken {
+				p.oe.pop()
+				p.acknowledgeSelfClosingTag()
+				break
+			}
+			// END MOD
 		case a.H1, a.H2, a.H3, a.H4, a.H5, a.H6:
 			p.popUntil(buttonScope, a.P)
 			switch n := p.top(); n.DataAtom {
@@ -999,6 +1043,31 @@ func inBodyIM(p *parser) bool {
 				}
 			}
 			p.reconstructActiveFormattingElements()
+			// MOD(pgaskin): Allow A to be self-closing. THIS IS NOT SPEC-
+			//     COMPLIANT, but won't cause any issues in basically any real-
+			//     world case, as people don't go doing things like
+			//     `<a href="/whatever" />link text</a>` and expect it to work (
+			//     the spec says to ignore the self-closing on any non-void
+			//     element). This fixes cases where people (or generators) do
+			//     things like `<a id="aRandomID" />some more text` and expect
+			//     it to be treated like XHTML/XML, where the self-closing would
+			//     work.
+			//
+			//     Based on the case for void elements (br, wbr, input, ...),
+			//     but only closes them if they have the self closing token (/>)
+			//     rather than closing them and ignoring content in all cases.
+			//
+			//     This is done after reconstructActiveFormattingElements (but
+			//     before addFormattingElement, which would be useless as there
+			//     isn't any content in a self-closing A) to prevent breaking
+			//     open formatting elements before the A tag.
+			if p.lenientSelfClosing && p.hasSelfClosingToken {
+				p.addElement()
+				p.oe.pop()
+				p.acknowledgeSelfClosingTag()
+				break
+			}
+			// END MOD
 			p.addFormattingElement()
 		case a.B, a.Big, a.Code, a.Em, a.Font, a.I, a.S, a.Small, a.Strike, a.Strong, a.Tt, a.U:
 			p.reconstructActiveFormattingElements()
@@ -1117,6 +1186,15 @@ func inBodyIM(p *parser) bool {
 		case a.Caption, a.Col, a.Colgroup, a.Frame, a.Head, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
 			// Ignore the token.
 		default:
+			// MOD(pgaskin): Allow span to be self-closing. See the mod above
+			//     for A elements for more details.
+			if p.lenientSelfClosing && p.tok.DataAtom == a.Span && p.hasSelfClosingToken {
+				p.addElement()
+				p.oe.pop()
+				p.acknowledgeSelfClosingTag()
+				break
+			}
+			// END MOD
 			p.reconstructActiveFormattingElements()
 			p.addElement()
 		}
@@ -2363,6 +2441,15 @@ type ParseOption func(p *parser)
 func ParseOptionEnableScripting(enable bool) ParseOption {
 	return func(p *parser) {
 		p.scripting = enable
+	}
+}
+
+// ParseOptionLenientSelfClosing controls whether to allow additional non-void
+// elements to be self closing (<whatever ... />). This is mainly for better
+// compatibility with XHTML found in EPUBs. MOD(pgaskin)
+func ParseOptionLenientSelfClosing(enable bool) ParseOption {
+	return func(p *parser) {
+		p.lenientSelfClosing = enable
 	}
 }
 
