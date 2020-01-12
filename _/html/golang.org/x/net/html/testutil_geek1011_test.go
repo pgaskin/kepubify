@@ -63,7 +63,7 @@ func testModRerender(orig string, popts []ParseOption, ropts []RenderOption, con
 		rpOut := buf.String()
 
 		if out != rpOut {
-			return "", fmt.Errorf("inconsistent rerendering with same opts: first:%#v != second:%#v", out, rpOut)
+			return "", fmt.Errorf("inconsistent rerendering with same opts: first:`%v` != second:`%v`", out, rpOut)
 		}
 	}
 
