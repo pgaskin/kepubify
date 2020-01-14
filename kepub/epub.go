@@ -7,84 +7,86 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/beevik/etree"
 )
 
-// exists checks whether a path exists
-func exists(path string) bool {
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return true
+// FindOPF finds the path to the first OPF package document in an unpacked EPUB.
+func FindOPF(dir string) (string, error) {
+	rsk, err := os.Open(filepath.Join(dir, "META-INF", "container.xml"))
+	if err != nil {
+		return "", fmt.Errorf("error opening container.xml: %w", err)
 	}
-	return false
-}
+	defer rsk.Close()
 
-// isDir checks if a exists and is a dir
-func isDir(path string) bool {
-	if fi, err := os.Stat(path); err == nil && fi.IsDir() {
-		return true
-	}
-	return false
-}
-
-// UnpackEPUB unpacks an epub
-func UnpackEPUB(src, dest string, overwritedest bool) error {
-	if src == "" {
-		return errors.New("source must not be empty")
+	doc := etree.NewDocument()
+	if _, err = doc.ReadFrom(rsk); err != nil {
+		return "", fmt.Errorf("error parsing container.xml: %w", err)
 	}
 
-	if dest == "" {
-		return errors.New("destination must not be empty")
-	}
-
-	if !exists(src) {
-		return fmt.Errorf(`source file "%s" does not exist`, src)
-	}
-
-	if exists(dest) {
-		if !overwritedest {
-			return fmt.Errorf(`destination "%s" already exists`, dest)
+	if e := doc.FindElement("//rootfiles/rootfile[@full-path]"); e != nil {
+		if p := e.SelectAttrValue("full-path", ""); p != "" {
+			return filepath.Join(dir, p), nil
 		}
-		os.RemoveAll(dest)
+	}
+	return "", errors.New("error parsing container.xml: could not find rootfile")
+}
+
+// UnpackEPUB unpacks an EPUB to a directory, which must be a nonexistent
+// directory under an existing parent.
+func UnpackEPUB(epub, dir string) error {
+	if len(epub) == 0 || len(dir) == 0 {
+		return fmt.Errorf("epub (%#v) and dir (%#v) must not be empty", epub, dir)
 	}
 
-	src, err := filepath.Abs(src)
-	if err != nil {
-		return fmt.Errorf("error resolving absolute path of source: %w", err)
+	if _, err := os.Stat(dir); err == nil {
+		return fmt.Errorf("destination dir (%#v) must not exist", dir)
 	}
 
-	dest, err = filepath.Abs(dest)
-	if err != nil {
-		return fmt.Errorf("error resolving absolute path of destination: %w", err)
+	for _, d := range []*string{&epub, &dir} {
+		abs, err := filepath.Abs(*d)
+		if err != nil {
+			return fmt.Errorf("resolve absolute path of %#v: %w", *d, err)
+		}
+		*d = abs
 	}
 
-	r, err := zip.OpenReader(src)
+	zr, err := zip.OpenReader(epub)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := r.Close(); err != nil {
-			panic(err)
-		}
-	}()
+	defer zr.Close()
 
-	os.MkdirAll(dest, 0755)
+	if err := os.Mkdir(dir, 0755); err != nil {
+		return fmt.Errorf("create dest dir: %w", err)
+	}
 
-	// Closure to address file descriptors issue with all the deferred .Close() methods
-	extractAndWriteFile := func(f *zip.File) error {
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		defer rc.Close()
-
-		path := filepath.Join(dest, f.Name)
-
-		if f.FileInfo().IsDir() {
-			os.MkdirAll(path, 0700)
-		} else {
-			os.MkdirAll(filepath.Dir(path), 0700)
-			f, err := os.Create(path)
+	for _, zf := range zr.File {
+		// closure to simplify closing files with defer and prevent leaking FDs
+		if err := func(zf *zip.File) error {
+			fr, err := zf.Open()
 			if err != nil {
-				return err
+				return fmt.Errorf("open zip file %#v: %w", zf, err)
+			}
+			defer fr.Close()
+
+			out := filepath.Join(dir, zf.Name) // note: this is not safe to use with untrusted EPUBs
+
+			if zf.FileInfo().IsDir() {
+				if err := os.MkdirAll(out, 0755); err != nil {
+					return fmt.Errorf("extract dir %#v to %#v: %w", zf.Name, out, err)
+				}
+				return nil
+			}
+
+			// some badly-formed zips don't have dirs first
+			if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
+				return fmt.Errorf("create parent dir for %#v: %w", zf.Name, err)
+			}
+
+			f, err := os.OpenFile(out, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+			if err != nil {
+				return fmt.Errorf("extract file %#v to %#v: %w", zf.Name, out, err)
 			}
 			defer func() {
 				if err := f.Close(); err != nil {
@@ -92,17 +94,12 @@ func UnpackEPUB(src, dest string, overwritedest bool) error {
 				}
 			}()
 
-			_, err = io.Copy(f, rc)
-			if err != nil {
-				return err
+			if _, err := io.Copy(f, fr); err != nil {
+				return fmt.Errorf("extract file %#v to %#v: %w", zf.Name, out, err)
 			}
-		}
-		return nil
-	}
 
-	for _, f := range r.File {
-		err := extractAndWriteFile(f)
-		if err != nil {
+			return nil
+		}(zf); err != nil {
 			return err
 		}
 	}
@@ -110,120 +107,89 @@ func UnpackEPUB(src, dest string, overwritedest bool) error {
 	return nil
 }
 
-// PackEPUB packs an epub
-func PackEPUB(src, dest string, overwritedest bool) error {
-	if src == "" {
-		return errors.New("source dir must not be empty")
+// PackEPUB unpacks an EPUB to a file.
+func PackEPUB(dir, epub string) error {
+	if len(epub) == 0 || len(dir) == 0 {
+		return fmt.Errorf("epub (%#v) and dir (%#v) must not be empty", epub, dir)
 	}
 
-	if dest == "" {
-		return errors.New("destination must not be empty")
-	}
-
-	if !exists(src) {
-		return fmt.Errorf(`source dir "%s" does not exist`, src)
-	}
-
-	if exists(dest) {
-		if !overwritedest {
-			return fmt.Errorf(`destination "%s" already exists`, dest)
+	for _, d := range []*string{&dir, &epub} {
+		abs, err := filepath.Abs(*d)
+		if err != nil {
+			return fmt.Errorf("resolve absolute path of %#v: %w", *d, err)
 		}
-		os.RemoveAll(dest)
+		*d = abs
 	}
 
-	src, err := filepath.Abs(src)
+	if _, err := os.Stat(filepath.Join(dir, "META-INF", "container.xml")); err != nil {
+		return fmt.Errorf("could not access META-INF/container.xml: %w", err)
+	}
+
+	f, err := os.OpenFile(epub, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("error resolving absolute path of sourcedir: %w", err)
+		return fmt.Errorf("create destination epub: %w", err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	zw := zip.NewWriter(f)
+	defer func() {
+		if err := zw.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	if w, err := zw.CreateHeader(&zip.FileHeader{
+		Name:   "mimetype",
+		Method: zip.Store,
+	}); err != nil {
+		return fmt.Errorf("error writing mimetype to epub: %w", err)
+	} else if _, err = w.Write([]byte("application/epub+zip")); err != nil {
+		return fmt.Errorf("error writing mimetype to epub: %w", err)
 	}
 
-	dest, err = filepath.Abs(dest)
-	if err != nil {
-		return fmt.Errorf("error resolving absolute path of destination: %w", err)
-	}
-
-	if !exists(filepath.Join(src, "META-INF", "container.xml")) {
-		return fmt.Errorf("could not find META-INF/container.xml")
-	}
-
-	f, err := os.Create(dest)
-	if err != nil {
-		return fmt.Errorf("error creating destination file: %w", err)
-	}
-	defer f.Close()
-
-	epub := zip.NewWriter(f)
-	defer epub.Close()
-
-	var addFile = func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Get the path of the file relative to the source folder
-		relativePath, err := filepath.Rel(src, path)
+		rel, err := filepath.Rel(dir, path)
 		if err != nil {
 			return fmt.Errorf(`error getting relative path of "%s"`, path)
 		}
 
-		// Fix issue with path separators in zip on windows
-		relativePath = filepath.ToSlash(relativePath)
-
-		if filepath.ToSlash(path) == filepath.ToSlash(dest) {
-			// Skip if it is trying to pack itself
-			return nil
+		if filepath.ToSlash(path) == filepath.ToSlash(epub) {
+			return nil // don't pack self
 		}
 
 		if !info.Mode().IsRegular() {
-			// Skip if not file
-			return nil
+			return nil // only pack files
 		}
 
-		if filepath.ToSlash(path) == filepath.ToSlash(filepath.Join(src, "mimetype")) {
-			// Skip if it is the mimetype file
-			return nil
+		if filepath.Base(rel) == "mimetype" {
+			return nil // don't pack the mimetype again
 		}
 
-		// Create file in zip
-		w, err := epub.Create(relativePath)
+		rel = filepath.ToSlash(rel) // zips must use a forward slash
+
+		w, err := zw.Create(rel)
 		if err != nil {
-			return fmt.Errorf(`error creating file in epub "%s": %w`, relativePath, err)
+			return fmt.Errorf(`error creating file in epub %#v: %w`, rel, err)
 		}
 
-		// Open file on disk
-		r, err := os.Open(path)
+		r, err := os.OpenFile(path, os.O_RDONLY, 0)
 		if err != nil {
-			return fmt.Errorf(`error reading file "%s": %w`, path, err)
+			return fmt.Errorf(`error reading file %#v: %w`, path, err)
 		}
 		defer r.Close()
 
-		// Write file from disk to epub
-		_, err = io.Copy(w, r)
-		if err != nil {
-			return fmt.Errorf(`error writing file to epub "%s": %w`, relativePath, err)
+		if _, err = io.Copy(w, r); err != nil {
+			return fmt.Errorf(`error writing file to epub %#v: %w`, rel, err)
 		}
 
 		return nil
-	}
-
-	// Do not compress mimetype
-	mimetypeWriter, err := epub.CreateHeader(&zip.FileHeader{
-		Name:   "mimetype",
-		Method: zip.Store,
 	})
-
-	if err != nil {
-		return errors.New("error writing mimetype to epub")
-	}
-
-	_, err = mimetypeWriter.Write([]byte("application/epub+zip"))
-	if err != nil {
-		return errors.New("error writing mimetype to epub")
-	}
-
-	err = filepath.Walk(src, addFile)
-	if err != nil {
-		return fmt.Errorf("error adding file to epub: %w", err)
-	}
-
-	return nil
 }
