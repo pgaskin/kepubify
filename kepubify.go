@@ -5,114 +5,76 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/geek1011/kepubify/kepub"
-	isatty "github.com/mattn/go-isatty"
-	zglob "github.com/mattn/go-zglob"
 	"github.com/spf13/pflag"
 )
 
-var version = "dev"
-
-func helpExit() {
-	fmt.Fprintf(os.Stderr, "Usage: kepubify [OPTIONS] PATH [PATH]...\n\nVersion:\n  kepubify %s\n\nOptions:\n", version)
-	pflag.PrintDefaults()
-	fmt.Fprintf(os.Stderr, "\nArguments:\n  PATH is the path to an epub file or directory to convert. If it is a directory, the converted dir is the name of the dir with the suffix _converted. If the path is a file, the converted file has the extension .kepub.epub.\n")
-	if runtime.GOOS == "windows" {
-		time.Sleep(time.Second * 2)
-	}
-	os.Exit(1)
-}
-
-func errExit() {
-	if runtime.GOOS == "windows" {
-		time.Sleep(time.Second * 2)
-	}
-	os.Exit(1)
-}
+var version = "v3-dev"
 
 func main() {
-	help := pflag.BoolP("help", "h", false, "show this help text")
-	sversion := pflag.Bool("version", false, "show the version")
-	update := pflag.BoolP("update", "u", false, "don't reconvert files which have already been converted")
+	pflag.CommandLine.SortFlags = false
+
 	verbose := pflag.BoolP("verbose", "v", false, "show extra information in output")
-	output := pflag.StringP("output", "o", ".", "the directory to place the converted files")
-	css := pflag.StringP("css", "c", "", "custom CSS to add to ebook")
+	sversion := pflag.Bool("version", false, "show the version")
+	help := pflag.BoolP("help", "h", false, "show this help text")
+
+	for _, flag := range []string{"verbose", "version", "help"} {
+		pflag.CommandLine.SetAnnotation(flag, "category", []string{"1.General Options"})
+	}
+
+	update := pflag.BoolP("update", "u", false, "don't reconvert files which have already been converted (i.e. don't overwrite output files)")
+	inplace := pflag.BoolP("inplace", "i", false, "don't add the _converted suffix to converted files and directories")
+	nopreservedirs := pflag.Bool("no-preserve-dirs", false, "flatten the directory structure of the input (an error will be shown if there are conflicts)")
+	output := pflag.StringP("output", "o", "", "[>1 inputs || 1 file input with existing dir output]: directory to place converted files/dirs under; [1 file input with nonexistent output]: output filename; [1 dir input]: output directory for contents of input (default: current directory)")
+	calibre := pflag.Bool("calibre", false, "use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
+
+	for _, flag := range []string{"update", "inplace", "no-preserve-dirs", "output", "calibre"} {
+		pflag.CommandLine.SetAnnotation(flag, "category", []string{"2.Output Options"})
+	}
+
+	smartenpunct := pflag.Bool("smarten-punctuation", false, "smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)")
+	css := pflag.StringArrayP("css", "c", nil, "custom CSS to add to ebook")
 	hyphenate := pflag.Bool("hyphenate", false, "force enable hyphenation")
 	nohyphenate := pflag.Bool("no-hyphenate", false, "force disable hyphenation")
-	smartenpunct := pflag.Bool("smarten-punctuation", false, "smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)")
 	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
 	replace := pflag.StringArrayP("replace", "r", nil, "find and replace on all html files (repeat any number of times) (format: find|replace)")
-	calibre := pflag.Bool("calibre", false, "use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
+
+	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "replace"} {
+		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
+	}
+
+	// --- Parse options --- //
+
 	pflag.Parse()
 
 	if *sversion {
 		fmt.Printf("kepubify %s\n", version)
-		os.Exit(0)
+		exit(0)
+		return
 	}
 
 	if *help || pflag.NArg() == 0 {
 		helpExit()
+		return
 	}
 
 	if *hyphenate && *nohyphenate {
-		fmt.Printf("--hyphenate and --no-hyphenate are mutally exclusive\n")
-		helpExit()
+		fmt.Printf("Error: --hyphenate and --no-hyphenate are mutally exclusive. See --help for more details.\n")
+		exit(2)
+		return
 	}
-
-	logV := func(format string, a ...interface{}) {
-		if *verbose {
-			if os.Getenv("TERM") != "dumb" && (runtime.GOOS == "linux" || runtime.GOOS == "darwin") && isatty.IsTerminal(os.Stdout.Fd()) {
-				fmt.Print("\033[36m")
-				fmt.Printf(format, a...)
-				fmt.Print("\033[0m")
-				return
-			}
-			fmt.Printf(format, a...)
-		}
-	}
-
-	log := func(format string, a ...interface{}) {
-		fmt.Printf(format, a...)
-	}
-
-	logE := func(format string, a ...interface{}) {
-		fmt.Fprintf(os.Stderr, format, a...)
-	}
-
-	ext := ".kepub.epub"
-	if *calibre {
-		ext = ".kepub"
-	}
-
-	out := ""
-	out, err := filepath.Abs(*output)
-	if err != nil || out == "" {
-		logE("Error resolving output dir '%s': %v\n", *output, err)
-		errExit()
-	}
-
-	logV("version: %s\n\n", version)
-	logV("output: %s\n", *output)
-	logV("output-abs: %s\n", out)
-	logV("help: %t\n", *help)
-	logV("update: %t\n", *update)
-	logV("verbose: %t\n", *verbose)
-	logV("css: %s\n", *css)
-	logV("hyphenate: %t\n", *hyphenate)
-	logV("nohyphenate: %t\n", *nohyphenate)
-	logV("smartenpunct: %t\n", *smartenpunct)
-	logV("fullscreenfixes: %t\n", *fullscreenfixes)
-	logV("replace: %s\n", strings.Join(*replace, ","))
-	logV("calibre: %t (ext=%s)\n\n", *calibre, ext)
 
 	kepub.Verbose = *verbose
 
+	// --- Make converter --- //
+
 	var opts []kepub.ConverterOption
-	if len(*css) != 0 {
-		opts = append(opts, kepub.ConverterOptionAddCSS(*css))
+	for _, v := range *css {
+		opts = append(opts, kepub.ConverterOptionAddCSS(v))
 	}
 	if *hyphenate {
 		opts = append(opts, kepub.ConverterOptionHyphenate(true))
@@ -128,149 +90,145 @@ func main() {
 	for _, r := range *replace {
 		spl := strings.SplitN(r, "|", 2)
 		if len(spl) != 2 {
-			logE("Error parsing replacement '%s': must be in format `find|replace`\n", r)
-			errExit()
+			fmt.Fprintf(os.Stderr, "Error: Parse replacement %#v: must be in format `find|replace`\n", r)
+			exit(1)
 		}
 		opts = append(opts, kepub.ConverterOptionFindReplace(spl[0], spl[1]))
 	}
 	converter := kepub.NewConverterWithOptions(opts...)
 
-	paths := map[string]string{}
-	for _, arg := range uniq(pflag.Args()) {
-		if !exists(arg) {
-			logE("Path '%s' does not exist\n", arg)
-			errExit()
-		}
-		if isFile(arg) {
-			logV("file: %s\n", arg)
-			f, err := filepath.Abs(arg)
-			if err != nil {
-				logE("Error resolving absolute path for file '%s'\n", arg)
-				errExit()
-			}
-			if !strings.HasSuffix(f, ".epub") {
-				logE("File '%s' is not an epub\n", f)
-				errExit()
-			}
-			if strings.HasSuffix(f, ".kepub.epub") || strings.HasSuffix(f, ".kepub") {
-				logE("File '%s' is already a kepub\n", f)
-				errExit()
-			}
-			paths[f] = filepath.Join(out, strings.TrimSuffix(filepath.Base(f), ".epub")+ext)
-			logV("  file-result: %s -> %s\n", f, paths[f])
-		} else if isDir(arg) {
-			argabs, err := filepath.Abs(arg)
-			if err != nil {
-				logE("Error resolving path for dir '%s'\n", arg)
-				errExit()
-			}
-			logV("dir: %s\n", arg)
-			l, err := zglob.Glob(filepath.Join(arg, "**", "*.epub"))
-			if err != nil {
-				logV("Error scanning dir '%s'\n", arg)
-				errExit()
-			}
-			for _, f := range l {
-				logV("  dir-file: %s\n", f)
-				if !strings.HasSuffix(f, ".epub") || strings.HasSuffix(f, ".kepub.epub") {
-					continue
-				}
+	// --- Transform paths --- //
 
-				rel, err := filepath.Rel(arg, filepath.Join(filepath.Dir(f), strings.TrimSuffix(filepath.Base(f), ".epub")+ext))
-				if err != nil {
-					logE("Error resolving relative path for file '%s'\n", f)
-					errExit()
-				}
-
-				abs, err := filepath.Abs(f)
-				if err != nil {
-					logE("Error resolving absolute path for file '%s'\n", f)
-					errExit()
-				}
-
-				paths[abs] = filepath.Join(out, filepath.Base(argabs)+"_converted", rel)
-				logV("    dir-result: %s -> %s\n", abs, paths[abs])
-			}
-		} else {
-			logE("Path '%s' is not a file or a dir\n", arg)
-			errExit()
-		}
-	}
-
-	logV("\n")
-
-	log("Kepubify %s: Converting %d books\n", version, len(paths))
-	log("Output folder: %s\n", out)
-
+	ext := ".kepub.epub"
 	if *calibre {
-		log("Using extension %s for Calibre compatibility (this is meant for use with a Calibre library and will not work directly on a Kobo reader)\n", ext)
+		ext = ".kepub"
 	}
 
-	n := 0
-	errs := [][]string{}
-	converted := 0
-	skipped := 0
-	errored := 0
-	for i, o := range paths {
-		n++
-		e := exists(o)
-		if e && *update {
-			log("[%d/%d] Skipping '%s'\n", n, len(paths), i)
-		} else {
-			log("[%d/%d] Converting '%s'\n", n, len(paths), i)
-		}
+	out, err := filepath.Abs(*output)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Could not resolve output dir %#v: %v\n", *output, err)
+		exit(1)
+		return
+	}
 
-		de := isDir(filepath.Dir(o))
+	pathMap, skipList, err := transformer{
+		NoPreserveDirs:  *nopreservedirs,
+		Update:          *update,
+		Inplace:         *inplace,
+		Suffixes:        []string{".epub"},
+		ExcludeSuffixes: []string{".kepub.epub"},
+		TargetSuffix:    ext,
+	}.TransformPaths(out, pflag.Args()...)
 
-		logV("  i: %s\n", i)
-		logV("  o: %s\n", o)
-		logV("  e: %t\n", e)
-		logV("  de: %t\n", de)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		exit(1)
+		return
+	}
 
-		if e && *update {
+	// --- Convert --- //
+
+	fmt.Printf("Kepubify %s\n", version)
+	if *calibre {
+		fmt.Printf("Using extension %s for Calibre compatibility (this is meant for use with a Calibre library and will not work directly on a Kobo reader)\n", ext)
+	}
+	fmt.Printf("\n")
+
+	var inputs []string
+	for key := range pathMap {
+		inputs = append(inputs, key)
+	}
+	inputs = append(inputs, skipList...)
+	sort.Strings(inputs)
+
+	var converted, skipped, errored int
+	errs := map[string]error{}
+	for i, input := range inputs {
+		output, ok := pathMap[input]
+
+		if !ok {
+			fmt.Printf("[% 3d/% 3d] Skipping %s\n", i+1, len(pathMap), input)
 			skipped++
 			continue
 		}
 
-		if !de {
-			logV("  mkdirAll: %s\n", filepath.Dir(o))
-			err := os.MkdirAll(filepath.Dir(o), 0755)
-			if err != nil {
-				e := fmt.Sprintf("error creating output dir: %v", err)
-				errs = append(errs, []string{i, o, e})
-				logV("  err: %v\n", e)
-				logE("  Error: %v\n", e)
-				errored++
-				continue
-			}
+		fmt.Printf("[% 3d/% 3d] Converting %s\n", i+1, len(pathMap), input)
+		if *verbose {
+			fmt.Printf("          => %s\n", output)
 		}
 
-		err := converter.ConvertEPUB(i, o)
-		if err != nil {
-			errs = append(errs, []string{i, o, err.Error()})
-			logV("  err: %v\n", err)
-			logE("  Error: %v\n", err)
+		if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
+			errs[input] = err
 			errored++
+			continue
+		}
+
+		if err := converter.ConvertEPUB(input, output); err != nil {
+			fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
+			errs[input] = err
+			errored++
+			continue
 		}
 
 		converted++
 	}
 
-	logV("\nn: %d\n", n)
-	logV("converted: %d\n", converted)
-	logV("skipped: %d\n", skipped)
-	logV("errored: %d\n", errored)
-	logV("errs: %v\n", errs)
+	fmt.Printf("\n%d total: %d converted, %d skipped, %d errored\n", len(pathMap), converted, skipped, errored)
 
-	log("\n%d total, %d converted, %d skipped, %d errored\n", len(paths), converted, skipped, errored)
 	if len(errs) > 0 {
-		logE("\nErrors:\n")
-		for _, err := range errs {
-			logE("  '%s': %s\n", err[0], err[2])
+		fmt.Fprintf(os.Stderr, "\nErrors:\n")
+		for _, input := range inputs {
+			fmt.Fprintf(os.Stderr, "  %#v\n  => %#v\n  Error: %v\n\n", input, pathMap[input], err)
 		}
+		exit(1)
 	}
 
-	if len(paths) == 1 && len(errs) > 0 {
-		errExit()
+	exit(0)
+}
+
+func helpExit() {
+	fmt.Fprintf(os.Stderr, "Usage: kepubify [options] input_path [input_path]...\n")
+	fmt.Fprintf(os.Stderr, "\nVersion:\n  kepubify %s\n", version)
+
+	categories := map[string]*pflag.FlagSet{}
+	pflag.VisitAll(func(flag *pflag.Flag) {
+		category := flag.Annotations["category"][0] // this will panic if the category is not set, which is intended
+		if _, ok := categories[category]; !ok {
+			categories[category] = pflag.NewFlagSet("tmp", pflag.ExitOnError)
+			categories[category].SortFlags = false
+		}
+		categories[category].AddFlag(flag)
+	})
+
+	var categoriesSort []string
+	for category := range categories {
+		categoriesSort = append(categoriesSort, category)
 	}
+	sort.Strings(categoriesSort)
+
+	for _, category := range categoriesSort {
+		fmt.Fprintf(os.Stderr, "\n%s:\n%s", strings.Split(category, ".")[1], categories[category].FlagUsagesWrapped(160))
+	}
+
+	// TODO: examples?
+
+	fmt.Fprintf(os.Stderr, "\nLinks:\n")
+	for _, v := range [][]string{
+		{"Website", "https://pgaskin.net/kepubify"},
+		{"Source Code", "https://github.com/geek1011/kepubify"},
+		{"Bugs/Support", "https://github.com/geek1011/kepubify/issues"},
+		{"MobileRead", "http://mr.gd/forums/showthread.php?t=295287"},
+	} {
+		fmt.Fprintf(os.Stderr, "  %-12s - %s\n", v[0], v[1])
+	}
+
+	exit(0)
+}
+
+func exit(status int) {
+	if runtime.GOOS == "windows" {
+		time.Sleep(time.Second * 2)
+	}
+	os.Exit(status)
 }

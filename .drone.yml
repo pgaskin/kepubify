@@ -12,26 +12,6 @@ steps:
   commands:
   - GO111MODULE=on go test -mod=readonly -v ./kepub
 
-# ---
-# 
-# kind: pipeline
-# name: kepub-windows
-# type: docker
-# 
-# platform:
-#   os: windows
-#   arch: amd64
-# 
-# steps:
-# - name: test-html
-#   image: golang:1.13-windowsservercore
-#   commands:
-#   - GO111MODULE=on go test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
-# - name: test-kepub
-#   image: golang:1.13-windowsservercore
-#   commands:
-#   - GO111MODULE=on go test -mod=readonly -v ./kepub
-
 ---
 
 kind: pipeline

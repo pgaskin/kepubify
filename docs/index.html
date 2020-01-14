@@ -31,13 +31,12 @@
             <b>Features</b>
             <ul>
                 <li>Full support of all kepub features</li>
-                <li>Batch conversion</li>
-                <li>Fast (about 15x faster than Calibre)</li>
-                <li>Works from the command line</li>
+                <li>Extremely fast (about 15x faster and uses 3x less memory than Calibre)</li>
+                <li>Batch conversion with full control over the directory structure</li>
+                <li>Works from the command line and can be embedded in other applications</li>
+                <li>Comprehensive test suite</li>
                 <li>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
                 <li>Optionally update Kobo series metadata (even before the book is imported)</li>
-                <li>Does not add any extra metadata (unlike Calibre)</li>
-                <li>Supports many different CSS tweaks</li>
                 <li><b><a href="https://github.com/geek1011/kepubify/releases/latest">Covergen</a>: </b>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
                 <li><b><a href="https://github.com/geek1011/kepubify/releases/latest">Seriesmeta</a>: </b>Optionally update Kobo series metadata (even before the book is imported)</li>
             </ul>
@@ -88,26 +87,34 @@
     <div class="section">
         <div class="name">Usage</div>
         <div class="text">
-            <pre>Usage: kepubify [OPTIONS] PATH [PATH]...
+            <pre>Usage: kepubify [options] input_path [input_path]...
 
-Options:
-      --calibre                    use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
-  -c, --css string                 custom CSS to add to ebook
-      --fullscreen-reading-fixes   enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
-  -h, --help                       show this help text
+General Options:
+  -v, --verbose   show extra information in output
+      --version   show the version
+  -h, --help      show this help text
+
+Output Options:
+  -u, --update             don't reconvert files which have already been converted (i.e. don't overwrite output files)
+  -i, --inplace            don't add the _converted suffix to converted files and directories
+      --no-preserve-dirs   flatten the directory structure of the input (an error will be shown if there are conflicts)
+  -o, --output string      [>1 inputs || 1 file input with existing dir output]: directory to place converted files/dirs under; [1 file input with
+                           nonexistent output]: output filename; [1 dir input]: output directory for contents of input (default: current directory)
+      --calibre            use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
+
+Conversion Options:
+      --smarten-punctuation        smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
+  -c, --css stringArray            custom CSS to add to ebook
       --hyphenate                  force enable hyphenation
       --no-hyphenate               force disable hyphenation
-  -o, --output string              the directory to place the converted files (default ".")
+      --fullscreen-reading-fixes   enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
   -r, --replace stringArray        find and replace on all html files (repeat any number of times) (format: find|replace)
-      --smarten-punctuation        smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
-  -u, --update                     don't reconvert files which have already been converted
-  -v, --verbose                    show extra information in output
-      --version                    show the version
 
-Arguments:
-  PATH is the path to an epub file or directory to convert. If it is a directory, the converted
-  dir is the name of the dir with the suffix _converted. If the path is a file, the converted
-  file has the extension .kepub.epub.</pre>
+Links:
+  Website      - https://pgaskin.net/kepubify
+  Source Code  - https://github.com/geek1011/kepubify
+  Bugs/Support - https://github.com/geek1011/kepubify/issues
+  MobileRead   - http://mr.gd/forums/showthread.php?t=295287</pre>
         </div>
     </div>
     <div class="section">
@@ -170,6 +177,12 @@ Arguments:
                 <br>
                 <tt>kepubify --update /path/to/the/books/</tt>
             </p>
+
+            <p>
+                <b>To convert a calibre library in-place</b>:
+                <br>
+                <tt>kepubify --update --inplace --calibre /path/to/calibre/library/</tt>
+            </p>
         </div>
     </div>
     <div class="section">
@@ -225,16 +238,16 @@ Arguments:
         <div class="name">Why would I use this over the Calibre kepub output plugin?</div>
         <div class="text">
             <ul>
-                <li>Calibre adds additional unnecessary metadata to the ebook</li>
-                <li>Kepubify is usually at least 12x faster than the Calibre plugin</li>
+                <li>Kepubify is usually at least 15x faster and uses 3x less memory than the Calibre plugin</li>
+                <li>Kepubify produces output nearly identical to official KEPUB files (as of 2020-01-14, Kepubify has a few things which the Calibre plugin doesn't)</li>
                 <li>Kepubify works from the command line</li>
-                <li>Kepubify removes leftover Adobe DRM tags, cleans up MS Word tags, and cleans up the html</li>
-                <li>Calibre is an enourmous program, which is unnecessary if all you want to do is convert books</li>
+                <li>Kepubify gives you complete control over the resulting file structure</li>
+                <li>Kepubify can be embedded in other applications</li>
+                <li>Calibre is an large application, which is unnecessary if all you want to do is convert books</li>
                 <li>Kepubify is written in Go, which is a compiled language</li>
                 <li>Kepubify can update the series metadata on your Kobo without managing your whole library</li>
-                <li>Kepubify is easier to customize</li>
             </ul>
-            <p>If you are already using Calibre heavily to manage your books, kepubify is not for you. You can still use covergen and seriesmeta, though.</p>
+            <p>If you are already using Calibre heavily to manage your books, kepubify is not for you (unless you want to use it to pre-convert your books). You may still like covergen or seriesmeta, though.</p>
         </div>
     </div>
     <div class="section">
@@ -249,7 +262,7 @@ Arguments:
             </p>
         </div>
     </div>
-    <div class="footer">Copyright 2019 Patrick Gaskin</div>
+    <div class="footer">Copyright 2017-2020 Patrick Gaskin</div>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-66226417-1"></script>
     <script>

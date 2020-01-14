@@ -3,10 +3,9 @@ module github.com/geek1011/kepubify
 go 1.13
 
 require (
-	// command/tools
+	// kepubify/covergen/seriesmeta
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b
 	github.com/geek1011/koboutils/v2 v2.0.0
-	github.com/mattn/go-isatty v0.0.11
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
 	github.com/mattn/go-zglob v0.0.1
 	github.com/spf13/pflag v1.0.5
