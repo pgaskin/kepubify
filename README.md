@@ -55,7 +55,7 @@ will detect Calibre (`meta[name=calibre:series]`) and EPUB3
 (`meta[property=belongs-to-collection]`) series metadata.
 
 ```
-Usage: seriesmeta [OPTIONS] [KOBO_PATH]
+Usage: seriesmeta [options] [kobo_path]
 
 Options:
   -h, --help         Show this help message
@@ -64,7 +64,7 @@ Options:
   -u, --uninstall    Uninstall seriesmeta table and hooks (imported series metadata will be left untouched)
 
 Arguments:
-  KOBO_PATH is the path to the Kobo eReader. If not specified, seriesmeta will
+  kobo_path is the path to the Kobo eReader. If not specified, seriesmeta will
   try to automatically detect the Kobo.
 ```
 

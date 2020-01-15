@@ -73,7 +73,7 @@ steps:
 - name: run
   image: golang:1.12-buster
   commands:
-  - GO111MODULE=on go run -mod=readonly ./seriesmeta --help || true
+  - GO111MODULE=on go run -mod=readonly ./seriesmeta --help
 
 ---
 

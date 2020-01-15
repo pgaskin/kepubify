@@ -29,10 +29,15 @@ func main() {
 	pflag.Parse()
 
 	if *help || pflag.NArg() > 1 {
-		fmt.Fprintf(os.Stderr, "Usage: seriesmeta [OPTIONS] [KOBO_PATH]\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
+		fmt.Fprintf(os.Stderr, "Usage: seriesmeta [options] [kobo_path]\n\nVersion:\n  seriesmeta %s\n\nOptions:\n", version)
 		pflag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader. If not specified, seriesmeta will try to automatically detect the Kobo.\n")
-		os.Exit(2)
+		fmt.Fprintf(os.Stderr, "\nArguments:\n  kobo_path is the path to the Kobo eReader. If not specified, seriesmeta will try to automatically detect the Kobo.\n")
+		if pflag.NArg() > 1 {
+			os.Exit(2)
+		} else {
+			os.Exit(0)
+		}
+		return
 	}
 
 	fmt.Println("Finding kobo")
@@ -56,16 +61,19 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not open Kobo eReader: %v.\n", err)
 		os.Exit(1)
+		return
 	}
 
 	fmt.Println("Setting up database")
 	if err := k.SeriesConfig(*noReplace, *noPersist, *uninstall); err != nil {
 		fmt.Fprintf(os.Stderr, "Could not set up database: %v.\n", err)
 		os.Exit(1)
+		return
 	}
 
 	if *uninstall {
 		os.Exit(0)
+		return
 	}
 
 	fmt.Println("Updating metadata")
@@ -85,12 +93,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Could not update metadata: %v.\n", err)
 		k.Close()
 		os.Exit(1)
+		return
 	}
 
 	fmt.Printf("%d total: %d updated, %d errored, %d without metadata\n", nt, nu, ne, nn)
 	if ne > 0 {
 		k.Close()
 		os.Exit(1)
+		return
 	}
 	k.Close()
 }
