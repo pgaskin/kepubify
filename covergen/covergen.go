@@ -35,16 +35,22 @@ func main() {
 	pflag.Parse()
 
 	if *help || pflag.NArg() > 1 {
-		fmt.Fprintf(os.Stderr, "Usage: covergen [OPTIONS] [KOBO_PATH]\n\nVersion:\n  covergen %s\n\nOptions:\n", version)
+		fmt.Fprintf(os.Stderr, "Usage: covergen [options] [kobo_path]\n\nVersion:\n  covergen %s\n\nOptions:\n", version)
 		pflag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nArguments:\n  KOBO_PATH is the path to the Kobo eReader. If not specified, covergen will try to automatically detect the Kobo.\n")
-		os.Exit(2)
+		fmt.Fprintf(os.Stderr, "\nArguments:\n  kobo_path is the path to the Kobo eReader. If not specified, covergen will try to automatically detect the Kobo.\n")
+		if pflag.NArg() > 1 {
+			os.Exit(2)
+		} else {
+			os.Exit(0)
+		}
+		return
 	}
 
 	filter := getfilter(*method)
 	if filter == nil {
 		fmt.Fprintf(os.Stderr, "Error: Unknown resize method %s.\n", *method)
 		os.Exit(2)
+		return
 	}
 
 	fmt.Println("Finding kobo reader")
@@ -52,6 +58,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v.\n", err)
 		os.Exit(1)
+		return
 	}
 	fmt.Printf("... Found %s at %s\n", dev, kp)
 
@@ -60,6 +67,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Could not find epubs: %v.\n", err)
 		os.Exit(1)
+		return
 	}
 	fmt.Printf("... Found %d epubs\n", len(epubs))
 
@@ -148,7 +156,12 @@ func main() {
 	}
 
 	fmt.Printf("%d covers (%d books): %d updated, %d errored, %d skipped, %d without covers\n", ntc, nt, nu, ne, ns, nn)
-	os.Exit(1)
+	if ne > 0 {
+		os.Exit(1)
+		return
+	}
+
+	os.Exit(0)
 }
 
 func getfilter(name string) rez.Filter {

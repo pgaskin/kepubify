@@ -53,7 +53,7 @@ steps:
 - name: run
   image: golang:1.13-buster
   commands:
-  - GO111MODULE=on go run -mod=readonly ./covergen --help || true
+  - GO111MODULE=on go run -mod=readonly ./covergen --help
 
 ---
 
