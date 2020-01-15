@@ -266,8 +266,6 @@ func TestTransformPaths(t *testing.T) {
 		ShouldError: true,
 	}.Run(t)
 
-	// TODO: dir tests
-
 	transformPathsCase{
 		What: "converting a single dir should convert into (dir name)_converted and preserve subdirs",
 		Input: []string{

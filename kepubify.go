@@ -104,13 +104,6 @@ func main() {
 		ext = ".kepub"
 	}
 
-	out, err := filepath.Abs(*output)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Could not resolve output dir %#v: %v\n", *output, err)
-		exit(1)
-		return
-	}
-
 	pathMap, skipList, err := transformer{
 		NoPreserveDirs:  *nopreservedirs,
 		Update:          *update,
@@ -118,7 +111,7 @@ func main() {
 		Suffixes:        []string{".epub"},
 		ExcludeSuffixes: []string{".kepub.epub"},
 		TargetSuffix:    ext,
-	}.TransformPaths(out, pflag.Args()...)
+	}.TransformPaths(*output, pflag.Args()...)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
