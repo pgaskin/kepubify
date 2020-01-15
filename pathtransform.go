@@ -119,7 +119,11 @@ nextInput:
 
 			if t.Inplace {
 				if fileIsDir[input] {
-					target = filepath.Join(filepath.Base(filepath.Clean(input)), target)
+					if outputProvided {
+						target = filepath.Join(filepath.Base(filepath.Clean(input)), target)
+					} else {
+						target = filepath.Join(filepath.Clean(input), target)
+					}
 				}
 			} else {
 				if fileIsDir[input] {

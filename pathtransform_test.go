@@ -341,6 +341,26 @@ func TestTransformPaths(t *testing.T) {
 	}.Run(t)
 
 	transformPathsCase{
+		What: "converting a dir inplace with no explicit output path should convert back into the original location",
+		Input: []string{
+			"./dir1/subdir/book1.epub",
+			"./dir1/subdir/book2.epub",
+			"./dir1/subdir/another/book3.epub",
+			"./dir2/subdir/another/one/book4.epub",
+		},
+		Transformer: mkTestTransformer(transformer{
+			Inplace: true,
+		}),
+		Inputs: []string{"./dir1/subdir", "./dir2/subdir"},
+		Outputs: []string{
+			"dir1/subdir/book1.kepub.epub",
+			"dir1/subdir/book2.kepub.epub",
+			"dir1/subdir/another/book3.kepub.epub",
+			"dir2/subdir/another/one/book4.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
 		What: "converting multiple dirs should convert into subdirs of the specified output dir",
 		Input: []string{
 			"./dir1/book1.epub",
@@ -405,9 +425,11 @@ func TestTransformPaths(t *testing.T) {
 			"./dir2/book4.epub",
 			"./book5.epub",
 			"./dir3/subdir/book6.epub",
+			"./dir4/subdir/another/book7.epub",
+			"./dir4/subdir/another/one/book8.epub",
 		},
 		Transformer: mkTestTransformer(transformer{}),
-		Inputs:      []string{"./dir1", "./dir2", "./book5.epub", "./dir3/subdir/book6.epub"},
+		Inputs:      []string{"./dir1", "./dir2", "./book5.epub", "./dir3/subdir/book6.epub", "./dir4"},
 		Outputs: []string{
 			"dir1_converted/book1.kepub.epub",
 			"dir1_converted/book2.kepub.epub",
@@ -415,6 +437,8 @@ func TestTransformPaths(t *testing.T) {
 			"dir2_converted/book4.kepub.epub",
 			"book5_converted.kepub.epub",
 			"book6_converted.kepub.epub",
+			"dir4_converted/subdir/another/book7.kepub.epub",
+			"dir4_converted/subdir/another/one/book8.kepub.epub",
 		},
 	}.Run(t)
 
