@@ -140,12 +140,12 @@ func main() {
 		output, ok := pathMap[input]
 
 		if !ok {
-			fmt.Printf("[% 3d/% 3d] Skipping %s\n", i+1, len(pathMap), input)
+			fmt.Printf("[% 3d/% 3d] Skipping %s\n", i+1, len(pathMap)+len(skipList), input)
 			skipped++
 			continue
 		}
 
-		fmt.Printf("[% 3d/% 3d] Converting %s\n", i+1, len(pathMap), input)
+		fmt.Printf("[% 3d/% 3d] Converting %s\n", i+1, len(pathMap)+len(skipList), input)
 		if *verbose {
 			fmt.Printf("          => %s\n", output)
 		}
@@ -167,7 +167,7 @@ func main() {
 		converted++
 	}
 
-	fmt.Printf("\n%d total: %d converted, %d skipped, %d errored\n", len(pathMap), converted, skipped, errored)
+	fmt.Printf("\n%d total: %d converted, %d skipped, %d errored\n", len(pathMap)+len(skipList), converted, skipped, errored)
 
 	if len(errs) > 0 {
 		fmt.Fprintf(os.Stderr, "\nErrors:\n")
