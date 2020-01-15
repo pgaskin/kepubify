@@ -23,10 +23,10 @@ Options:
       --fullscreen-reading-fixes   enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
   -h, --help                       show this help text
       --hyphenate                  force enable hyphenation
-      --inline-styles              inline all stylesheets (for working around certain bugs)
       --no-hyphenate               force disable hyphenation
   -o, --output string              the directory to place the converted files (default ".")
   -r, --replace stringArray        find and replace on all html files (repeat any number of times) (format: find|replace)
+      --smarten-punctuation        smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
   -u, --update                     don't reconvert files which have already been converted
   -v, --verbose                    show extra information in output
       --version                    show the version

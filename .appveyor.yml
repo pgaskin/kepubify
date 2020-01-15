@@ -1,0 +1,14 @@
+version: '{build}'
+
+environment:
+  GO111MODULE: on
+
+build_script:
+- cmd: C:\go113\bin\go.exe run -mod=readonly . --help || cd .
+
+test_script:
+- cmd: C:\go113\bin\go.exe test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
+- cmd: C:\go113\bin\go.exe test -mod=readonly -v ./kepub
+- cmd: C:\go113\bin\go.exe test -mod=readonly -v .
+
+deploy: off

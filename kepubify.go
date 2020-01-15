@@ -42,7 +42,7 @@ func main() {
 	css := pflag.StringP("css", "c", "", "custom CSS to add to ebook")
 	hyphenate := pflag.Bool("hyphenate", false, "force enable hyphenation")
 	nohyphenate := pflag.Bool("no-hyphenate", false, "force disable hyphenation")
-	inlinestyles := pflag.Bool("inline-styles", false, "inline all stylesheets (for working around certain bugs)")
+	smartenpunct := pflag.Bool("smarten-punctuation", false, "smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)")
 	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
 	replace := pflag.StringArrayP("replace", "r", nil, "find and replace on all html files (repeat any number of times) (format: find|replace)")
 	calibre := pflag.Bool("calibre", false, "use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
@@ -103,30 +103,37 @@ func main() {
 	logV("css: %s\n", *css)
 	logV("hyphenate: %t\n", *hyphenate)
 	logV("nohyphenate: %t\n", *nohyphenate)
-	logV("inlinestyles: %t\n", *inlinestyles)
+	logV("smartenpunct: %t\n", *smartenpunct)
 	logV("fullscreenfixes: %t\n", *fullscreenfixes)
 	logV("replace: %s\n", strings.Join(*replace, ","))
 	logV("calibre: %t (ext=%s)\n\n", *calibre, ext)
 
-	findReplace := map[string]string{}
+	kepub.Verbose = *verbose
+
+	var opts []kepub.ConverterOption
+	if len(*css) != 0 {
+		opts = append(opts, kepub.ConverterOptionAddCSS(*css))
+	}
+	if *hyphenate {
+		opts = append(opts, kepub.ConverterOptionHyphenate(true))
+	} else if *nohyphenate {
+		opts = append(opts, kepub.ConverterOptionHyphenate(false))
+	}
+	if *smartenpunct {
+		opts = append(opts, kepub.ConverterOptionSmartypants())
+	}
+	if *fullscreenfixes {
+		opts = append(opts, kepub.ConverterOptionFullScreenFixes())
+	}
 	for _, r := range *replace {
 		spl := strings.SplitN(r, "|", 2)
 		if len(spl) != 2 {
 			logE("Error parsing replacement '%s': must be in format `find|replace`\n", r)
 			errExit()
 		}
-		findReplace[spl[0]] = spl[1]
+		opts = append(opts, kepub.ConverterOptionFindReplace(spl[0], spl[1]))
 	}
-
-	converter := &kepub.Converter{
-		ExtraCSS:        *css,
-		Hyphenate:       *hyphenate,
-		NoHyphenate:     *nohyphenate,
-		InlineStyles:    *inlinestyles,
-		FullScreenFixes: *fullscreenfixes,
-		FindReplace:     findReplace,
-		Verbose:         *verbose,
-	}
+	converter := kepub.NewConverterWithOptions(opts...)
 
 	paths := map[string]string{}
 	for _, arg := range uniq(pflag.Args()) {
@@ -227,7 +234,7 @@ func main() {
 
 		if !de {
 			logV("  mkdirAll: %s\n", filepath.Dir(o))
-			err := os.MkdirAll(o, os.ModePerm)
+			err := os.MkdirAll(filepath.Dir(o), 0755)
 			if err != nil {
 				e := fmt.Sprintf("error creating output dir: %v", err)
 				errs = append(errs, []string{i, o, e})
@@ -238,7 +245,7 @@ func main() {
 			}
 		}
 
-		err := converter.Convert(i, o)
+		err := converter.ConvertEPUB(i, o)
 		if err != nil {
 			errs = append(errs, []string{i, o, err.Error()})
 			logV("  err: %v\n", err)
