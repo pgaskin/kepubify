@@ -15,26 +15,34 @@ Kepubify can also be installed via Homebrew (kepubify).
 
 ## Usage
 ```
-Usage: kepubify [OPTIONS] PATH [PATH]...
+Usage: kepubify [options] input_path [input_path]...
 
-Options:
-      --calibre                    use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
-  -c, --css string                 custom CSS to add to ebook
-      --fullscreen-reading-fixes   enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
-  -h, --help                       show this help text
+General Options:
+  -v, --verbose   show extra information in output
+      --version   show the version
+  -h, --help      show this help text
+
+Output Options:
+  -u, --update             don't reconvert files which have already been converted (i.e. don't overwrite output files)
+  -i, --inplace            don't add the _converted suffix to converted files and directories
+      --no-preserve-dirs   flatten the directory structure of the input (an error will be shown if there are conflicts)
+  -o, --output string      [>1 inputs || 1 file input with existing dir output]: directory to place converted files/dirs under; [1 file input with
+                           nonexistent output]: output filename; [1 dir input]: output directory for contents of input (default: current directory)
+      --calibre            use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
+
+Conversion Options:
+      --smarten-punctuation        smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
+  -c, --css stringArray            custom CSS to add to ebook
       --hyphenate                  force enable hyphenation
       --no-hyphenate               force disable hyphenation
-  -o, --output string              the directory to place the converted files (default ".")
+      --fullscreen-reading-fixes   enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
   -r, --replace stringArray        find and replace on all html files (repeat any number of times) (format: find|replace)
-      --smarten-punctuation        smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
-  -u, --update                     don't reconvert files which have already been converted
-  -v, --verbose                    show extra information in output
-      --version                    show the version
 
-Arguments:
-  PATH is the path to an epub file or directory to convert. If it is a directory,
-  the converted dir is the name of the dir with the suffix _converted. If the path
-  is a file, the converted file has the extension .kepub.epub.
+Links:
+  Website      - https://pgaskin.net/kepubify
+  Source Code  - https://github.com/geek1011/kepubify
+  Bugs/Support - https://github.com/geek1011/kepubify/issues
+  MobileRead   - http://mr.gd/forums/showthread.php?t=295287
 ```
 
 ## seriesmeta
