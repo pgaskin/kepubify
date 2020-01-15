@@ -1,4 +1,4 @@
-module github.com/geek1011/kepubify/v2
+module github.com/geek1011/kepubify/v3
 
 go 1.13
 

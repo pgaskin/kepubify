@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/geek1011/kepubify/v2/kepub"
+	"github.com/geek1011/kepubify/v3/kepub"
 	isatty "github.com/mattn/go-isatty"
 	zglob "github.com/mattn/go-zglob"
 	"github.com/spf13/pflag"
