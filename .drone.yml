@@ -12,6 +12,10 @@ steps:
   commands:
   - GO111MODULE=on go test -mod=readonly -v ./kepub
 
+trigger:
+  event:
+    exclude: [promote]
+
 ---
 
 kind: pipeline
@@ -35,6 +39,10 @@ steps:
 depends_on:
 - kepub
 
+trigger:
+  event:
+    exclude: [promote]
+
 ---
 
 kind: pipeline
@@ -55,6 +63,10 @@ steps:
   commands:
   - GO111MODULE=on go run -mod=readonly ./covergen --help
 
+trigger:
+  event:
+    exclude: [promote]
+
 ---
 
 kind: pipeline
@@ -74,6 +86,10 @@ steps:
   image: golang:1.12-buster
   commands:
   - GO111MODULE=on go run -mod=readonly ./seriesmeta --help
+
+trigger:
+  event:
+    exclude: [promote]
 
 ---
 
@@ -148,6 +164,8 @@ steps:
 trigger:
   ref:
   - refs/tags/*
+  event:
+    exclude: [promote]
 
 depends_on:
 - kepubify
