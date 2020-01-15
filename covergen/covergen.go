@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 
 	"image"
@@ -28,7 +29,8 @@ func main() {
 	regenerate := pflag.BoolP("regenerate", "r", false, "Re-generate all covers")
 	method := pflag.StringP("method", "m", "lanczos3", "Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3)")
 	ar := pflag.Float64P("aspect-ratio", "a", 0, "Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)")
-	// TODO: invert, grayscale options
+	fgrayscale := pflag.BoolP("grayscale", "g", false, "Convert images to grayscale")
+	finvert := pflag.BoolP("invert", "i", false, "Invert images")
 	help := pflag.BoolP("help", "h", false, "Show this help message")
 	pflag.Parse()
 
@@ -115,6 +117,22 @@ func main() {
 				fmt.Fprintf(os.Stderr, "--------- Could not resize cover: %v.\n", err)
 				ne++
 				continue
+			}
+
+			if *fgrayscale {
+				if resized, err = grayscale(resized); err != nil {
+					fmt.Fprintf(os.Stderr, "--------- Could not grayscale cover: %v.\n", err)
+					ne++
+					continue
+				}
+			}
+
+			if *finvert {
+				if resized, err = invert(resized); err != nil {
+					fmt.Fprintf(os.Stderr, "--------- Could not invert cover: %v.\n", err)
+					ne++
+					continue
+				}
 			}
 
 			//fmt.Println(ct, origCover.Bounds().Size(), resized.Bounds().Size())
@@ -282,6 +300,44 @@ func extract(epub string) (image.Image, error) {
 	}
 
 	return img, nil // img may be nil
+}
+
+func grayscale(img image.Image) (*image.YCbCr, error) {
+	imgy, ok := img.(*image.YCbCr)
+	if !ok {
+		return nil, fmt.Errorf("unsupported image encoding (not YCbCr): %s", reflect.TypeOf(img))
+	}
+
+	for i := range imgy.Cb {
+		imgy.Cb[i] = 128
+	}
+
+	for i := range imgy.Cr {
+		imgy.Cr[i] = 128
+	}
+
+	return imgy, nil
+}
+
+func invert(img image.Image) (*image.YCbCr, error) {
+	imgy, ok := img.(*image.YCbCr)
+	if !ok {
+		return nil, fmt.Errorf("unsupported image encoding (not YCbCr): %s", reflect.TypeOf(img))
+	}
+
+	for i := range imgy.Y {
+		imgy.Y[i] = 0xFF - imgy.Y[i]
+	}
+
+	for i := range imgy.Cb {
+		imgy.Cb[i] = 0xFF - imgy.Cb[i]
+	}
+
+	for i := range imgy.Cr {
+		imgy.Cr[i] = 0xFF - imgy.Cr[i]
+	}
+
+	return imgy, nil
 }
 
 func dimens(img image.Image, filter rez.Filter, sz image.Point) (image.Image, error) {

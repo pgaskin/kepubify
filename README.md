@@ -91,7 +91,9 @@ Usage: covergen [OPTIONS] [KOBO_PATH]
 
 Options:
   -a, --aspect-ratio float   Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)
+  -g, --grayscale            Convert images to grayscale
   -h, --help                 Show this help message
+  -i, --invert               Invert images
   -m, --method string        Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3) (default "lanczos3")
   -r, --regenerate           Re-generate all covers
 
