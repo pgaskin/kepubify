@@ -149,6 +149,7 @@ steps:
 - name: notes
   image: golang:1.13-buster
   commands:
+  - git fetch --tags
   - git log "$(git describe --tags --abbrev=0 HEAD~1)..HEAD" --oneline --format='%h %s' | tee -a notes.md
   depends_on: [cross-kepubify, cross-covergen, cross-seriesmeta]
 - name: release
