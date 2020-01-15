@@ -61,6 +61,8 @@ func main() {
 	}
 	fmt.Printf("... Found %d epubs\n", len(epubs))
 
+	sort.Strings(epubs)
+
 	var nt, ntc, nu, ne, ns, nn int
 	fmt.Println("Generating covers")
 	nt = len(epubs)
