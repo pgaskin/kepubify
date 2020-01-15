@@ -18,30 +18,30 @@ var version = "v3-dev"
 func main() {
 	pflag.CommandLine.SortFlags = false
 
-	verbose := pflag.BoolP("verbose", "v", false, "show extra information in output")
-	sversion := pflag.Bool("version", false, "show the version")
-	help := pflag.BoolP("help", "h", false, "show this help text")
+	verbose := pflag.BoolP("verbose", "v", false, "Show extra information in output")
+	sversion := pflag.Bool("version", false, "Show the version")
+	help := pflag.BoolP("help", "h", false, "Show this help text")
 
 	for _, flag := range []string{"verbose", "version", "help"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"1.General Options"})
 	}
 
-	update := pflag.BoolP("update", "u", false, "don't reconvert files which have already been converted (i.e. don't overwrite output files)")
-	inplace := pflag.BoolP("inplace", "i", false, "don't add the _converted suffix to converted files and directories")
-	nopreservedirs := pflag.Bool("no-preserve-dirs", false, "flatten the directory structure of the input (an error will be shown if there are conflicts)")
-	output := pflag.StringP("output", "o", "", "[>1 inputs || 1 file input with existing dir output]: directory to place converted files/dirs under; [1 file input with nonexistent output]: output filename; [1 dir input]: output directory for contents of input (default: current directory)")
-	calibre := pflag.Bool("calibre", false, "use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
+	update := pflag.BoolP("update", "u", false, "Don't reconvert files which have already been converted (i.e. don't overwrite output files)")
+	inplace := pflag.BoolP("inplace", "i", false, "Don't add the _converted suffix to converted files and directories")
+	nopreservedirs := pflag.Bool("no-preserve-dirs", false, "Flatten the directory structure of the input (an error will be shown if there are conflicts)")
+	output := pflag.StringP("output", "o", "", "[>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)")
+	calibre := pflag.Bool("calibre", false, "Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
 
 	for _, flag := range []string{"update", "inplace", "no-preserve-dirs", "output", "calibre"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"2.Output Options"})
 	}
 
-	smartenpunct := pflag.Bool("smarten-punctuation", false, "smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)")
-	css := pflag.StringArrayP("css", "c", nil, "custom CSS to add to ebook")
-	hyphenate := pflag.Bool("hyphenate", false, "force enable hyphenation")
-	nohyphenate := pflag.Bool("no-hyphenate", false, "force disable hyphenation")
-	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
-	replace := pflag.StringArrayP("replace", "r", nil, "find and replace on all html files (repeat any number of times) (format: find|replace)")
+	smartenpunct := pflag.Bool("smarten-punctuation", false, "Smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)")
+	css := pflag.StringArrayP("css", "c", nil, "Custom CSS to add to ebook")
+	hyphenate := pflag.Bool("hyphenate", false, "Force enable hyphenation")
+	nohyphenate := pflag.Bool("no-hyphenate", false, "Force disable hyphenation")
+	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
+	replace := pflag.StringArrayP("replace", "r", nil, "Find and replace on all html files (repeat any number of times) (format: find|replace)")
 
 	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "replace"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
