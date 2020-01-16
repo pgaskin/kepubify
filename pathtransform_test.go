@@ -101,6 +101,19 @@ func TestTransformPaths(t *testing.T) {
 	}.Run(t)
 
 	transformPathsCase{
+		What: "converting a single file with an explicit output filename ending with a slash should treat the output as a dir even if it doesn't exist",
+		Input: []string{
+			"./book.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Output:      "output" + string(os.PathSeparator),
+		Inputs:      []string{"book.epub"},
+		Outputs: []string{
+			"output/book_converted.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
 		What: "converting a file should convert into (name of file)_converted.kepub.epub and skip other files",
 		Input: []string{
 			"./book.epub",

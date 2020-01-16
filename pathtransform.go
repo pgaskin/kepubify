@@ -143,7 +143,7 @@ nextInput:
 						spl := strings.Split(target, string(os.PathSeparator))
 						spl[0] = output // dir1_converted/whatever.kepub => output/whatever.kepub
 						target = filepath.Join(spl...)
-					} else if outputAccessible && outputIsDir {
+					} else if (outputAccessible && outputIsDir) || strings.HasSuffix(output, string(os.PathSeparator)) {
 						target = filepath.Join(output, target) // whatever_converted.kepub.epub => output/whatever_converted.kepub.epub
 					} else {
 						target = output // whatever_converted.kepub.epub => output.kepub.epub
