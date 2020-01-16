@@ -145,12 +145,12 @@ func transform2koboSpans(doc *html.Node) {
 				}
 			}
 
-			// wrap each sentence in a span (if it isn't just whitespace) and add it back to the parent
+			// wrap each sentence in a span (don't wrap whitespace unless it is
+			// directly under a P tag [TODO: are there any other cases we wrap
+			// whitespace? ... I need to find a kepub like this]) and add it
+			// back to the parent.
 			for _, sentence := range sentences {
-				if allSpace(sentence) {
-					// if only spaces, preserve them, but don't wrap them with a span (issue #41, issue #21)
-					// this matches Kobo's behaviour better than the previous method of collapsing whitespace,
-					// and is less likely to cause future issues with book formatting
+				if allSpace(sentence) && cur.Parent.DataAtom != atom.P {
 					cur.Parent.InsertBefore(&html.Node{
 						Type: html.TextNode,
 						Data: sentence,

@@ -41,6 +41,7 @@ func TestTransformContent(t *testing.T) {
 </pre>
     <table borders><tr><td>test</td></tr></table>
     <p>  </p>
+    <p></p>
     <img src="test">
     <p>&nbsp;</p>
     <svg></svg>
@@ -74,9 +75,10 @@ func TestTransformContent(t *testing.T) {
     <pre>Test
 </pre>
     <table borders=""><tbody><tr><td><span class="koboSpan" id="kobo.6.1">test</span></td></tr></tbody></table>
-    <p>  </p>
-    <span class="koboSpan" id="kobo.7.1"></span><img src="test"/>
-    <p>&#160;</p>
+    <p><span class="koboSpan" id="kobo.7.1">  </span></p>
+    <p></p>
+    <span class="koboSpan" id="kobo.8.1"></span><img src="test"/>
+    <p><span class="koboSpan" id="kobo.9.1">&#160;</span></p>
     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>
 
 </i></b></div></div></body></html>`); a != b {
@@ -184,10 +186,10 @@ func TestTransformContentParts(t *testing.T) {
 
 		transformContentCase{
 			Func:     transform2koboSpans,
-			What:     "preserve but don't wrap extra whitespace",
+			What:     "preserve but don't wrap extra whitespace outside of P elements", // TODO: are there any other cases where we need to still wrap whitespace to match Kobo's behaviour?
 			Fragment: true,
-			In:       `<p>This is a test.` + "\n" + `    This is another sentence on the next line.<span> </span>Another sentence.</p>` + "\n" + "    <p>Another paragraph.</p>",
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">This is a test.` + "\n" + `    </span><span class="koboSpan" id="kobo.1.2">This is another sentence on the next line.</span><span> </span><span class="koboSpan" id="kobo.1.3">Another sentence.</span></p>` + "\n" + `    <p><span class="koboSpan" id="kobo.2.1">Another paragraph.</span></p>`,
+			In:       `<p>This is a test.` + "\n" + `    This is another sentence on the next line.<span> </span>Another sentence.</p>` + "\n" + "    <p>Another paragraph.</p><p> </p><p></p>",
+			Out:      `<p><span class="koboSpan" id="kobo.1.1">This is a test.` + "\n" + `    </span><span class="koboSpan" id="kobo.1.2">This is another sentence on the next line.</span><span> </span><span class="koboSpan" id="kobo.1.3">Another sentence.</span></p>` + "\n" + `    <p><span class="koboSpan" id="kobo.2.1">Another paragraph.</span></p><p><span class="koboSpan" id="kobo.3.1"> </span></p><p></p>`,
 		}.Run(t)
 
 		transformContentCase{
@@ -235,7 +237,7 @@ func TestTransformContentParts(t *testing.T) {
 			What:     "don't increment paragraph counter if no spans were added",
 			Fragment: true,
 			In:       `<p>One.</p><p> </p><p><!-- comment --></p><p>Two.</p><p><b>Three.</b></p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><p> </p><p><!-- comment --></p><p><span class="koboSpan" id="kobo.2.1">Two.</span></p><p><b><span class="koboSpan" id="kobo.3.1">Three.</span></b></p>`,
+			Out:      `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><p><span class="koboSpan" id="kobo.2.1"> </span></p><p><!-- comment --></p><p><span class="koboSpan" id="kobo.3.1">Two.</span></p><p><b><span class="koboSpan" id="kobo.4.1">Three.</span></b></p>`,
 		}.Run(t)
 	})
 
