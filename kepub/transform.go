@@ -178,9 +178,19 @@ func transform2koboSpans(doc *html.Node) {
 				seg = 0
 				incParaNext = false
 
-				// add a span before the image
+				// add a span around the image
 				seg++
-				cur.Parent.InsertBefore(koboSpan(para, seg), cur)
+				s := koboSpan(para, seg)
+				s.AppendChild(&html.Node{
+					Type:      cur.Type,
+					DataAtom:  cur.DataAtom,
+					Namespace: cur.Namespace,
+					Data:      cur.Data,
+					Attr:      cur.Attr,
+					// note: img elements don't have children
+				})
+				cur.Parent.InsertBefore(s, cur)
+				cur.Parent.RemoveChild(cur)
 
 				fallthrough
 			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video:

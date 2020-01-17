@@ -77,7 +77,7 @@ func TestTransformContent(t *testing.T) {
     <table borders=""><tbody><tr><td><span class="koboSpan" id="kobo.6.1">test</span></td></tr></tbody></table>
     <p><span class="koboSpan" id="kobo.7.1">  </span></p>
     <p></p>
-    <span class="koboSpan" id="kobo.8.1"></span><img src="test"/>
+    <span class="koboSpan" id="kobo.8.1"><img src="test"/></span>
     <p><span class="koboSpan" id="kobo.9.1">&#160;</span></p>
     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>
 
@@ -226,10 +226,10 @@ func TestTransformContentParts(t *testing.T) {
 
 		transformContentCase{
 			Func:     transform2koboSpans,
-			What:     "treat an img as a new paragraph and add a span before it",
+			What:     "treat an img as a new paragraph and add a span around it",
 			Fragment: true,
 			In:       `<p>One.</p><img src="test"><p>Three.</p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><span class="koboSpan" id="kobo.2.1"></span><img src="test"/><p><span class="koboSpan" id="kobo.3.1">Three.</span></p>`,
+			Out:      `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><span class="koboSpan" id="kobo.2.1"><img src="test"/></span><p><span class="koboSpan" id="kobo.3.1">Three.</span></p>`,
 		}.Run(t)
 
 		transformContentCase{
