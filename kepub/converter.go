@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"golang.org/x/net/html"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -29,6 +30,9 @@ type Converter struct {
 	// than working with strings)
 	find    [][]byte
 	replace [][]byte
+
+	// addSpans is for use by the kobotest command and should note be used elsewhere.
+	addSpans func(*html.Node)
 }
 
 // NewConverter creates a new Converter. By default, no options are applied.
@@ -42,6 +46,7 @@ func NewConverterWithOptions(opts ...ConverterOption) *Converter {
 	for _, f := range opts {
 		f(c)
 	}
+	c.addSpans = transform2koboSpans
 	return c
 }
 

@@ -20,4 +20,7 @@ require (
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 )
 
+// tests/utils
+require github.com/sergi/go-diff v1.1.0
+
 replace golang.org/x/net => github.com/geek1011/net v0.0.0-20200112223105-747a32f770f8 // x/net/html options for kepubify
