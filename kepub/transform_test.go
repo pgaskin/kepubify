@@ -239,6 +239,16 @@ func TestTransformContentParts(t *testing.T) {
 			In:       `<p>One.</p><p> </p><p><!-- comment --></p><p>Two.</p><p><b>Three.</b></p>`,
 			Out:      `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><p><span class="koboSpan" id="kobo.2.1"> </span></p><p><!-- comment --></p><p><span class="koboSpan" id="kobo.3.1">Two.</span></p><p><b><span class="koboSpan" id="kobo.4.1">Three.</span></b></p>`,
 		}.Run(t)
+
+		// The following cases were found after using kobotest on a bunch of files (the previous cases are also based on kepubs, but I did them manually and didn't keep track):
+
+		transformContentCase{
+			Func:     transform2koboSpans,
+			What:     "also increment paragraph counter on heading tags and don't split sentences after colons or if there isn't any spaces after a period", // 69b8ba8c-1799-4e0d-ba3a-ce366410335e (Janurary 2020): Arthur Conan Doyle - The Complete Sherlock Holmes.kepub/OEBPS/bookwire/bookwire_advertisement1.xhtml
+			Fragment: true,
+			In:       `<div class="img_container"><p class="ad_image"><img src="bookwire_ad_cover1.jpg" alt="image"/></p></div>` + "\n" + `    <h2 class="subheadline">The Christmas Collection: All Of Your Favourite Classic Christmas Stories, Novels, Poems, Carols in One Ebook</h2>` + "\n" + `    <p class="subheadline2"></p>` + "\n" + `    <p class="metadata">Carr, Annie Roe</p>`,
+			Out:      `<div class="img_container"><p class="ad_image"><span class="koboSpan" id="kobo.1.1"><img src="bookwire_ad_cover1.jpg" alt="image"/></span></p></div>` + "\n" + `    <h2 class="subheadline"><span class="koboSpan" id="kobo.2.1">The Christmas Collection: All Of Your Favourite Classic Christmas Stories, Novels, Poems, Carols in One Ebook</span></h2>` + "\n" + `    <p class="subheadline2"></p>` + "\n" + `    <p class="metadata"><span class="koboSpan" id="kobo.3.1">Carr, Annie Roe</span></p>`,
+		}.Run(t)
 	})
 
 	t.Run("AddStyle", func(t *testing.T) {

@@ -110,7 +110,7 @@ func transform2koboDivs(doc *html.Node) {
 	}
 }
 
-var sentencere = regexp.MustCompile(`((?ms).*?[\.\!\?\:]['"”’“…]?\s*)`)
+var sentencere = regexp.MustCompile(`((?ms).*?[\.\!\?]['"”’“…]?\s+)`)
 
 func transform2koboSpans(doc *html.Node) {
 	// behaviour matches Kobo (checked with 3 books) as of 2020-01-12
@@ -173,7 +173,7 @@ func transform2koboSpans(doc *html.Node) {
 		case html.ElementNode:
 			switch cur.DataAtom {
 			case atom.Img:
-				// increment the paragraph ommediately
+				// increment the paragraph immediately
 				para++
 				seg = 0
 				incParaNext = false
@@ -195,7 +195,7 @@ func transform2koboSpans(doc *html.Node) {
 				fallthrough
 			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video:
 				continue // don't add spans to elements which should keep text as-is
-			case atom.P, atom.Ol, atom.Ul, atom.Table:
+			case atom.P, atom.Ol, atom.Ul, atom.Table, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
 				incParaNext = true // increment it only if it will have spans in it
 				fallthrough
 			default:
