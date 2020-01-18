@@ -126,11 +126,11 @@ func OpenKobo(path string) (*Kobo, error) {
 
 	db, err := sql.Open("sqlite3", filepath.Join(path, ".kobo", "KoboReader.sqlite"))
 	if err != nil {
-		return nil, fmt.Errorf("could not open KoboReader.sqlite: %v", err)
+		return nil, fmt.Errorf("could not open KoboReader.sqlite: %w", err)
 	}
 
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("could not open KoboReader.sqlite: %v", err)
+		return nil, fmt.Errorf("could not open KoboReader.sqlite: %w", err)
 	}
 
 	return &Kobo{path, db}, nil
@@ -258,13 +258,13 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 	for i, epub := range epubs {
 		relEpubs[i], err = filepath.Rel(k.Path, epub)
 		if err != nil {
-			return fmt.Errorf("could not resolve relative path to %#v: %v", epub, err)
+			return fmt.Errorf("could not resolve relative path to %#v: %w", epub, err)
 		}
 	}
 
 	tx, err := k.DB.Begin()
 	if err != nil {
-		return fmt.Errorf("could not begin db transaction: %v", err)
+		return fmt.Errorf("could not begin db transaction: %w", err)
 	}
 
 	for i, epub := range epubs {
@@ -290,7 +290,7 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("could not commit db transaction: %v", err)
+		return fmt.Errorf("could not commit db transaction: %w", err)
 	}
 
 	return nil
@@ -300,7 +300,7 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 func readEPUBSeriesInfo(filename string) (series string, index float64, err error) {
 	zr, err := zip.OpenReader(filename)
 	if err != nil {
-		return "", 0, fmt.Errorf("could not open ebook: %v", err)
+		return "", 0, fmt.Errorf("could not open ebook: %w", err)
 	}
 	defer zr.Close()
 
@@ -309,13 +309,13 @@ func readEPUBSeriesInfo(filename string) (series string, index float64, err erro
 		if strings.TrimLeft(strings.ToLower(f.Name), "/") == "meta-inf/container.xml" {
 			rc, err := f.Open()
 			if err != nil {
-				return "", 0, fmt.Errorf("could not open container.xml: %v", err)
+				return "", 0, fmt.Errorf("could not open container.xml: %w", err)
 			}
 			doc := etree.NewDocument()
 			_, err = doc.ReadFrom(rc)
 			if err != nil {
 				rc.Close()
-				return "", 0, fmt.Errorf("could not parse container.xml: %v", err)
+				return "", 0, fmt.Errorf("could not parse container.xml: %w", err)
 			}
 			if el := doc.FindElement("//rootfiles/rootfile[@full-path]"); el != nil {
 				rootfile = el.SelectAttrValue("full-path", "")
@@ -332,13 +332,13 @@ func readEPUBSeriesInfo(filename string) (series string, index float64, err erro
 		if strings.TrimLeft(strings.ToLower(f.Name), "/") == strings.TrimLeft(strings.ToLower(rootfile), "/") {
 			rc, err := f.Open()
 			if err != nil {
-				return "", 0, fmt.Errorf("could not open container.xml: %v", err)
+				return "", 0, fmt.Errorf("could not open container.xml: %w", err)
 			}
 			doc := etree.NewDocument()
 			_, err = doc.ReadFrom(rc)
 			if err != nil {
 				rc.Close()
-				return "", 0, fmt.Errorf("could not parse container.xml: %v", err)
+				return "", 0, fmt.Errorf("could not parse container.xml: %w", err)
 			}
 
 			// Calibre series metadata
