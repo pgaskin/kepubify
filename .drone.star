@@ -97,7 +97,7 @@ pipeline = [{
         },
         "commands": [
             "go install github.com/goreleaser/nfpm/cmd/nfpm",
-            "VERSION=$(cat build/debversion | tr -d v) nfpm pkg -f nfpm.yaml -t build/kepubify_$(cat build/debversion | tr -d v)_amd64.deb",
+            "VERSION=$(cat build/version | tr -d v) nfpm pkg -f nfpm.yaml -t build/kepubify_$(cat build/version | tr -d v)_amd64.deb",
         ],
     }, {
         "name": "ls",
