@@ -513,6 +513,129 @@ func TestTransformPaths(t *testing.T) {
 		ShouldError: true,
 	}.Run(t)
 
+	transformPathsCase{
+		What: "preserve should not change the extension",
+		Input: []string{
+			"./dir1/book1.pdf",
+		},
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf"},
+		}),
+		Inputs:  []string{"./dir1/book1.pdf"},
+		Outputs: []string{"book1.pdf"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should work with dir arguments",
+		Input: []string{
+			"./dir1/book1.pdf",
+		},
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf"},
+		}),
+		Inputs:  []string{"./dir1"},
+		Outputs: []string{"dir1_converted/book1.pdf"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should not convert overlapping input/output files",
+		Input: []string{
+			"./book1.pdf",
+		},
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf"},
+		}),
+		Inputs:  []string{"./book1.pdf"},
+		Outputs: nil,
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should still recopy files if needed",
+		Input: []string{
+			"./book1.pdf",
+			"./out/book1.pdf",
+		},
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf"},
+		}),
+		Output:  "out",
+		Inputs:  []string{"./book1.pdf"},
+		Outputs: []string{"out/book1.pdf"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should not recopy files if update is used",
+		Input: []string{
+			"./book1.pdf",
+			"./out/book1.pdf",
+		},
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf"},
+			Update:           true,
+		}),
+		Output:  "out",
+		Inputs:  []string{"./book1.pdf"},
+		Outputs: nil,
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should not convert overlapping input/output files with an explicit output",
+		Input: []string{
+			"./dir1/book1.pdf",
+		},
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf"},
+		}),
+		Output:  "./dir1/",
+		Inputs:  []string{"./dir1"},
+		Outputs: nil,
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should work in complex situations and not interfere with the usual behaviour",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/book1.pdf",
+			"./dir1/asd.pdf",
+			"./dir1/test.asd",
+			"./dir1/asd.asd/test.txt", // should not try to preserve dirs themselves
+			"./tmp/overlap1.pdf",
+			"./tmp/dir1/asd.pdf",
+			"./test.epub",
+		},
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf", ".asd"},
+			Inplace:          true,
+		}),
+		Output: "./tmp/",
+		Inputs: []string{"./dir1", "test.epub", "tmp/overlap1.pdf"},
+		Outputs: []string{
+			"tmp/dir1/book1.kepub.epub",
+			"tmp/dir1/book1.pdf",
+			"tmp/dir1/asd.pdf",
+			"tmp/dir1/test.asd",
+			"tmp/test.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should error when an ext is the target suffix",
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf", ".kepub.epub"},
+			Inplace:          true,
+		}),
+		ShouldError: true,
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should error when an ext is an input suffix",
+		Transformer: mkTestTransformer(transformer{
+			PreserveSuffixes: []string{".pdf", ".epub"},
+			Inplace:          true,
+		}),
+		ShouldError: true,
+	}.Run(t)
+
 	// TODO: more mixed tests
 }
 
@@ -637,6 +760,9 @@ func (tc transformPathsCase) KepubifyArgs() string {
 	}
 	if tc.Transformer.NoPreserveDirs {
 		args = append(args, "--no-preserve-dirs")
+	}
+	for _, x := range tc.Transformer.PreserveSuffixes {
+		args = append(args, "--copy "+x)
 	}
 	return strings.Join(append(args, tc.Inputs...), " ")
 }

@@ -15,6 +15,9 @@ type transformer struct {
 	// compared case-insensitively
 	Suffixes        []string
 	ExcludeSuffixes []string
+	// suffix not unchanged, only included in output if different from original
+	// filename and not matched or excluded above
+	PreserveSuffixes []string
 
 	// entire first matched suffix replaced
 	TargetSuffix string
@@ -28,7 +31,21 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 
 	matchingInputFiles := map[string][]string{}
 	matchingInputRelFilesNoSuffix := map[string][]string{}
+	sourceTargetSuffix := map[string]string{}
 	fileIsDir := map[string]bool{}
+
+	for _, suffix := range t.PreserveSuffixes {
+		if strings.EqualFold(suffix, t.TargetSuffix) {
+			return nil, nil, fmt.Errorf("preserved suffix %#v overlaps with target suffix %#v", suffix, t.TargetSuffix)
+		}
+		for _, x := range t.Suffixes {
+			if strings.EqualFold(suffix, x) {
+				return nil, nil, fmt.Errorf("preserved suffix %#v overlaps with input suffix %#v", suffix, x)
+			}
+		}
+		// we don't check excluded suffixes for convenience
+	}
+
 nextInput:
 	for _, input := range inputs {
 		if len(matchingInputFiles[input]) != 0 {
@@ -54,6 +71,16 @@ nextInput:
 					path := filepath.Clean(input)
 					matchingInputFiles[input] = append(matchingInputFiles[input], path)
 					matchingInputRelFilesNoSuffix[input] = append(matchingInputRelFilesNoSuffix[input], path[:len(path)-len(suffix)])
+					sourceTargetSuffix[path] = t.TargetSuffix
+					continue nextInput
+				}
+			}
+			for _, suffix := range t.PreserveSuffixes {
+				if hasSuffixFold(input, suffix) {
+					path := filepath.Clean(input)
+					matchingInputFiles[input] = append(matchingInputFiles[input], path)
+					matchingInputRelFilesNoSuffix[input] = append(matchingInputRelFilesNoSuffix[input], path[:len(path)-len(suffix)])
+					sourceTargetSuffix[path] = suffix
 					continue nextInput
 				}
 			}
@@ -79,21 +106,30 @@ nextInput:
 					return nil // skip
 				}
 			}
-
 			for _, suffix := range t.Suffixes {
 				if hasSuffixFold(path, suffix) {
-					matchingInputFiles[input] = append(matchingInputFiles[input], path)
-
 					rel, err := filepath.Rel(input, path)
 					if err != nil {
 						return err
 					}
-
+					matchingInputFiles[input] = append(matchingInputFiles[input], path)
 					matchingInputRelFilesNoSuffix[input] = append(matchingInputRelFilesNoSuffix[input], rel[:len(rel)-len(suffix)])
+					sourceTargetSuffix[path] = t.TargetSuffix
 					return nil // next
 				}
 			}
-
+			for _, suffix := range t.PreserveSuffixes {
+				if hasSuffixFold(path, suffix) {
+					rel, err := filepath.Rel(input, path)
+					if err != nil {
+						return err
+					}
+					matchingInputFiles[input] = append(matchingInputFiles[input], path)
+					matchingInputRelFilesNoSuffix[input] = append(matchingInputRelFilesNoSuffix[input], rel[:len(rel)-len(suffix)])
+					sourceTargetSuffix[path] = suffix
+					return nil // next
+				}
+			}
 			return nil // skip
 		}); err != nil {
 			return nil, nil, fmt.Errorf("scan input %#v: %w", input, err)
@@ -130,12 +166,12 @@ nextInput:
 					if !t.NoPreserveDirs || oneInput {
 						target = filepath.Join(filepath.Base(filepath.Clean(input))+"_converted", target)
 					}
-				} else {
+				} else if sourceTargetSuffix[matchingFile] == t.TargetSuffix { // don't add _converted to standalone preserved files
 					target += "_converted"
 				}
 			}
 
-			target += t.TargetSuffix
+			target += sourceTargetSuffix[matchingFile]
 
 			if outputProvided {
 				if oneInput {
@@ -150,6 +186,18 @@ nextInput:
 					}
 				} else {
 					target = filepath.Join(output, target)
+				}
+			}
+
+			if sourceTargetSuffix[matchingFile] != t.TargetSuffix {
+				if matchingFile == target || filepath.Clean(matchingFile) == filepath.Clean(target) {
+					continue // skip if preserved same as original
+				} else if ia, err := filepath.Abs(matchingFile); err != nil {
+					return nil, nil, fmt.Errorf("%#v from input %#v: resolve path of preserved input %#v: %w", matchingFile, input, input, err)
+				} else if ta, err := filepath.Abs(target); err != nil {
+					return nil, nil, fmt.Errorf("%#v from input %#v: resolve path of preserved output %#v: %w", matchingFile, input, target, err)
+				} else if ia == ta {
+					continue // skip if preserved same as original
 				}
 			}
 

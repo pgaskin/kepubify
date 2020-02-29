@@ -101,6 +101,8 @@ Output Options:
   -o, --output string      [>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with
                            nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)
       --calibre            Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
+  -x, --copy strings       Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the
+                           same)
 
 Conversion Options:
       --smarten-punctuation        Smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
@@ -182,6 +184,12 @@ Links:
                 <b>To convert a calibre library in-place</b>:
                 <br>
                 <tt>kepubify --update --inplace --calibre /path/to/calibre/library/</tt>
+            </p>
+
+            <p>
+                <b>To convert a folder of books directly on to a Kobo eReader, while simply copying PDF files</b>:
+                <br>
+                <tt>kepubify --output /path/to/kobo/kepubify --update --copy .pdf /path/to/books/</tt>
             </p>
         </div>
     </div>

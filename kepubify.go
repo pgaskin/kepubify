@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,8 +32,9 @@ func main() {
 	nopreservedirs := pflag.Bool("no-preserve-dirs", false, "Flatten the directory structure of the input (an error will be shown if there are conflicts)")
 	output := pflag.StringP("output", "o", "", "[>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)")
 	calibre := pflag.Bool("calibre", false, "Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
+	copy := pflag.StringSliceP("copy", "x", nil, "Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the same)")
 
-	for _, flag := range []string{"update", "inplace", "no-preserve-dirs", "output", "calibre"} {
+	for _, flag := range []string{"update", "inplace", "no-preserve-dirs", "output", "calibre", "copy"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"2.Output Options"})
 	}
 
@@ -66,6 +68,14 @@ func main() {
 		fmt.Printf("Error: --hyphenate and --no-hyphenate are mutally exclusive. See --help for more details.\n")
 		exit(2)
 		return
+	}
+
+	for _, c := range *copy {
+		if len(c) == 0 || c[0] != '.' {
+			fmt.Printf("Error: --copy argument %#v doesn't have a leading period. See --help for more details.\n", c)
+			exit(2)
+			return
+		}
 	}
 
 	kepub.Verbose = *verbose
@@ -105,12 +115,13 @@ func main() {
 	}
 
 	pathMap, skipList, err := transformer{
-		NoPreserveDirs:  *nopreservedirs,
-		Update:          *update,
-		Inplace:         *inplace,
-		Suffixes:        []string{".epub"},
-		ExcludeSuffixes: []string{".kepub.epub"},
-		TargetSuffix:    ext,
+		NoPreserveDirs:   *nopreservedirs,
+		Update:           *update,
+		Inplace:          *inplace,
+		Suffixes:         []string{".epub"},
+		ExcludeSuffixes:  []string{".kepub.epub"},
+		PreserveSuffixes: *copy,
+		TargetSuffix:     ext,
 	}.TransformPaths(*output, pflag.Args()...)
 
 	if err != nil {
@@ -134,40 +145,57 @@ func main() {
 	inputs = append(inputs, skipList...)
 	sort.Strings(inputs)
 
-	var converted, skipped, errored int
+	var converted, copied, skipped, errored int
 	errs := map[string]error{}
 	for i, input := range inputs {
 		output, ok := pathMap[input]
-
 		if !ok {
 			fmt.Printf("[%3d/%3d] Skipping %s\n", i+1, len(pathMap)+len(skipList), input)
 			skipped++
 			continue
 		}
 
-		fmt.Printf("[%3d/%3d] Converting %s\n", i+1, len(pathMap)+len(skipList), input)
-		if *verbose {
-			fmt.Printf("          => %s\n", output)
+		switch {
+		case !strings.HasSuffix(output, ext):
+			fmt.Printf("[%3d/%3d] Copying %s\n", i+1, len(pathMap)+len(skipList), input)
+			if *verbose {
+				fmt.Printf("          => %s\n", output)
+			}
+			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
+				errs[input] = err
+				errored++
+				continue
+			}
+			if err := copyFile(input, output); err != nil {
+				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
+				errs[input] = err
+				errored++
+				continue
+			}
+			copied++
+		default:
+			fmt.Printf("[%3d/%3d] Converting %s\n", i+1, len(pathMap)+len(skipList), input)
+			if *verbose {
+				fmt.Printf("          => %s\n", output)
+			}
+			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
+				errs[input] = err
+				errored++
+				continue
+			}
+			if err := converter.ConvertEPUB(input, output); err != nil {
+				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
+				errs[input] = err
+				errored++
+				continue
+			}
+			converted++
 		}
-
-		if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
-			errs[input] = err
-			errored++
-			continue
-		}
-
-		if err := converter.ConvertEPUB(input, output); err != nil {
-			fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
-			errs[input] = err
-			errored++
-			continue
-		}
-
-		converted++
 	}
 
-	fmt.Printf("\n%d total: %d converted, %d skipped, %d errored\n", len(pathMap)+len(skipList), converted, skipped, errored)
+	fmt.Printf("\n%d total: %d converted, %d copied, %d skipped, %d errored\n", len(pathMap)+len(skipList), converted, copied, skipped, errored)
 
 	if len(errs) > 0 {
 		fmt.Fprintf(os.Stderr, "\nErrors:\n")
@@ -224,4 +252,23 @@ func exit(status int) {
 		time.Sleep(time.Second * 2)
 	}
 	os.Exit(status)
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Close() // note: this runs before the deferred Close, so errors will work correctly
 }
