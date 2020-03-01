@@ -199,7 +199,7 @@ func main() {
 
 	if len(errs) > 0 {
 		fmt.Fprintf(os.Stderr, "\nErrors:\n")
-		for _, input := range inputs {
+		for input, err := range errs {
 			fmt.Fprintf(os.Stderr, "  %#v\n  => %#v\n  Error: %v\n\n", input, pathMap[input], err)
 		}
 		exit(1)
