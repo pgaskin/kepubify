@@ -172,7 +172,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = (SELECT Series       FROM _seriesmeta WHERE ImageId = new.ImageId),
-					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId)
+					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId),
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId) AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId))
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
@@ -189,7 +191,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = (SELECT Series       FROM _seriesmeta WHERE ImageId = new.ImageId),
-					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId)
+					SeriesNumber = (SELECT SeriesNumber FROM _seriesmeta WHERE ImageId = new.ImageId),
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId) AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), (SELECT Series FROM _seriesmeta WHERE ImageId = new.ImageId))
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
@@ -216,7 +220,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = new.Series,
-					SeriesNumber = new.SeriesNumber
+					SeriesNumber = new.SeriesNumber,
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = new.Series AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), new.Series)
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
@@ -232,7 +238,9 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 				UPDATE content
 				SET
 					Series       = new.Series,
-					SeriesNumber = new.SeriesNumber
+					SeriesNumber = new.SeriesNumber,
+					/* Get the SeriesID from books from the Kobo Store (WorkId NOT NULL) where the series name matches, otherwise just use the series name as the SeriesID (https://www.mobileread.com/forums/showthread.php?p=3959768) */
+					SeriesID     = coalesce((SELECT SeriesID FROM content WHERE Series = new.Series AND WorkId NOT NULL AND SeriesID NOT NULL AND WorkId != "" AND SeriesID != "" LIMIT 1), new.Series)
 				WHERE ImageId = new.ImageId;
 				{{if .NoPersist}}DELETE FROM _seriesmeta WHERE ImageId = new.ImageId;{{end}}
 			END;
