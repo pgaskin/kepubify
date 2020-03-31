@@ -277,6 +277,14 @@ func TestTransformContentParts(t *testing.T) {
 			In:       `<p>This is a test sentence to test smartypants' conversion of <code>"quotation marks"</code>, dashes like <pre>- / -- / ---</pre>, and symbols like (c).</p><style>div{font-family:"Test"}</style><script>var a="test"</script>`,
 			Out:      `<p>This is a test sentence to test smartypants’ conversion of <code>&#34;quotation marks&#34;</code>, dashes like </p><pre>- / -- / ---</pre>, and symbols like ©.<p></p><style>div{font-family:"Test"}</style><script>var a="test"</script>`,
 		}.Run(t)
+
+		transformContentCase{
+			Func:     transform2smartypants,
+			What:     "properly handle entity escaping",
+			Fragment: true,
+			In:       `<p>&amp;&quot;&lt;&gt;&quot;</p><pre>&quot;</pre>`,
+			Out:      `<p>&amp;“&lt;&gt;”</p><pre>&#34;</pre>`,
+		}.Run(t)
 	})
 
 	t.Run("CleanHTML", func(t *testing.T) {

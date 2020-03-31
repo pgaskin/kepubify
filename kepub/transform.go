@@ -256,7 +256,11 @@ func transform2smartypants(doc *html.Node) {
 				if _, err := smartypants.New(buf, smartypants.LatexDashes).Write([]byte(cur.Data)); err != nil {
 					panic(err) // smartypants should never error on its own
 				}
-				cur.Data = buf.String()
+				// (*smartypants.writer).write calls smartypants.attrEscape on
+				// the passed data (which has been unescaped by the parser),
+				// which escapes the HTML entities, so we need to unescape it
+				// after it has been processed.
+				cur.Data = html.UnescapeString(buf.String())
 			}
 		}
 	}
