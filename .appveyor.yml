@@ -3,6 +3,8 @@ version: '{build}'
 environment:
   GO111MODULE: on
 
+# TODO: update to Go 1.14 once ready (appveyor/ci#3325)
+
 build_script:
 - cmd: C:\go113\bin\go.exe run -mod=readonly . --help
 
