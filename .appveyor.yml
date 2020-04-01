@@ -6,11 +6,11 @@ environment:
 # TODO: update to Go 1.14 once ready (appveyor/ci#3325)
 
 build_script:
-- cmd: C:\go113\bin\go.exe run -mod=readonly . --help
+- cmd: C:\go113\bin\go.exe run -mod=readonly ./cmd/kepubify --help
 
 test_script:
 - cmd: C:\go113\bin\go.exe test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
 - cmd: C:\go113\bin\go.exe test -mod=readonly -v ./kepub
-- cmd: C:\go113\bin\go.exe test -mod=readonly -v .
+- cmd: C:\go113\bin\go.exe test -mod=readonly -v ./cmd/kepubify
 
 deploy: off

@@ -21,19 +21,19 @@ pipeline = [{
 } for (pname, psteps, pdep) in [
     ("kepub", [
         ("test-html", "go test -mod=readonly -run \"^TestMod_\" golang.org/x/net/html -v"),
-        ("test", "go test -mod=readonly ./kepub -v"),
+        ("test", "go test -mod=readonly ./kepub -v -cover"),
     ], []),
     ("kepubify", [
-        ("test", "go test -mod=readonly . -v"),
-        ("run", "go run -mod=readonly . --help"),
+        ("test", "go test -mod=readonly ./cmd/kepubify -v -cover"),
+        ("run", "go run -mod=readonly ./cmd/kepubify --help"),
     ], ["kepub"]),
     ("covergen", [
-        ("test", "go test -mod=readonly ./covergen -v"),
-        ("run", "go run -mod=readonly ./covergen --help"),
+        ("test", "go test -mod=readonly ./cmd/covergen -v -cover"),
+        ("run", "go run -mod=readonly ./cmd/covergen --help"),
     ], []),
     ("seriesmeta", [
-        ("test", "go test -mod=readonly ./seriesmeta -v"),
-        ("run", "go run -mod=readonly ./seriesmeta --help"),
+        ("test", "go test -mod=readonly ./cmd/seriesmeta -v -cover"),
+        ("run", "go run -mod=readonly ./cmd/seriesmeta --help"),
     ], []),
 ]] + [{
     "name": "release",
@@ -56,39 +56,19 @@ pipeline = [{
         },
         "command": [
             "--platforms", platform,
-            "--build-cmd", "go env; CGO_ENABLED=%s go build -ldflags \"-s -w -X main.version=$(cat build/version)\" -o \"build/%s-%s\" %s" % ({
-                False: "0",
-                True: "1",
-            }[cgo], app, {
-                "windows/amd64": "windows-64bit.exe",
-                "windows/386":   "windows-32bit.exe",
-                "linux/amd64":   "linux-64bit",
-                "linux/386":     "linux-32bit",
-                "linux/armv6":   "linux-arm",
-                "darwin/amd64":  "darwin-64bit",
-            }[platform], path),
+            "--build-cmd", "go env; CGO_ENABLED=%s go build -ldflags \"-s -w -X main.version=$(cat build/version)\" -o \"build/%s%s\" %s" % (cgo, app, suffix, "./cmd/" + app),
         ],
-    } for (app, path, img, platform, cgo) in [
-        ("kepubify", ".", "main",   "linux/amd64",   False),
-        ("kepubify", ".", "main",   "linux/386",     False),
-        ("kepubify", ".", "arm",    "linux/armv6",   False),
-        ("kepubify", ".", "darwin", "darwin/amd64",  False),
-        ("kepubify", ".", "main",   "windows/amd64", False),
-        ("kepubify", ".", "main",   "windows/386",   False),
-
-        ("covergen", "./covergen", "main",   "linux/amd64",   False),
-        ("covergen", "./covergen", "main",   "linux/386",     False),
-        ("covergen", "./covergen", "arm",    "linux/armv6",   False),
-        ("covergen", "./covergen", "darwin", "darwin/amd64",  False),
-        ("covergen", "./covergen", "main",   "windows/amd64", False),
-        ("covergen", "./covergen", "main",   "windows/386",   False),
-
-        ("seriesmeta", "./seriesmeta", "main",   "linux/amd64",   True),
-        ("seriesmeta", "./seriesmeta", "main",   "linux/386",     True),
-        ("seriesmeta", "./seriesmeta", "arm",    "linux/armv6",   True),
-        ("seriesmeta", "./seriesmeta", "darwin", "darwin/amd64",  True),
-        ("seriesmeta", "./seriesmeta", "main",   "windows/amd64", True),
-        ("seriesmeta", "./seriesmeta", "main",   "windows/386",   True),
+    } for (img, platform, suffix) in [
+        ("main",   "linux/amd64",   "-linux-64bit"),
+        ("main",   "linux/386",     "-linux-32bit"),
+        ("arm",    "linux/armv6",   "-linux-arm"),
+        ("darwin", "darwin/amd64",  "-darwin-64bit"),
+        ("main",   "windows/amd64", "-windows-64bit.exe"),
+        ("main",   "windows/386",   "-windows-32bit.exe"),
+    ] for (app, cgo) in [
+        ("kepubify",   "0"),
+        ("covergen",   "0"),
+        ("seriesmeta", "1"),
     ]] + [{
         "name": "debian",
         "image": "golang:%s-buster" % (go),

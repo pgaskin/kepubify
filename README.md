@@ -3,8 +3,8 @@
 [![](https://img.shields.io/github/v/release/geek1011/kepubify)](https://github.com/geek1011/kepubify/releases/latest) [![](https://img.shields.io/drone/build/geek1011/kepubify/master)](https://cloud.drone.io/geek1011/kepubify) [![](https://img.shields.io/drone/build/geek1011/kepubify/master?label=linux%20build)](https://cloud.drone.io/geek1011/kepubify) [![](https://img.shields.io/appveyor/ci/geek1011/kepubify/master?label=windows%20build)](https://ci.appveyor.com/project/geek1011/kepubify/branch/master) [![](https://img.shields.io/travis/com/geek1011/kepubify/master?label=macOS%20build)](https://travis-ci.com/geek1011/kepubify) ![](https://img.shields.io/github/go-mod/go-version/geek1011/kepubify) [![](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/mod/github.com/geek1011/kepubify/v3?tab=versions) [![](https://goreportcard.com/badge/github.com/geek1011/kepubify)](https://goreportcard.com/report/github.com/geek1011/kepubify)
 
 Kepubify converts EPUBs to KEPUBS. Kepubify also includes two standalone utilities
-which do not depend on kepubify (and don't conflict with Calibre): [covergen](./covergen)
-(which pre-generates cover images), and [seriesmeta](./seriesmeta) (which updates
+which do not depend on kepubify (and don't conflict with Calibre): [covergen](./cmd/covergen)
+(which pre-generates cover images), and [seriesmeta](./cmd/seriesmeta) (which updates
 Calibre or EPUB3 series metadata).
 
 See the [releases](https://github.com/geek1011/kepubify/releases/latest) page for

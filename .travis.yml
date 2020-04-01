@@ -10,7 +10,7 @@ env:
   GO111MODULE: "on"
 
 script:
-- go run -mod=readonly . --help
+- go run -mod=readonly ./cmd/kepubify --help
 - go test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
 - go test -mod=readonly -v ./kepub
-- go test -mod=readonly -v .
+- go test -mod=readonly -v ./cmd/kepubify
