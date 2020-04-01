@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/geek1011/kepubify/v3/kepub"
@@ -102,6 +104,7 @@ func main() {
 		if len(spl) != 2 {
 			fmt.Fprintf(os.Stderr, "Error: Parse replacement %#v: must be in format `find|replace`\n", r)
 			exit(1)
+			return
 		}
 		opts = append(opts, kepub.ConverterOptionFindReplace(spl[0], spl[1]))
 	}
@@ -145,66 +148,143 @@ func main() {
 	inputs = append(inputs, skipList...)
 	sort.Strings(inputs)
 
-	var converted, copied, skipped, errored int
-	errs := map[string]error{}
-	for i, input := range inputs {
-		output, ok := pathMap[input]
-		if !ok {
-			fmt.Printf("[%3d/%3d] Skipping %s\n", i+1, len(pathMap)+len(skipList), input)
-			skipped++
-			continue
-		}
+	// --- Conversion Pipeline --- //
+	var cur int64                                 // progress
+	var converted, copied, skipped, errored int64 // counters (sum == total)
+	var errs sync.Map                             // input -> error
+	total := int64(len(pathMap) + len(skipList))  // immutable
 
-		switch {
-		case !strings.HasSuffix(output, ext):
-			fmt.Printf("[%3d/%3d] Copying %s\n", i+1, len(pathMap)+len(skipList), input)
-			if *verbose {
-				fmt.Printf("          => %s\n", output)
-			}
-			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
-				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
-				errs[input] = err
-				errored++
-				continue
-			}
-			if err := copyFile(input, output); err != nil {
-				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
-				errs[input] = err
-				errored++
-				continue
-			}
-			copied++
-		default:
-			fmt.Printf("[%3d/%3d] Converting %s\n", i+1, len(pathMap)+len(skipList), input)
-			if *verbose {
-				fmt.Printf("          => %s\n", output)
-			}
-			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
-				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
-				errs[input] = err
-				errored++
-				continue
-			}
-			if err := converter.ConvertEPUB(input, output); err != nil {
-				fmt.Fprintf(os.Stderr, "          Error: %v\n", err)
-				errs[input] = err
-				errored++
-				continue
-			}
-			converted++
-		}
+	var allWg sync.WaitGroup
+
+	// logging
+
+	type loge struct {
+		stderr bool
+		msg    string
+	}
+	logCh := make(chan loge)
+	log := func(stderr bool, format string, a ...interface{}) {
+		logCh <- loge{stderr, fmt.Sprintf(format, a...)}
 	}
 
-	fmt.Printf("\n%d total: %d converted, %d copied, %d skipped, %d errored\n", len(pathMap)+len(skipList), converted, copied, skipped, errored)
-
-	if len(errs) > 0 {
-		fmt.Fprintf(os.Stderr, "\nErrors:\n")
-		for input, err := range errs {
-			fmt.Fprintf(os.Stderr, "  %#v\n  => %#v\n  Error: %v\n\n", input, pathMap[input], err)
+	allWg.Add(1)
+	go func() {
+		defer allWg.Done()
+		for l := range logCh {
+			if l.stderr {
+				fmt.Fprint(os.Stderr, l.msg)
+			} else {
+				fmt.Print(l.msg)
+			}
 		}
+	}()
+
+	// tasks
+
+	inCh := make(chan [2]string)
+
+	allWg.Add(1)
+	go func() {
+		defer allWg.Done()
+		defer close(inCh)
+		for _, input := range inputs {
+			output, ok := pathMap[input]
+			if !ok {
+				atomic.AddInt64(&cur, 1)
+				atomic.AddInt64(&skipped, 1)
+				log(false, "[%3d/%3d] Skipping %s\n", atomic.LoadInt64(&cur), total, input)
+				continue
+			}
+			input := input // copy
+			inCh <- [2]string{input, output}
+		}
+	}()
+
+	// processing
+
+	allWg.Add(1)
+	go func() {
+		defer allWg.Done()
+		defer close(logCh)
+
+		var workerWg sync.WaitGroup
+		defer workerWg.Wait()
+
+		for i := 0; i < runtime.NumCPU(); i++ {
+			workerWg.Add(1)
+			go func() {
+				defer workerWg.Done()
+				for t := range inCh {
+					var i int64
+					for {
+						if tmp := atomic.LoadInt64(&cur); atomic.CompareAndSwapInt64(&cur, tmp, tmp+1) {
+							i = tmp + 1
+							break
+						}
+					}
+					input, output := t[0], t[1]
+					switch {
+					case !strings.HasSuffix(output, ext):
+						if !*verbose {
+							log(false, "[%3d/%3d] Copying %s\n", i, total, input)
+						} else {
+							log(false, "[%3d/%3d] Copying %s\n          => %s\n", atomic.LoadInt64(&cur), total, input, output)
+						}
+						if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+							errs.Store(input, err)
+							atomic.AddInt64(&errored, 1)
+							log(true, "          Error (%d): %v\n", i, err)
+							continue
+						}
+						if err := copyFile(input, output); err != nil {
+							errs.Store(input, err)
+							atomic.AddInt64(&errored, 1)
+							log(true, "          Error (%d): %v\n", i, err)
+							continue
+						}
+						atomic.AddInt64(&copied, 1)
+					default:
+						if !*verbose {
+							log(false, "[%3d/%3d] Converting %s\n", i, total, input)
+						} else {
+							log(false, "[%3d/%3d] Converting %s\n          => %s\n", atomic.LoadInt64(&cur), total, input, output)
+						}
+						if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+							errs.Store(input, err)
+							atomic.AddInt64(&errored, 1)
+							log(true, "          Error (%d): %v\n", i, err)
+							continue
+						}
+						if err := converter.ConvertEPUB(input, output); err != nil {
+							errs.Store(input, err)
+							atomic.AddInt64(&errored, 1)
+							log(true, "          Error (%d): %v\n", i, err)
+							continue
+						}
+						atomic.AddInt64(&converted, 1)
+					}
+				}
+			}()
+		}
+	}()
+
+	allWg.Wait()
+
+	fmt.Printf("\n%d total: %d converted, %d copied, %d skipped, %d errored\n", total, converted, copied, skipped, errored)
+
+	var tmp bool
+	errs.Range(func(input, err interface{}) bool {
+		if !tmp {
+			fmt.Fprintf(os.Stderr, "\nErrors:\n")
+			tmp = true
+		}
+		fmt.Fprintf(os.Stderr, "  %#v\n  => %#v\n  Error: %v\n\n", input, pathMap[input.(string)], err)
+		return true
+	})
+	if tmp {
 		exit(1)
+		return
 	}
-
 	exit(0)
 }
 
