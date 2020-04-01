@@ -1,3 +1,4 @@
+// Command seriesmeta updates series metadata for EPUB/KEPUB books in the Kobo database.
 package main
 
 import (

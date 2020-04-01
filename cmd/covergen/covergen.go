@@ -1,3 +1,4 @@
+// Command covergen (pre-)generates book covers for EPUB/KEPUB books.
 package main
 
 import (

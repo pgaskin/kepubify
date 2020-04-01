@@ -1,3 +1,4 @@
+// Command kepubify is a fast, standalone, EPUB to KEPUB converter.
 package main
 
 import (
