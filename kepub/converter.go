@@ -136,14 +136,13 @@ func (c *Converter) transformAllContentParallel(dir string) error {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		g.Go(func() error {
 			for fn := range contentFiles {
-				f, err := os.OpenFile(fn, os.O_RDWR, 0)
-				if err != nil {
+				if f, err := os.OpenFile(fn, os.O_RDWR, 0); err != nil {
 					return fmt.Errorf("open content file %#v: %w", fn, err)
-				}
-				defer f.Close()
-
-				if err := c.TransformContentDocFile(f); err != nil {
+				} else if err := c.TransformContentDocFile(f); err != nil {
+					f.Close()
 					return fmt.Errorf("transform content file %#v: %w", fn, err)
+				} else {
+					f.Close()
 				}
 
 				select {
