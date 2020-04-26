@@ -383,9 +383,9 @@ Arguments:
                 urls[release.assets[i].name] = release.assets[i].browser_download_url;
             }
 
-            if (os == "Windows" && urls["kepubify-windows-32bit.exe"]) {
+            if (os == "Windows" && urls["kepubify-windows-64bit.exe"]) {
                 otherPlatforms.style.display = "block";
-                button.href = urls["kepubify-windows-32bit.exe"];
+                button.href = urls["kepubify-windows-64bit.exe"];
                 button.target = "_blank";
                 button.innerHTML = "Download for Windows";
             } else if (os == "Linux" && urls["kepubify-linux-64bit"]) {
