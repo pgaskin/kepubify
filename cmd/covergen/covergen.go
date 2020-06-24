@@ -20,7 +20,6 @@ import (
 	"github.com/bamiaux/rez"
 	"github.com/beevik/etree"
 	"github.com/geek1011/koboutils/v2/kobo"
-	"github.com/mattn/go-zglob"
 	"github.com/spf13/pflag"
 )
 
@@ -204,7 +203,17 @@ func device(root string) (string, kobo.Device, error) {
 }
 
 func scan(root string) ([]string, error) {
-	return zglob.Glob(filepath.Join(root, "**", "*.epub"))
+	var epubs []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("error scanning %q: %w", path, err)
+		}
+		if !info.IsDir() && strings.EqualFold(filepath.Ext(path), ".epub") {
+			epubs = append(epubs, path)
+		}
+		return nil
+	})
+	return epubs, err
 }
 
 func imageID(kp, book string) (string, error) {
