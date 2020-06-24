@@ -62,6 +62,7 @@ pipeline = [{
         ("main",   "linux/amd64",   "-linux-64bit"),
         ("main",   "linux/386",     "-linux-32bit"),
         ("arm",    "linux/armv6",   "-linux-arm"),
+        ("arm",    "linux/arm64",   "-linux-arm64"),
         ("darwin", "darwin/amd64",  "-darwin-64bit"),
         ("main",   "windows/amd64", "-windows-64bit.exe"),
         ("main",   "windows/386",   "-windows-32bit.exe"),
