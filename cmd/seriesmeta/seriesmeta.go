@@ -16,7 +16,6 @@ import (
 	"github.com/beevik/etree"
 	"github.com/geek1011/koboutils/v2/kobo"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/mattn/go-zglob"
 	"github.com/spf13/pflag"
 )
 
@@ -258,7 +257,16 @@ func (k *Kobo) SeriesConfig(noReplace, noPersist, uninstall bool) error {
 // UpdateSeries updates the series metadata for all epub books on the device. All
 // errors from individual books are returned through the log callback.
 func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series string, index float64, err error)) error {
-	epubs, err := zglob.Glob(filepath.Join(k.Path, "**/*.epub"))
+	var epubs []string
+	err := filepath.Walk(k.Path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("error scanning %q: %w", path, err)
+		}
+		if !info.IsDir() && strings.EqualFold(filepath.Ext(path), ".epub") {
+			epubs = append(epubs, path)
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
