@@ -1,13 +1,13 @@
 <h1 align="center">kepubify</h1>
 
-[![](https://img.shields.io/github/v/release/geek1011/kepubify)](https://github.com/geek1011/kepubify/releases/latest) [![](https://img.shields.io/drone/build/geek1011/kepubify/master)](https://cloud.drone.io/geek1011/kepubify) [![](https://img.shields.io/drone/build/geek1011/kepubify/master?label=linux%20build)](https://cloud.drone.io/geek1011/kepubify) [![](https://img.shields.io/appveyor/ci/pgaskin/kepubify/master?label=windows%20build)](https://ci.appveyor.com/project/pgaskin/kepubify/branch/master) [![](https://img.shields.io/travis/com/geek1011/kepubify/master?label=macOS%20build)](https://travis-ci.com/geek1011/kepubify) ![](https://img.shields.io/github/go-mod/go-version/geek1011/kepubify) [![](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/mod/github.com/geek1011/kepubify/v3?tab=versions) [![](https://goreportcard.com/badge/github.com/geek1011/kepubify)](https://goreportcard.com/report/github.com/geek1011/kepubify)
+[![](https://img.shields.io/github/v/release/pgaskin/kepubify)](https://github.com/pgaskin/kepubify/releases/latest) [![](https://img.shields.io/drone/build/pgaskin/kepubify/master)](https://cloud.drone.io/pgaskin/kepubify) [![](https://img.shields.io/drone/build/pgaskin/kepubify/master?label=linux%20build)](https://cloud.drone.io/pgaskin/kepubify) [![](https://img.shields.io/appveyor/ci/pgaskin/kepubify/master?label=windows%20build)](https://ci.appveyor.com/project/pgaskin/kepubify/branch/master) [![](https://img.shields.io/travis/com/pgaskin/kepubify/master?label=macOS%20build)](https://travis-ci.com/pgaskin/kepubify) ![](https://img.shields.io/github/go-mod/go-version/pgaskin/kepubify) [![](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/mod/github.com/pgaskin/kepubify/v3?tab=versions) [![](https://goreportcard.com/badge/github.com/pgaskin/kepubify)](https://goreportcard.com/report/github.com/pgaskin/kepubify)
 
 Kepubify converts EPUBs to KEPUBS. Kepubify also includes two standalone utilities
 which do not depend on kepubify (and don't conflict with Calibre): [covergen](./cmd/covergen)
 (which pre-generates cover images), and [seriesmeta](./cmd/seriesmeta) (which updates
 Calibre or EPUB3 series metadata).
 
-See the [releases](https://github.com/geek1011/kepubify/releases/latest) page for
+See the [releases](https://github.com/pgaskin/kepubify/releases/latest) page for
 download links, and the [website](https://pgaskin.net/kepubify) for more information.
 Kepubify can also be installed via Homebrew (kepubify).
 
@@ -40,8 +40,8 @@ Conversion Options:
 
 Links:
   Website      - https://pgaskin.net/kepubify
-  Source Code  - https://github.com/geek1011/kepubify
-  Bugs/Support - https://github.com/geek1011/kepubify/issues
+  Source Code  - https://github.com/pgaskin/kepubify
+  Bugs/Support - https://github.com/pgaskin/kepubify/issues
   MobileRead   - http://mr.gd/forums/showthread.php?t=295287
 ```
 
@@ -86,7 +86,7 @@ detected path can be relative to the epub root or to the package document.
 Covergen does not support the external SD on older devices, and will ignore it.
 
 The N3_LIBRARY_FULL, N3_LIBRARY_LIST, and N3_LIBRARY_GRID images are generated
-using the same resizing algorithm as nickel (see [koboutils](https://github.com/geek1011/koboutils/blob/master/kobo/device.go) for more info).
+using the same resizing algorithm as nickel (see [koboutils](https://github.com/pgaskin/koboutils/blob/master/kobo/device.go) for more info).
 
 ```
 Usage: covergen [options] [kobo_path]

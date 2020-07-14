@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
-	"github.com/geek1011/kepubify/v3/kepub"
+	"github.com/pgaskin/kepubify/v3/kepub"
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 

@@ -1,12 +1,12 @@
-module github.com/geek1011/kepubify/v3
+module github.com/pgaskin/kepubify/v3
 
 go 1.14
 
 require (
 	// kepubify/covergen/seriesmeta
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b
-	github.com/geek1011/koboutils/v2 v2.0.1
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/pgaskin/koboutils/v2 v2.1.0
 	github.com/spf13/pflag v1.0.5
 )
 
@@ -22,4 +22,4 @@ require (
 // tests/utils
 require github.com/sergi/go-diff v1.1.0
 
-replace golang.org/x/net => github.com/geek1011/net v0.0.0-20200112223105-747a32f770f8 // x/net/html options for kepubify
+replace golang.org/x/net => github.com/pgaskin/net v0.0.0-20200714194227-0135d2310fe0 // x/net/html options for kepubify

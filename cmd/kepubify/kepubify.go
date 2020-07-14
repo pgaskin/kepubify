@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/geek1011/kepubify/v3/kepub"
+	"github.com/pgaskin/kepubify/v3/kepub"
 	"github.com/spf13/pflag"
 )
 
@@ -318,8 +318,8 @@ func helpExit() {
 	fmt.Fprintf(os.Stderr, "\nLinks:\n")
 	for _, v := range [][]string{
 		{"Website", "https://pgaskin.net/kepubify"},
-		{"Source Code", "https://github.com/geek1011/kepubify"},
-		{"Bugs/Support", "https://github.com/geek1011/kepubify/issues"},
+		{"Source Code", "https://github.com/pgaskin/kepubify"},
+		{"Bugs/Support", "https://github.com/pgaskin/kepubify/issues"},
 		{"MobileRead", "http://mr.gd/forums/showthread.php?t=295287"},
 	} {
 		fmt.Fprintf(os.Stderr, "  %-12s - %s\n", v[0], v[1])

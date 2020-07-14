@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
-	"github.com/geek1011/koboutils/v2/kobo"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/pgaskin/koboutils/v2/kobo"
 	"github.com/spf13/pflag"
 )
 
