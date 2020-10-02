@@ -193,7 +193,7 @@ func transform2koboSpans(doc *html.Node) {
 				cur.Parent.RemoveChild(cur)
 
 				fallthrough
-			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video:
+			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video, atom.Svg, atom.Math:
 				continue // don't add spans to elements which should keep text as-is
 			case atom.P, atom.Ol, atom.Ul, atom.Table, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
 				incParaNext = true // increment it only if it will have spans in it
