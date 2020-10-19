@@ -40,6 +40,8 @@ func main() {
 		return
 	}
 
+	fmt.Println("Note: You might be interested in NickelSeries (https://go.pgaskin.net/kobo/ns), which will automatically import series and subtitle metadata along with the book itself.")
+
 	fmt.Println("Finding kobo")
 	var kp string
 	if pflag.NArg() == 1 {
