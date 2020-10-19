@@ -316,12 +316,9 @@ const cssHyphenate = `* {
     -moz-hyphens: auto;
     hyphens: auto;
 
-    -webkit-hyphenate-after: 3;
-    -webkit-hyphenate-before: 3;
-    -webkit-hyphenate-lines: 2;
-    hyphenate-after: 3;
-    hyphenate-before: 3;
-    hyphenate-lines: 2;
+    -webkit-hyphenate-limit-after: 3;
+    -webkit-hyphenate-limit-before: 3;
+    -webkit-hyphenate-limit-lines: 2;
 }
 
 h1, h2, h3, h4, h5, h6, td {
