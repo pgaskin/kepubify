@@ -1,4 +1,4 @@
-go = "1.14.0"
+go = "1.14.10"
 
 pipeline = [{
     "name": pname,
