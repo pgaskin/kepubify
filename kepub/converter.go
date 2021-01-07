@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"golang.org/x/net/html"
 	"golang.org/x/sync/errgroup"
+	"github.com/beevik/etree"
 )
 
 // Verbose controls whether this package writes verbose output (it is silent
@@ -57,7 +57,12 @@ func (c *Converter) Convert(dir string) error {
 		return fmt.Errorf("not an epub: %s", dir)
 	}
 
-	if err := c.transformAllContentParallel(dir); err != nil {
+	htmlFiles, err := c.GetHtmlFiles(dir)
+	if err != nil {
+		return fmt.Errorf("transform htmlFiles: %w", err)
+	}
+
+	if err := c.transformAllContentParallel(htmlFiles); err != nil {
 		return fmt.Errorf("transform content: %w", err)
 	}
 
@@ -81,6 +86,43 @@ func (c *Converter) Convert(dir string) error {
 	}
 
 	return nil
+}
+
+func (c *Converter) GetHtmlFiles(dir string) ([]string, error) {
+	opfPath, err := FindOPF(dir)
+	if err != nil {
+		return []string{}, fmt.Errorf("transform opf: find: %w", err)
+	}
+
+	rsk, err := os.Open(opfPath)
+	if err != nil {
+		return []string{}, fmt.Errorf("error opening opf file: %w", err)
+	}
+	defer rsk.Close()
+
+	doc := etree.NewDocument()
+	if _, err = doc.ReadFrom(rsk); err != nil {
+		return []string{}, fmt.Errorf("error parsing opf file: %w", err)
+	}
+
+	var files []string
+
+	elements := doc.FindElements("//package/manifest/item")
+	for _, element := range elements {
+		href := ""
+		mimeType := ""
+		for _, attr := range element.Attr {
+			if attr.Key == "media-type" {
+				mimeType = attr.Value
+			} else if attr.Key == "href" {
+				href = attr.Value
+			}
+		}
+		if (mimeType == "text/html" || mimeType == "application/xhtml+xml") && href != "" {
+			files = append(files, filepath.Join(filepath.Dir(opfPath), href))
+		}
+	}
+	return files, nil
 }
 
 // ConvertEPUB converts an EPUB file.
@@ -108,34 +150,12 @@ func (c *Converter) ConvertEPUB(epub, kepub string) error {
 	return nil
 }
 
-func (c *Converter) transformAllContentParallel(dir string) error {
+func (c *Converter) transformAllContentParallel(contentFiles []string) error {
 	g, ctx := errgroup.WithContext(context.Background())
-	contentFiles := make(chan string)
-
-	g.Go(func() error {
-		defer close(contentFiles)
-		return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.Mode().IsRegular() {
-				return nil
-			}
-			switch strings.ToLower(filepath.Ext(path)) {
-			case ".html", ".xhtml", ".htm", ".xhtm":
-				select {
-				case contentFiles <- path:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-			return nil
-		})
-	})
 
 	for i := 0; i < runtime.NumCPU(); i++ {
 		g.Go(func() error {
-			for fn := range contentFiles {
+			for _, fn := range contentFiles {
 				if f, err := os.OpenFile(fn, os.O_RDWR, 0); err != nil {
 					return fmt.Errorf("open content file %#v: %w", fn, err)
 				} else if err := c.TransformContentDocFile(f); err != nil {
