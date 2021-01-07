@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/beevik/etree"
 	"golang.org/x/net/html"
 	"golang.org/x/sync/errgroup"
-	"github.com/beevik/etree"
 )
 
 // Verbose controls whether this package writes verbose output (it is silent
@@ -150,12 +150,25 @@ func (c *Converter) ConvertEPUB(epub, kepub string) error {
 	return nil
 }
 
-func (c *Converter) transformAllContentParallel(contentFiles []string) error {
+func (c *Converter) transformAllContentParallel(files []string) error {
 	g, ctx := errgroup.WithContext(context.Background())
+	contentFiles := make(chan string)
+
+	g.Go(func() error {
+		defer close(contentFiles)
+		for _, file := range files {
+			select {
+			case contentFiles <- file:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		return nil
+	})
 
 	for i := 0; i < runtime.NumCPU(); i++ {
 		g.Go(func() error {
-			for _, fn := range contentFiles {
+			for fn := range contentFiles {
 				if f, err := os.OpenFile(fn, os.O_RDWR, 0); err != nil {
 					return fmt.Errorf("open content file %#v: %w", fn, err)
 				} else if err := c.TransformContentDocFile(f); err != nil {
