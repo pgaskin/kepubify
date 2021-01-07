@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/beevik/etree"
 	"golang.org/x/net/html"
@@ -119,7 +120,15 @@ func (c *Converter) GetHtmlFiles(dir string) ([]string, error) {
 			}
 		}
 		if (mimeType == "text/html" || mimeType == "application/xhtml+xml") && href != "" {
-			files = append(files, filepath.Join(filepath.Dir(opfPath), href))
+			//Most of the time colon means href is a remote address.
+			if !strings.Contains(href, ":") {
+				file := filepath.Join(filepath.Dir(opfPath), href)
+				rel, err := filepath.Rel(dir, file)
+				//Don't add paths reference outside of root dir
+				if err == nil && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != ".." {
+					files = append(files, file)
+				}
+			}
 		}
 	}
 	return files, nil
