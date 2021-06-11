@@ -1,7 +1,6 @@
 package kepub
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/xml"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pgaskin/kepubify/v4/internal/zip"
 	"golang.org/x/sync/errgroup"
 )
 

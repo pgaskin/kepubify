@@ -10,11 +10,11 @@ import (
 	"strings"
 	"unicode"
 
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
-
 	"github.com/beevik/etree"
 	"github.com/kr/smartypants"
+
+	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
+	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/atom"
 )
 
 // TransformFileFilter returns true if a file should be filtered from the EPUB.
@@ -433,10 +433,6 @@ func transformContentClean(doc *html.Node) {
 			}
 		}
 	}
-
-	// Note: The other cleanups for ensuring valid XHTML and other misc HTML
-	//       fixes are now part of my forked golang.org/x/net/html package (see
-	//       go test -run "^TestMod_" golang.org/x/net/html -v).
 }
 
 // withText adds text to a node and returns it.

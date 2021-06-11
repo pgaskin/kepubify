@@ -8,7 +8,8 @@ import (
 	"testing"
 
 	"github.com/beevik/etree"
-	"golang.org/x/net/html"
+
+	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 )
 
 func TestTransformContent(t *testing.T) {

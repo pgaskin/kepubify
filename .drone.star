@@ -17,11 +17,13 @@ pipeline = [{
     "depends_on": pdep,
 } for (pname, psteps, pdep) in [
     ("kepub", [
-        ("test-html", "go test -mod=readonly -run \"^TestMod_\" golang.org/x/net/html -v"),
+        ("test-html", "go test -mod=readonly -run \"^TestMod_\" github.com/pgaskin/kepubify/_/html/golang.org/x/net/html -v"),
         ("test", "go test -mod=readonly ./kepub -v -cover"),
+        ("test-zip117", "go test -mod=readonly -tags zip117 ./kepub -v -cover"),
     ], []),
     ("kepubify", [
         ("test", "go test -mod=readonly ./cmd/kepubify -v -cover"),
+        ("test-zip117", "go test -mod=readonly -tags zip117 ./cmd/kepubify -v -cover"),
         ("run", "go run -mod=readonly ./cmd/kepubify --help"),
     ], ["kepub"]),
     ("covergen", [
@@ -53,7 +55,7 @@ pipeline = [{
         },
         "command": [
             "--platforms", platform,
-            "--build-cmd", "go env; CGO_ENABLED=%s go build -ldflags \"-s -w -X main.version=$(cat build/version)\" -o \"build/%s%s\" %s" % (cgo, app, suffix, "./cmd/" + app),
+            "--build-cmd", "go env; CGO_ENABLED=%s go build -ldflags \"-s -w -X main.version=$(cat build/version)\" -tags zip117 -o \"build/%s%s\" %s" % (cgo, app, suffix, "./cmd/" + app),
         ],
     } for (img, platform, suffix) in [
         ("main",   "linux/amd64",   "-linux-64bit"),

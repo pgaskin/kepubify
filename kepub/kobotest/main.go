@@ -11,10 +11,10 @@ import (
 	"os"
 	"strings"
 
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
-
 	"github.com/sergi/go-diff/diffmatchpatch"
+
+	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
+	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/atom"
 
 	//go:linkname transformContentKoboSpans github.com/pgaskin/kepubify/v4/kepub.transformContentKoboSpans
 

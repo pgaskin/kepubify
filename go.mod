@@ -13,11 +13,10 @@ require (
 require (
 	github.com/beevik/etree v1.1.0
 	github.com/kr/smartypants v0.1.0
-	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
+	github.com/pgaskin/kepubify/_/go116-zip.go117 v0.0.0-20210611152744-2d89b3182523
+	github.com/pgaskin/kepubify/_/html v0.0.0-20210611145339-337924fbbaf0
 	golang.org/x/sync v0.0.0-20201008141435-b3e1573b7520
 )
 
 // tests/utils
 require github.com/sergi/go-diff v1.1.0
-
-replace golang.org/x/net => github.com/pgaskin/net v0.0.0-20200714194227-0135d2310fe0 // x/net/html options for kepubify
