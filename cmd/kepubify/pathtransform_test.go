@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -675,7 +674,7 @@ func (tc transformPathsCase) Run(t *testing.T) {
 	t.Log("===\n")
 	t.Logf("case %#v", tc.What)
 
-	td, err := ioutil.TempDir("", "kepubify-test")
+	td, err := os.MkdirTemp("", "kepubify-test")
 	if err != nil {
 		panic(err)
 	}
@@ -696,7 +695,7 @@ func (tc transformPathsCase) Run(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(in), 0755); err != nil {
 			panic(err)
 		}
-		if err := ioutil.WriteFile(fn, []byte(in), 0644); err != nil {
+		if err := os.WriteFile(fn, []byte(in), 0644); err != nil {
 			panic(err)
 		}
 	}
