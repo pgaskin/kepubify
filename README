@@ -1,0 +1,9 @@
+html
+
+This is a fork of golang.org/x/net/html which includes additional
+features and modifications required by kepubify.
+
+Prior to kepubify v4, the modifications were replaced using a go.mod
+directive, with the code stored in github.com/pgaskin/net. The git
+history there has been preserved under the branch
+pgaskin/kepubify/pre-v4.
