@@ -2,6 +2,8 @@
 package main
 
 import (
+	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -80,8 +82,6 @@ func main() {
 			return
 		}
 	}
-
-	kepub.Verbose = *verbose
 
 	// --- Make converter --- //
 
@@ -256,7 +256,37 @@ func main() {
 							log(true, "          Error (%d): %v\n", i, err)
 							continue
 						}
-						if err := converter.ConvertEPUB(input, output); err != nil {
+						if err := func() error {
+							fi, err := zip.OpenReader(input)
+							if err != nil {
+								return err
+							}
+							defer fi.Close()
+
+							fo, err := os.CreateTemp(filepath.Dir(output), ".kepubify."+filepath.Base(output)+".*")
+							if err != nil {
+								return err
+							}
+							defer os.Remove(fo.Name())
+
+							if err := converter.Convert(context.Background(), fo, fi); err != nil {
+								return err
+							}
+
+							if err := fo.Sync(); err != nil {
+								return err
+							}
+
+							if err := fo.Close(); err != nil {
+								return err
+							}
+
+							if err := os.Rename(fo.Name(), output); err != nil {
+								return err
+							}
+
+							return nil
+						}(); err != nil {
 							errs.Store(input, err)
 							atomic.AddInt64(&errored, 1)
 							log(true, "          Error (%d): %v\n", i, err)
@@ -312,8 +342,6 @@ func helpExit() {
 	for _, category := range categoriesSort {
 		fmt.Fprintf(os.Stderr, "\n%s:\n%s", strings.Split(category, ".")[1], categories[category].FlagUsagesWrapped(160))
 	}
-
-	// TODO: examples?
 
 	fmt.Fprintf(os.Stderr, "\nLinks:\n")
 	for _, v := range [][]string{

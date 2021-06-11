@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -22,7 +19,8 @@ func TestTransformContent(t *testing.T) {
 	}
 
 	// yes, I know it isn't valid XML, but I'm testing preserving the XML declaration
-	doc, err := c.transform1(strings.NewReader(strings.TrimSpace(`
+	buf := bytes.NewBuffer(nil)
+	if err := c.TransformContent(buf, strings.NewReader(strings.TrimSpace(`
 <?xml version="1.0" charset="utf-8"?>
 <!DOCTYPE html>
 <html>
@@ -46,18 +44,8 @@ func TestTransformContent(t *testing.T) {
     <p>&nbsp;</p>
     <svg></svg>
 </body>
-</html>`)))
-	if err != nil {
-		t.Fatalf("transform1: unexpected error: %v", err)
-	}
-
-	if err := c.transform2(doc); err != nil {
-		t.Fatalf("transform2: unexpected error: %v", err)
-	}
-
-	buf := bytes.NewBuffer(nil)
-	if err := c.transform3(buf, doc); err != nil {
-		t.Fatalf("transform3: unexpected error: %v", err)
+</html>`))); err != nil {
+		t.Fatalf("transform: unexpected error: %v", err)
 	}
 
 	if a, b := strings.TrimSpace(buf.String()), strings.TrimSpace(`
@@ -92,7 +80,7 @@ func TestTransformContent(t *testing.T) {
 func TestTransformContentParts(t *testing.T) {
 	t.Run("KoboStyles", func(t *testing.T) {
 		transformContentCase{
-			Func:     transform2koboStyles,
+			Func:     transformContentKoboStyles,
 			What:     "add kobo style hacks",
 			Fragment: false,
 			Contains: true,
@@ -103,7 +91,7 @@ func TestTransformContentParts(t *testing.T) {
 
 	t.Run("KoboDivs", func(t *testing.T) {
 		transformContentCase{
-			Func:     transform2koboDivs,
+			Func:     transformContentKoboDivs,
 			What:     "no content",
 			Fragment: true,
 			In:       ``,
@@ -111,7 +99,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboDivs,
+			Func:     transformContentKoboDivs,
 			What:     "already has divs",
 			Fragment: true,
 			In:       `<div id="book-columns"><div id="book-inner"></div></div>`,
@@ -119,7 +107,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboDivs,
+			Func:     transformContentKoboDivs,
 			What:     "single text node",
 			Fragment: true,
 			In:       `test`,
@@ -127,7 +115,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboDivs,
+			Func:     transformContentKoboDivs,
 			What:     "multiple elements and children",
 			Fragment: true,
 			In:       `<p>Test 1</p><p>Test <b>2</b></p><p>Test 3</p>`,
@@ -137,7 +125,7 @@ func TestTransformContentParts(t *testing.T) {
 
 	t.Run("KoboSpans", func(t *testing.T) {
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "no content",
 			Fragment: true,
 			In:       ``,
@@ -145,7 +133,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "already has spans",
 			Fragment: true,
 			In:       `<p><span class="koboSpan" id="kobo.1.1">Test</span></p>`,
@@ -153,7 +141,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "increment segment counter from 1 for every sentence",
 			Fragment: true,
 			In:       `<p>Sentence 1. Sentence 2. Sentence 3.</p>`,
@@ -161,7 +149,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "increment paragraph counter from 1 and reset segment counter for every p, ul, ol, or table",
 			Fragment: true,
 			In:       `<p>Sentence 1. Sentence 2.</p><p>Sentence 3.</p><ul><li>Sentence 4</li><li>Sentence 5</li></ul><ol><li>Sentence 6</li><li>Sentence 7</li></ol><table><tbody><tr><td>Test</td></tr><tr><td>Test</td></tr></tbody></table>`,
@@ -169,7 +157,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "merge stray text at the end of lines into the next sentence (between regexp matches)",
 			Fragment: true,
 			In:       `<p>Sentence 1. Sentence 2. Stray text` + "\n" + `Another sentence.</p>`,
@@ -177,7 +165,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "don't lose stray text not part of a sentence (after the last regexp match)",
 			Fragment: true,
 			In:       `<p>Sentence 1. Sentence 2. Stray text</p>`,
@@ -185,7 +173,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "preserve but don't wrap extra whitespace outside of P elements", // TODO: are there any other cases where we need to still wrap whitespace to match Kobo's behaviour?
 			Fragment: true,
 			In:       `<p>This is a test.` + "\n" + `    This is another sentence on the next line.<span> </span>Another sentence.</p>` + "\n" + "    <p>Another paragraph.</p><p> </p><p></p>",
@@ -193,7 +181,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "preserve and split segments on formatting and links",
 			Fragment: true,
 			In:       `<p>Sentence<b> 1. </b>Sentence <span>2. Se</span>nten<a href="test.html">ce 3. Another word</a></p>`,
@@ -201,7 +189,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "preserve and split segments on nested formatting and links",
 			Fragment: true,
 			In:       `<p>Sentence<b> 1. Sente<i>nce <span>2. Se</span>nt</i>en<a href="test.html">ce 3. Another word</a></b></p>`,
@@ -209,7 +197,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "nested lists/paragraphs should not reset numbering once out of scope (i.e. <p [para1]>[span1.1]<ul [para2]><li>[span2.1]</li></ul>[span2.2]</p>)", // TODO: verify against an actual kepub (I'll have to find a free non-fiction one or one with a nested TOC)
 			Fragment: true,
 			In:       `<p>Sentence.<ul><li>Another sentence.</li><li>Another sentence.<ul><li>Another sentence.</li><li>Another sentence.</li></ul></li><li>Another sentence.</li></ul> Another sentence.</p>`,
@@ -217,7 +205,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "don't touch the contents of script, style, pre, audio, video tags",
 			Fragment: true,
 			In:       `<p>Touch this.</p><script>not this</script><style>or this</style><pre>or this</pre><audio>or this</audio><video>or this</video><p>Touch this.</p>`,
@@ -225,7 +213,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "treat an img as a new paragraph and add a span around it",
 			Fragment: true,
 			In:       `<p>One.</p><img src="test"><p>Three.</p>`,
@@ -233,7 +221,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "don't increment paragraph counter if no spans were added",
 			Fragment: true,
 			In:       `<p>One.</p><p> </p><p><!-- comment --></p><p>Two.</p><p><b>Three.</b></p>`,
@@ -241,7 +229,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "don't add spans to svg and math elements",
 			Fragment: true,
 			In:       `<svg xmlns="http://www.w3.org/2000/svg"><g><text font-size="24" y="20" x="0">kepubify</text></g></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mfrac><mrow><mo>-</mo><mi>b</mi><mo>±</mo><msqrt><msup><mi>b</mi><mn>2</mn></msup><mo>-</mo><mn>4</mn><mi>a</mi><mi>c</mi></msqrt></mrow><mrow><mn>2</mn><mi>a</mi></mrow></mfrac></math>`,
@@ -251,7 +239,7 @@ func TestTransformContentParts(t *testing.T) {
 		// The following cases were found after using kobotest on a bunch of files (the previous cases are also based on kepubs, but I did them manually and didn't keep track):
 
 		transformContentCase{
-			Func:     transform2koboSpans,
+			Func:     transformContentKoboSpans,
 			What:     "also increment paragraph counter on heading tags and don't split sentences after colons or if there isn't any spaces after a period", // 69b8ba8c-1799-4e0d-ba3a-ce366410335e (Janurary 2020): Arthur Conan Doyle - The Complete Sherlock Holmes.kepub/OEBPS/bookwire/bookwire_advertisement1.xhtml
 			Fragment: true,
 			In:       `<div class="img_container"><p class="ad_image"><img src="bookwire_ad_cover1.jpg" alt="image"/></p></div>` + "\n" + `    <h2 class="subheadline">The Christmas Collection: All Of Your Favourite Classic Christmas Stories, Novels, Poems, Carols in One Ebook</h2>` + "\n" + `    <p class="subheadline2"></p>` + "\n" + `    <p class="metadata">Carr, Annie Roe</p>`,
@@ -261,7 +249,7 @@ func TestTransformContentParts(t *testing.T) {
 
 	t.Run("AddStyle", func(t *testing.T) {
 		transformContentCase{
-			Func:     func(doc *html.Node) { transform2addStyle(doc, "kepubify-test", "div > div { color: black; }") },
+			Func:     func(doc *html.Node) { transformContentAddStyle(doc, "kepubify-test", "div > div { color: black; }") },
 			What:     "add style to head",
 			Fragment: false,
 			In:       `<!DOCTYPE html><html><head><title>Kepubify Test</title></head><body></body></html>`,
@@ -271,7 +259,7 @@ func TestTransformContentParts(t *testing.T) {
 
 	t.Run("SmartyPants", func(t *testing.T) {
 		transformContentCase{
-			Func:     transform2smartypants,
+			Func:     transformContentPunctuation,
 			What:     "smart punctuation",
 			Fragment: true,
 			In:       `<p>This is a test sentence to test smartypants' conversion of "quotation marks", dashes like - / -- / ---, and symbols like (c).</p>`,
@@ -279,7 +267,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2smartypants,
+			Func:     transformContentPunctuation,
 			What:     "skip pre, code, style, and script elements",
 			Fragment: true,
 			In:       `<p>This is a test sentence to test smartypants' conversion of <code>"quotation marks"</code>, dashes like <pre>- / -- / ---</pre>, and symbols like (c).</p><style>div{font-family:"Test"}</style><script>var a="test"</script>`,
@@ -287,7 +275,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2smartypants,
+			Func:     transformContentPunctuation,
 			What:     "properly handle entity escaping",
 			Fragment: true,
 			In:       `<p>&amp;&quot;&lt;&gt;&quot;</p><pre>&quot;</pre>`,
@@ -297,7 +285,7 @@ func TestTransformContentParts(t *testing.T) {
 
 	t.Run("CleanHTML", func(t *testing.T) {
 		transformContentCase{
-			Func:     transform2cleanHTML,
+			Func:     transformContentClean,
 			What:     "remove adobe adept metadata",
 			Fragment: true,
 			In:       `<meta charset="utf-8"/><meta name="Adept.expected.resource"/>`,
@@ -305,7 +293,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2cleanHTML,
+			Func:     transformContentClean,
 			What:     "remove useless MS Word tags",
 			Fragment: true,
 			In:       `<o:p></o:p><st1:test></st1:test><div><o:p> dfg </o:p><o:p></o:p></div>`,
@@ -313,7 +301,7 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 
 		transformContentCase{
-			Func:     transform2cleanHTML,
+			Func:     transformContentClean,
 			What:     "remove unicode replacement chars",
 			Fragment: true,
 			In:       `�<p>test�ing</p><p>asd<b>fgh</b></p>`,
@@ -326,7 +314,8 @@ func TestTransformOPF(t *testing.T) {
 	// note: the individual parts below aren't tested again here
 	c := &Converter{}
 
-	doc, err := c.transformOPF1(strings.NewReader(strings.TrimSpace(`
+	buf := bytes.NewBuffer(nil)
+	if err := c.TransformOPF(buf, strings.NewReader(strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -340,18 +329,8 @@ func TestTransformOPF(t *testing.T) {
     <spine toc="ncx">
         <itemref idref="xhtml_text1"/>
     </spine>
-</package>`)))
-	if err != nil {
-		t.Fatalf("transform1: unexpected error: %v", err)
-	}
-
-	if err := c.transformOPF2(doc); err != nil {
-		t.Fatalf("transform2: unexpected error: %v", err)
-	}
-
-	buf := bytes.NewBuffer(nil)
-	if err := c.transformOPF3(buf, doc); err != nil {
-		t.Fatalf("transform3: unexpected error: %v", err)
+</package>`))); err != nil {
+		t.Fatalf("transform: unexpected error: %v", err)
 	}
 
 	if a, b := strings.TrimSpace(buf.String()), strings.TrimSpace(`
@@ -380,7 +359,7 @@ func TestTransformOPF(t *testing.T) {
 func TestTransformOPFParts(t *testing.T) {
 	t.Run("CoverImage", func(t *testing.T) {
 		transformXMLTestCase{
-			Func: transformOPF2coverImage,
+			Func: transformOPFCoverImage,
 			What: "set cover-image property on ID from meta[name=cover]",
 			In: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
@@ -417,7 +396,7 @@ func TestTransformOPFParts(t *testing.T) {
 		}.Run(t)
 
 		transformXMLTestCase{
-			Func: transformOPF2coverImage,
+			Func: transformOPFCoverImage,
 			What: "set cover-image property on #cover if meta[name=cover] not present",
 			In: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
@@ -455,7 +434,7 @@ func TestTransformOPFParts(t *testing.T) {
 	t.Run("CalibreMeta", func(t *testing.T) {
 		// note: the <!-- --> is to preven editors from trimming the whitespace
 		transformXMLTestCase{
-			Func: transformOPF2calibreMeta,
+			Func: transformOPFCalibreMeta,
 			What: "remove calibre:timestamp and calibre contributor",
 			In: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
@@ -479,24 +458,7 @@ func TestTransformOPFParts(t *testing.T) {
 	})
 }
 
-func TestTransformEPUB(t *testing.T) {
-	c := &Converter{}
-
-	td, err := ioutil.TempDir("", "kepubify-test")
-	if err != nil {
-		panic(err)
-	}
-	defer os.RemoveAll(td)
-
-	if err := os.Mkdir(filepath.Join(td, "META-INF"), 0755); err != nil {
-		panic(err)
-	}
-
-	empty, err := countDir(td)
-	if err != nil {
-		panic(err)
-	}
-
+func TestTransformFileFilter(t *testing.T) {
 	for _, fn := range []string{
 		"META-INF/calibre_bookmarks.txt",
 		"iTunesMetadata.plist",
@@ -505,27 +467,9 @@ func TestTransformEPUB(t *testing.T) {
 		"__MACOSX/test.txt",
 		"thumbs.db",
 	} {
-		ffn := filepath.Join(td, filepath.FromSlash(fn))
-		if err := os.MkdirAll(filepath.Dir(ffn), 0755); err != nil {
-			panic(err)
+		if !(&Converter{}).TransformFileFilter(fn) {
+			t.Errorf("expected %q to be filtered", fn)
 		}
-		if err := ioutil.WriteFile(ffn, []byte("test"), 0644); err != nil {
-			panic(err)
-		}
-	}
-
-	t.Log("transform EPUB: including cleaning extra files")
-	if err := c.transformEPUB(td); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	new, err := countDir(td)
-	if err != nil {
-		panic(err)
-	}
-
-	if new != empty {
-		t.Errorf("expected %d files, got %d", empty, new)
 	}
 }
 
@@ -612,16 +556,4 @@ func (tc transformXMLTestCase) Run(t *testing.T) {
 		fmt.Println("---")
 		fmt.Println(b)
 	}
-}
-
-func countDir(dir string) (int, error) {
-	var n int
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		n++
-		return nil
-	})
-	return n, err
 }

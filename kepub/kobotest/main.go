@@ -9,16 +9,21 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"strings"
-	"unsafe"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
-	"github.com/pgaskin/kepubify/v4/kepub"
 	"github.com/sergi/go-diff/diffmatchpatch"
+
+	//go:linkname transformContentKoboSpans github.com/pgaskin/kepubify/v4/kepub.transformContentKoboSpans
+
+	_ "unsafe"
+
+	_ "github.com/pgaskin/kepubify/v4/kepub"
 )
+
+func transformContentKoboSpans(*html.Node)
 
 func main() {
 	doc, err := html.ParseWithOptions(os.Stdin, html.ParseOptionIgnoreBOM(true), html.ParseOptionEnableScripting(true), html.ParseOptionLenientSelfClosing(true))
@@ -43,7 +48,7 @@ func main() {
 		panic(err)
 	}
 
-	addSpans(doc)
+	transformContentKoboSpans(doc)
 
 	fmt.Print("\n\n=== SPANS ADDED ===\n\n")
 	if err := html.Render(os.Stdout, doc); err != nil {
@@ -70,8 +75,6 @@ func main() {
 	fmt.Println("All spans match.")
 	os.Exit(0)
 }
-
-var addSpans = (*(*func(*html.Node))(unsafe.Pointer(reflect.ValueOf(kepub.NewConverter()).Elem().FieldByName("addSpans").UnsafeAddr())))
 
 func removeSpans(node *html.Node) {
 	var stack []*html.Node

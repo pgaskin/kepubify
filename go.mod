@@ -11,8 +11,6 @@ require (
 )
 
 require (
-	// kepub
-	github.com/andybalholm/cascadia v1.2.0
 	github.com/beevik/etree v1.1.0
 	github.com/kr/smartypants v0.1.0
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
