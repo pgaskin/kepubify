@@ -1,0 +1,21 @@
+name: forks - html
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: test - Go ${{matrix.go}}
+    runs-on: ubuntu-latest
+    container: golang:${{matrix.go}}-alpine
+    strategy:
+      matrix:
+        go:
+          - 1.16
+          - 1.17-rc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Test
+        run: |
+          cd _/html && go test -v ./...
