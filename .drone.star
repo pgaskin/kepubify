@@ -68,16 +68,6 @@ pipeline = [{
         ("covergen",   "0"),
         ("seriesmeta", "1"),
     ]] + [{
-        "name": "debian",
-        "image": "golang:%s-buster" % (go),
-        "environment": {
-            "GO111MODULE": "on",
-        },
-        "commands": [
-            "go install github.com/goreleaser/nfpm/cmd/nfpm",
-            "VERSION=$(cat build/version | tr -d v) nfpm pkg -f nfpm.yaml -t build/kepubify_$(cat build/version | tr -d v)_amd64.deb",
-        ],
-    }, {
         "name": "ls",
         "image": "golang:%s-buster" % (go),
         "commands": [
