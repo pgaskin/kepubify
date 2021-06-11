@@ -1,0 +1,5 @@
+go116-zip.go117
+
+This is archive/zip from Go 1.17 (tip) backported to Go 1.16 for the
+new raw access functions, which significantly improve conversion
+performance.
