@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pgaskin/kepubify/v3/kepub"
+	"github.com/pgaskin/kepubify/v4/kepub"
 	"github.com/spf13/pflag"
 )
 

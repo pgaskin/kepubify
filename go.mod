@@ -1,4 +1,4 @@
-module github.com/pgaskin/kepubify/v3
+module github.com/pgaskin/kepubify/v4
 
 go 1.14
 
