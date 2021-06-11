@@ -4,10 +4,7 @@ os:
 language: go
 
 go:
-- 1.14.x
-
-env:
-  GO111MODULE: "on"
+- 1.16.x
 
 script:
 - go run -mod=readonly ./cmd/kepubify --help

@@ -1,6 +1,6 @@
 module github.com/pgaskin/kepubify/v4
 
-go 1.14
+go 1.16
 
 require (
 	// kepubify/covergen/seriesmeta

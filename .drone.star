@@ -1,4 +1,4 @@
-go = "1.14.7"
+go = "1.16.4"
 
 pipeline = [{
     "name": pname,
@@ -7,9 +7,6 @@ pipeline = [{
     "steps": [{
         "name": name,
         "image": "golang:%s-buster" % (go),
-        "environment": {
-            "GO111MODULE": "on",
-        },
         "commands": [cmd],
     } for (name, cmd) in psteps],
     "trigger": {

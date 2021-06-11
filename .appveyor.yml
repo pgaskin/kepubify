@@ -1,16 +1,13 @@
 version: '{build}'
 
-environment:
-  GO111MODULE: on
-
-# TODO: update to Go 1.14 once ready (appveyor/ci#3325)
+image: Visual Studio 2019
 
 build_script:
-- cmd: C:\go113\bin\go.exe run -mod=readonly ./cmd/kepubify --help
+- cmd: C:\go116\bin\go.exe run -mod=readonly ./cmd/kepubify --help
 
 test_script:
-- cmd: C:\go113\bin\go.exe test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
-- cmd: C:\go113\bin\go.exe test -mod=readonly -v ./kepub
-- cmd: C:\go113\bin\go.exe test -mod=readonly -v ./cmd/kepubify
+- cmd: C:\go116\bin\go.exe test -mod=readonly -run "^TestMod_" golang.org/x/net/html -v
+- cmd: C:\go116\bin\go.exe test -mod=readonly -v ./kepub
+- cmd: C:\go116\bin\go.exe test -mod=readonly -v ./cmd/kepubify
 
 deploy: off
