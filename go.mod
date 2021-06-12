@@ -18,5 +18,4 @@ require (
 	golang.org/x/sync v0.0.0-20201008141435-b3e1573b7520
 )
 
-// tests/utils
-require github.com/sergi/go-diff v1.1.0
+require github.com/hexops/gotextdiff v1.0.3

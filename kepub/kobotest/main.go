@@ -5,13 +5,16 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
-	"github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/hexops/gotextdiff/myers"
+	"github.com/hexops/gotextdiff/span"
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/atom"
@@ -31,10 +34,7 @@ func main() {
 		panic(err)
 	}
 
-	koboTree := bytes.NewBuffer(nil)
-	if err := mkTree(koboTree, doc); err != nil {
-		panic(err)
-	}
+	koboTree := mkTree(doc)
 
 	fmt.Print("\n\n=== ORIGINAL ===\n\n")
 	if err := html.Render(os.Stdout, doc); err != nil {
@@ -55,19 +55,40 @@ func main() {
 		panic(err)
 	}
 
-	kepubifyTree := bytes.NewBuffer(nil)
-	if err := mkTree(kepubifyTree, doc); err != nil {
-		panic(err)
-	}
+	kepubifyTree := mkTree(doc)
 
-	koboTreeStr := koboTree.String()
-	kepubifyTreeStr := kepubifyTree.String()
+	fmt.Print("\n\n=== RESULT (blue=kepubify, yellow=kobo) ===\n\n")
 
-	fmt.Print("\n\n=== RESULT (red=incorrect green=correct) ===\n\n")
+	if a, b := kepubifyTree, koboTree; a != b {
+		txt, prev := span.NewContentConverter("", []byte(a)), 0
+		for _, edit := range myers.ComputeEdits(span.URI(""), a, b) {
+			span, _ := edit.Span.WithOffset(txt)
+			start, end := span.Start().Offset(), span.End().Offset()
+			if start > prev {
+				io.WriteString(os.Stdout, a[prev:start])
+				prev = start
+			}
+			if end > start {
+				io.WriteString(os.Stdout, "\x1b[34m") // blue
+				io.WriteString(os.Stdout, a[start:end])
+				io.WriteString(os.Stdout, "\x1b[0m")
+			}
+			if edit.NewText != "" {
+				io.WriteString(os.Stdout, "\x1b[33m") // yellow
+				io.WriteString(os.Stdout, edit.NewText)
+				io.WriteString(os.Stdout, "\x1b[0m")
+			}
+			prev = end
+		}
+		if prev < len(a) {
+			io.WriteString(os.Stdout, a[prev:])
+		}
 
-	if kepubifyTreeStr != koboTreeStr {
-		dmp := diffmatchpatch.New()
-		fmt.Println(dmp.DiffPrettyText(dmp.DiffMain(kepubifyTreeStr, koboTreeStr, false)))
+		lines := strings.SplitAfter(a, "\n")
+		if lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
+		}
+
 		os.Exit(1)
 		return
 	}
@@ -133,7 +154,9 @@ func removeSpans(node *html.Node) {
 	}
 }
 
-func mkTree(w io.Writer, node *html.Node) error {
+func mkTree(node *html.Node) string {
+	var b strings.Builder
+
 	var stack []*html.Node
 	var cur *html.Node
 
@@ -150,37 +173,68 @@ func mkTree(w io.Writer, node *html.Node) error {
 
 		switch cur.Type {
 		case html.TextNode:
-			if _, err := fmt.Fprintf(w, "%s- TextNode: %#v\n", indent, cur.Data); err != nil {
-				return err
+			if cur.PrevSibling != nil && cur.PrevSibling.Type == html.ElementNode {
+				b.WriteByte('\n')
+			}
+			b.WriteString(indent)
+			b.WriteString("\x1b[2mTextNode:  » \x1b[22m")
+			q := strconv.Quote(cur.Data)
+			if q[0] == '"' && q[len(q)-1] == '"' {
+				if t := q[1 : len(q)-1]; t != "" {
+					var unquoted bool
+					if r, _ := utf8.DecodeLastRuneInString(t); !unicode.IsSpace(r) {
+						if r, _ := utf8.DecodeLastRuneInString(t); !unicode.IsSpace(r) {
+							b.WriteString(t)
+							unquoted = true
+						}
+					}
+					if !unquoted {
+						b.WriteString("\x1b[2m\"\x1b[22m")
+						b.WriteString(t)
+						b.WriteString("\x1b[2m\"\x1b[22m")
+					}
+				}
+			}
+			b.WriteByte('\n')
+			if cur.NextSibling != nil && cur.NextSibling.Type == html.ElementNode {
+				b.WriteByte('\n')
 			}
 			continue
 		case html.ElementNode:
-			desc := cur.Data
+			b.WriteString(indent)
+			b.WriteString("\x1b[2mElementNode: \x1b[22m")
+			b.WriteString(cur.Data)
 			for _, attr := range cur.Attr {
 				if attr.Key == "class" {
-					desc += "." + strings.Join(strings.Fields(attr.Val), ".")
+					b.WriteByte('.')
+					b.WriteString(strings.Join(strings.Fields(attr.Val), "."))
 					break
 				}
 			}
 			for _, attr := range cur.Attr {
 				if attr.Key == "id" {
-					desc += "#" + strings.TrimSpace(attr.Val)
+					b.WriteByte('#')
+					b.WriteString(strings.TrimSpace(attr.Val))
 					break
 				}
 			}
 			for _, attr := range cur.Attr {
 				if attr.Key != "class" && attr.Key != "id" && !strings.HasPrefix(attr.Key, "xmlns") {
-					desc += fmt.Sprintf("[%s=%#v]", attr.Key, attr.Val)
+					b.WriteByte('[')
+					b.WriteString(attr.Key)
+					b.WriteByte('=')
+					b.WriteString(attr.Val)
+					b.WriteByte(']')
 					break
 				}
 			}
-			if _, err := fmt.Fprintf(w, "%s- ElementNode: %s\n", indent, desc); err != nil {
-				return err
+			b.WriteByte('\n')
+			if cur.PrevSibling != nil && (cur.PrevSibling.LastChild != nil && cur.PrevSibling.LastChild.Type == html.TextNode) {
+				b.WriteByte('\n')
 			}
 		case html.DocumentNode:
-			if _, err := fmt.Fprintf(w, "%sDocumentNode:\n", indent); err != nil {
-				return err
-			}
+			b.WriteString(indent)
+			b.WriteString("\x1b[2mDocumentNode:\x1b[22m\n")
 		}
 
 		for c := cur.LastChild; c != nil; c = c.PrevSibling {
@@ -189,5 +243,5 @@ func mkTree(w io.Writer, node *html.Node) error {
 		}
 	}
 
-	return nil
+	return b.String()
 }
