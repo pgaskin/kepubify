@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -16,7 +17,19 @@ func TestTransformContent(t *testing.T) {
 	c := &Converter{
 		extraCSS:      []string{"body { color: black; }"},
 		extraCSSClass: []string{"kepubify-test"},
-		smartypants:   true,
+		find: [][]byte{
+			[]byte("Test sentence 2."),
+			[]byte("<a id=\"test\">"),
+			[]byte("sdfsdfsdf"),
+			[]byte(" sentence 2"),
+		},
+		replace: [][]byte{
+			[]byte("Replaced sentence 2."),
+			[]byte("<a id=\"test1\">"),
+			[]byte("dfgdfgdfg"),
+			[]byte(nil),
+		},
+		smartypants: true,
 	}
 
 	// yes, I know it isn't valid XML, but I'm testing preserving the XML declaration
@@ -58,7 +71,7 @@ func TestTransformContent(t *testing.T) {
          in my tests for that library. -->
 <style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style><style type="text/css" class="kepubify-test">body { color: black; }</style></head>
 <body><div id="book-columns"><div id="book-inner">
-    <p><span class="koboSpan" id="kobo.1.1">Test sentence 1. </span><a id="test"></a><span class="koboSpan" id="kobo.1.2"> Test sentence 2. </span><b><span class="koboSpan" id="kobo.1.3">Test sentence 3</span><i><span class="koboSpan" id="kobo.1.4">Test sentence 4</span></i></b></p><b><i>
+    <p><span class="koboSpan" id="kobo.1.1">Test sentence 1. </span><a id="test1"></a><span class="koboSpan" id="kobo.1.2"> Replaced. </span><b><span class="koboSpan" id="kobo.1.3">Test sentence 3</span><i><span class="koboSpan" id="kobo.1.4">Test sentence 4</span></i></b></p><b><i>
     <p><span class="koboSpan" id="kobo.2.1">Test sentence 5. </span><i><span class="koboSpan" id="kobo.2.2">“This is quoted”</span></i><span class="koboSpan" id="kobo.2.3"> – </span><b><span class="koboSpan" id="kobo.2.4">and this is not</span></b><span class="koboSpan" id="kobo.2.5">.</span></p>
     <p><span class="koboSpan" id="kobo.3.1">Sentence.</span></p><ul><li><span class="koboSpan" id="kobo.4.1">Another sentence.</span></li><li><span class="koboSpan" id="kobo.4.2">Another sentence.</span><ul><li><span class="koboSpan" id="kobo.5.1">Another sentence.</span></li><li><span class="koboSpan" id="kobo.5.2">Another sentence.</span></li></ul></li><li><span class="koboSpan" id="kobo.5.3">Another sentence.</span></li></ul><span class="koboSpan" id="kobo.5.4"> Another sentence.</span><p></p>
     <pre>Test
@@ -309,6 +322,102 @@ func TestTransformContentParts(t *testing.T) {
 			Out:      `<p>testing</p><p>asd<b>fgh</b></p>`,
 		}.Run(t)
 	})
+
+	t.Run("Replacements", func(t *testing.T) {
+		const corpus = `<!DOCTYPE html><html><head><title></title></head><body><b>Lorem ipsum</b> dolor sit amet, <a href="https://example.com">consectetur adipiscing elit</a>, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</body></html>`
+		for _, tc := range []struct {
+			What         string
+			Replacements []string
+		}{
+			{
+				What: "simple removal",
+				Replacements: []string{
+					" ipsum", "",
+				},
+			},
+			{
+				What: "simple replacement",
+				Replacements: []string{
+					". ", "_ ",
+				},
+			},
+			{
+				What: "complex removal", // to ensure the transformer behaves correctly when it requires multiple writes from the renderer
+				Replacements: []string{
+					"<b>Lorem ipsum</b>", "",
+				},
+			},
+			{
+				What: "long replacement",
+				Replacements: []string{
+					"ipsum", strings.Repeat(".", 4096),
+				},
+			},
+			{
+				What: "simple chained",
+				Replacements: []string{
+					"ipsum", "test1",
+					"amet", "test2",
+					"commodo", "",
+				},
+			},
+			{
+				What: "ordered chained",
+				Replacements: []string{
+					"ipsum", "Lorem",
+					"Lorem", "test1",
+					"ipsum", "",
+				},
+			},
+			{
+				What: "overlapping chained",
+				Replacements: []string{
+					"Lorem", "test1",
+					"test1", "test2",
+					"ipsum", "test2 ipsum",
+					"test2", "test3",
+				},
+			},
+			{
+				What: "complex chained", // to ensure order matters
+				Replacements: []string{
+					"Lorem", "ipsum",
+					"or", "ar",
+					"dolar", "dolor",
+					"</", "__________",
+					"________", "__</",
+					"_", " ",
+					". ", "; ",
+				},
+			},
+		} {
+			out := corpus
+			for i := 0; i < len(tc.Replacements)/2; i++ {
+				out = strings.ReplaceAll(out, tc.Replacements[i*2], tc.Replacements[i*2+1])
+			}
+			if out == corpus {
+				panic("strings don't differ")
+			}
+			transformContentCase{
+				Func: func(repl ...string) func(io.Writer) io.WriteCloser {
+					if len(repl)%2 != 0 {
+						panic("replacements not a multiple of 2")
+					}
+					f := make([][]byte, len(repl)/2)
+					r := make([][]byte, len(repl)/2)
+					for i := 0; i < len(repl)/2; i++ {
+						f[i], r[i] = []byte(repl[i*2]), []byte(repl[i*2+1])
+					}
+					return func(w io.Writer) io.WriteCloser {
+						return transformContentReplacements(w, f, r)
+					}
+				}(tc.Replacements...),
+				What: tc.What,
+				In:   corpus,
+				Out:  out,
+			}.Run(t)
+		}
+	})
 }
 
 func TestTransformOPF(t *testing.T) {
@@ -475,7 +584,7 @@ func TestTransformFileFilter(t *testing.T) {
 }
 
 type transformContentCase struct {
-	Func     func(doc *html.Node)
+	Func     interface{}
 	What     string
 	Fragment bool
 	Contains bool
@@ -503,12 +612,28 @@ func (tc transformContentCase) Run(t *testing.T) {
 		return
 	}
 
-	tc.Func(doc)
-
+	var w io.Writer
 	buf := bytes.NewBuffer(nil)
-	if err := html.Render(buf, doc); err != nil {
+	w = buf
+
+	switch fn := tc.Func.(type) {
+	case func(doc *html.Node):
+		fn(doc)
+	case func(w io.Writer) io.WriteCloser:
+		w = fn(w)
+	default:
+		panic(fmt.Sprintf("unknown type for func: %T", fn))
+	}
+
+	if err := html.Render(w, doc); err != nil {
 		t.Errorf("case %#v: render: %v", tc.What, err)
 		return
+	}
+
+	if wc, ok := w.(io.WriteCloser); ok {
+		if err := wc.Close(); err != nil {
+			t.Errorf("case %#v: render: %v", tc.What, err)
+		}
 	}
 
 	hstr := buf.String()
@@ -557,4 +682,90 @@ func (tc transformXMLTestCase) Run(t *testing.T) {
 		fmt.Println("---")
 		fmt.Println(b)
 	}
+}
+
+var testSentences = []string{
+	" ! Lorem ipsum dolor, sit amet. Consectetur adipiscing elit?\n Sed do eiusmod tempor incididunt!?! Ut labore et dolore \"magna aliqua.\". Ut enim ad “minim veniam”, quis nostrud exercitation 'ullamco laboris' nisi ut aliquip ex ea commodo consequat?… Duis aute irure dolor in reprehenderit in voluptate velit’s esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.      sdfsdfsdf",
+	"Lorem ipsum dolor, sit amet. Consectetur adipiscing elit? Sed do eiusmod tempor incididunt!?! Ut labore et dolore magna aliqua.",
+	strings.Repeat("Lorem ipsum dolor sit amet. Consectetur adipiscing elit ut labore et dolore magna aliqua. ", 40),
+	"                                ",
+	"...       !!!       ???       .'.'.'.'   ",
+	"test\u00a0.\u0080.\u00a0.",
+	"",
+	"🌝. 🌝      🌝.    🌝",
+	"!",
+	"? ",
+	"? ?",
+	"?  ",
+	"  ?  ",
+	" ?'  .",
+	" ?'  .   ",
+	" ?'  .   \xFF",
+	" ?'  .   \xFF .",
+	" ?'  .   \xe2\x82\x28\xFF",
+	" ?'  .   \xe2\x82\x28\xFF .",
+	" ?'  .   .\xe2\x82\x28\xFF",
+	" ?'  .   .\xe2\x82\x28\xFF .",
+	" ?'  .   .'\xe2\x82\x28\xFF",
+	" ?'  .   .'\xe2\x82\x28\xFF .",
+	" ?'  .   .'\xe2\x82\x28\xFF.",
+}
+
+func TestSplitSentences(t *testing.T) {
+	for _, v := range testSentences {
+		sss := splitSentences(v, nil)
+		ssr := splitSentencesRegexp(v)
+
+		if len(sss) == len(ssr) {
+			for i := range sss {
+				if sss[i] != ssr[i] {
+					t.Errorf("%q (new state-machine) != %q (old regexp)", sss, ssr)
+				}
+			}
+		} else {
+			t.Errorf("%q (new state-machine) != %q (old regexp)", sss, ssr)
+		}
+
+		if j := strings.Join(sss, ""); j != v {
+			t.Errorf("%q (joined sentence) != %q (original sentence)", j, v)
+		}
+	}
+}
+
+func BenchmarkSplitSentences(b *testing.B) {
+	b.SetParallelism(1) // for more accurate results
+	b.Run("Regexp", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for _, v := range testSentences {
+				splitSentencesRegexp(v)
+			}
+		}
+	})
+	b.Run("StateMachine", func(b *testing.B) {
+		sentences := make([]string, 0, 8)
+		for i := 0; i < b.N; i++ {
+			for _, v := range testSentences {
+				sentences = splitSentences(v, sentences[:0])
+			}
+		}
+	})
+}
+
+var sentenceRe = regexp.MustCompile(`((?ms).*?[\.\!\?]['"”’“…]?\s+)`)
+
+func splitSentencesRegexp(str string) (r []string) {
+	if matches := sentenceRe.FindAllStringIndex(str, -1); len(matches) == 0 {
+		r = []string{str} // nothing matched, use the whole string
+	} else {
+		var pos int
+		r = make([]string, len(matches))
+		for i, match := range matches {
+			r[i] = str[pos:match[1]] // end of last match to end of the current one
+			pos = match[1]
+		}
+		if len(str) > pos {
+			r = append(r, str[pos:]) // rest of the string, if any
+		}
+	}
+	return
 }

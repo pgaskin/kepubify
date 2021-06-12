@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/beevik/etree"
 	"github.com/kr/smartypants"
+	"golang.org/x/text/transform"
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/atom"
@@ -173,18 +174,9 @@ func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 	transformContentClean(doc)
 
 	if len(c.find) != 0 {
-		buf := bytes.NewBuffer(nil)
-		if err := html.RenderWithOptions(buf, doc,
-			html.RenderOptionAllowXMLDeclarations(true),
-			html.RenderOptionPolyglot(true)); err != nil {
-			return err
-		}
-		b := buf.Bytes()
-		for i := range c.find {
-			b = bytes.ReplaceAll(b, c.find[i], c.replace[i])
-		}
-		_, err := w.Write(b)
-		return err
+		wc := transformContentReplacements(w, c.find, c.replace)
+		w = wc
+		defer wc.Close()
 	}
 
 	err = html.RenderWithOptions(w, doc,
@@ -241,8 +233,6 @@ func transformContentKoboDivs(doc *html.Node) {
 	}
 }
 
-var sentencere = regexp.MustCompile(`((?ms).*?[\.\!\?]['"”’“…]?\s+)`)
-
 func transformContentKoboSpans(doc *html.Node) {
 	// behavior matches Kobo (checked with 3 books) as of 2020-01-12
 	if findClass(findAtom(doc, atom.Body), "koboSpan") != nil {
@@ -256,25 +246,13 @@ func transformContentKoboSpans(doc *html.Node) {
 	var cur *html.Node
 	stack = append(stack, findAtom(doc, atom.Body))
 
+	sentences := make([]string, 0, 8)
+
 	for len(stack) != 0 {
 		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
 		switch cur.Type {
 		case html.TextNode:
-			// split after each sentence (matches Kobo's behavior, and can't leave anything behind)
-			var sentences []string
-			if matches := sentencere.FindAllStringIndex(cur.Data, -1); len(matches) == 0 {
-				sentences = []string{cur.Data} // nothing matched, use the whole string
-			} else {
-				var pos int
-				sentences = make([]string, len(matches))
-				for i, match := range matches {
-					sentences[i] = cur.Data[pos:match[1]] // end of last match to end of the current one
-					pos = match[1]
-				}
-				if len(cur.Data) > pos {
-					sentences = append(sentences, cur.Data[pos:]) // rest of the string, if any
-				}
-			}
+			sentences = splitSentences(cur.Data, sentences[:0])
 
 			// wrap each sentence in a span (don't wrap whitespace unless it is
 			// directly under a P tag [TODO: are there any other cases we wrap
@@ -341,6 +319,158 @@ func transformContentKoboSpans(doc *html.Node) {
 			}
 		}
 	}
+}
+
+// splitSentences splits the string into sentences using the rules for creating
+// koboSpans. To make this zero-allocation, pass a zero-length slice for
+// splitSentences to take ownership of. To re-use the slice, pass the returned
+// slice, sliced to zero. If the slice is too small, it will be grown, causing
+// an allocation.
+//
+// This state-machine based implementation is around three times as fast as the
+// regexp-based one on average, and even faster when pre-allocating and re-using
+// the sentences slice. It should have the same output. For the original
+// implementation, see splitSentencesRegexp in the tests.
+func splitSentences(str string, sentences []string) []string {
+	const (
+		InputPunct   = iota // sentence-terminating punctuation
+		InputExtra          // additional punctuation (one is optionionally consumed after punct if present)
+		InputSpace          // whitespace
+		InputAny            // any valid rune not previously matched
+		InputInvalid        // an invalid byte
+		InputEOS            // end-of-string
+	)
+	const (
+		OutputNone = iota // moves to the next rune.
+		OutputNext        // adds everything from the last call up to (but not including) the current rune, and moves to the next rune.
+		OutputRest        // adds everything not yet added by OutputNext (state must be -1)
+	)
+	const (
+		StateDefault         = iota // in a sentence
+		StateAfterPunct             // after the sentence-terminating rune
+		StateAfterPunctExtra        // after the optional additional punctuation rune
+		StateAfterSpace             // the trailing whitespace after the sentence
+	)
+
+	if sentences == nil {
+		sentences = make([]string, 0, 4) // pre-allocate some room
+	}
+
+	for i, state := 0, 0; state != -1; {
+		x, z := utf8.DecodeRuneInString(str[i:])
+
+		var input int
+		switch x {
+		case utf8.RuneError:
+			switch z {
+			case 0:
+				input = InputEOS
+			default:
+				input = InputInvalid
+			}
+		case '.', '!', '?':
+			input = InputPunct
+		case '\'', '"', '”', '’', '“', '…':
+			input = InputExtra
+		case '\t', '\n', '\f', '\r', ' ': // \s only matches only ASCII whitespace
+			input = InputSpace
+		default:
+			input = InputAny
+		}
+
+		var output int
+		switch state {
+		case StateDefault:
+			switch input {
+			case InputPunct:
+				output, state = OutputNone, StateAfterPunct
+			case InputExtra:
+				output, state = OutputNone, StateDefault
+			case InputSpace:
+				output, state = OutputNone, StateDefault
+			case InputAny:
+				output, state = OutputNone, StateDefault
+			case InputInvalid:
+				output, state = OutputNone, StateDefault
+			case InputEOS:
+				output, state = OutputRest, -1
+			default:
+				panic("unhandled input")
+			}
+		case StateAfterPunct:
+			switch input {
+			case InputPunct:
+				output, state = OutputNone, StateAfterPunct
+			case InputExtra:
+				output, state = OutputNone, StateAfterPunctExtra
+			case InputSpace:
+				output, state = OutputNone, StateAfterSpace
+			case InputAny:
+				output, state = OutputNone, StateDefault
+			case InputInvalid:
+				output, state = OutputNone, StateDefault
+			case InputEOS:
+				output, state = OutputRest, -1
+			default:
+				panic("unhandled input")
+			}
+		case StateAfterPunctExtra:
+			switch input {
+			case InputPunct:
+				output, state = OutputNone, StateAfterPunct
+			case InputExtra:
+				output, state = OutputNone, StateDefault
+			case InputSpace:
+				output, state = OutputNone, StateAfterSpace
+			case InputAny:
+				output, state = OutputNone, StateDefault
+			case InputInvalid:
+				output, state = OutputNone, StateDefault
+			case InputEOS:
+				output, state = OutputRest, -1
+			default:
+				panic("unhandled input")
+			}
+		case StateAfterSpace:
+			switch input {
+			case InputPunct:
+				output, state = OutputNext, StateAfterPunct
+			case InputExtra:
+				output, state = OutputNext, StateDefault
+			case InputSpace:
+				output, state = OutputNone, StateAfterSpace
+			case InputAny:
+				output, state = OutputNext, StateDefault
+			case InputInvalid:
+				output, state = OutputNext, StateDefault
+			case InputEOS:
+				output, state = OutputRest, -1
+			default:
+				panic("unhandled input")
+			}
+		default:
+			panic("unhandled state")
+		}
+
+		switch output {
+		case OutputNone:
+			i += z
+		case OutputNext:
+			sentences = append(sentences, str[:i])
+			str, i = str[i:], z
+		case OutputRest:
+			if len(str) != 0 || len(sentences) == 0 {
+				sentences = append(sentences, str)
+			}
+			if state != -1 {
+				panic("invalid state")
+			}
+		default:
+			panic("unhandled output")
+		}
+	}
+
+	return sentences
 }
 
 func koboSpan(para, seg int) *html.Node {
@@ -433,6 +563,23 @@ func transformContentClean(doc *html.Node) {
 			}
 		}
 	}
+}
+
+func transformContentReplacements(w io.Writer, find, replace [][]byte) io.WriteCloser {
+	var t []transform.Transformer
+	if len(find) != len(replace) {
+		panic("find and replace must be the same length")
+	}
+	for i := range find {
+		if len(find[i]) == 0 {
+			continue
+		}
+		t = append(t, &byteReplacer{
+			Find:    find[i],
+			Replace: replace[i],
+		})
+	}
+	return transform.NewWriter(w, transform.Chain(t...))
 }
 
 // withText adds text to a node and returns it.
@@ -533,4 +680,82 @@ func includes(s, token string) bool {
 		s = s[i+1:]
 	}
 	return false
+}
+
+// byteReplacer is a Transformer which finds and replaces sequences of bytes.
+type byteReplacer struct {
+	transform.NopResetter
+	Find, Replace []byte
+}
+
+func (b *byteReplacer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	if len(b.Find) == 0 {
+		panic("find length must not be zero")
+	}
+
+	for {
+		// find the next match
+		i := bytes.Index(src[nSrc:], b.Find)
+		if i == -1 {
+			break
+		}
+
+		// copy the non-matching prefix
+		if n := copy(dst[nDst:], src[nSrc:nSrc+i]); n == len(src[nSrc:nSrc+i]) {
+			nSrc += n
+			nDst += n
+		} else {
+			// skip what we've already processed
+			nSrc += n
+			nDst += n
+			// have it call us again with a larger destination buffer
+			err = transform.ErrShortDst
+			return
+		}
+
+		// copy the new value
+		if n := copy(dst[nDst:], b.Replace); n == len(b.Replace) {
+			nSrc += len(b.Find)
+			nDst += n
+		} else {
+			// have it call us again with a larger destination buffer
+			err = transform.ErrShortDst
+			return
+		}
+	}
+
+	if !atEOF {
+		// skip everything, minus the last len(b.Replace)-1 in case there is another
+		// partial match at the end
+		if skip := len(src[nSrc:]) - (len(b.Find) - 1); skip > 0 {
+			if n := copy(dst[nDst:], src[nSrc:nSrc+skip]); n == len(src[nSrc:nSrc+skip]) {
+				nSrc += n
+				nDst += n
+			} else {
+				// skip what we've already processed
+				nSrc += n
+				nDst += n
+				// have it call us again with a larger destination buffer
+				err = transform.ErrShortDst
+				return
+			}
+		}
+
+		// have it call us again with more source bytes to find another match in
+		err = transform.ErrShortSrc
+		return
+	}
+
+	// at EOF, and no more replacements, so copy the remaining bytes
+	if n := copy(dst[nDst:], src[nSrc:]); n == len(src[nSrc:]) {
+		nDst += n
+		nSrc += n
+	} else {
+		// skip what we've already copied
+		nDst += n
+		nSrc += n
+		// have it call us again with a larger destination buffer
+		err = transform.ErrShortDst
+	}
+	return
 }

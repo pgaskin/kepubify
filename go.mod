@@ -16,6 +16,7 @@ require (
 	github.com/pgaskin/kepubify/_/go116-zip.go117 v0.0.0-20210611152744-2d89b3182523
 	github.com/pgaskin/kepubify/_/html v0.0.0-20210611145339-337924fbbaf0
 	golang.org/x/sync v0.0.0-20201008141435-b3e1573b7520
+	golang.org/x/text v0.3.6
 )
 
 require github.com/hexops/gotextdiff v1.0.3

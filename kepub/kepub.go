@@ -10,8 +10,7 @@ type Converter struct {
 	// smart punctuation
 	smartypants bool
 
-	// find/replace in raw html output (note: inefficient, but more efficient
-	// than working with strings)
+	// find/replace in raw html output
 	find    [][]byte
 	replace [][]byte
 }
@@ -40,9 +39,7 @@ func ConverterOptionSmartypants() ConverterOption {
 	}
 }
 
-// ConverterOptionFindReplace replaces a raw string in the transformed HTML
-// (note that this impacts performance since it requires an additional temporary
-// buffer to be created for each document).
+// ConverterOptionFindReplace replaces a raw string in the transformed HTML.
 func ConverterOptionFindReplace(find, replace string) ConverterOption {
 	return func(c *Converter) {
 		c.find = append(c.find, []byte(find))
