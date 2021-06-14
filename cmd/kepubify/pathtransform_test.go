@@ -732,12 +732,12 @@ func (tc transformPathsCase) Run(t *testing.T) {
 
 	var ins []string
 	for in := range pathMap {
-		ins = append(ins, filepath.ToSlash(in))
+		ins = append(ins, in)
 	}
 	for _, other := range tc.Inputs {
 		other = filepath.Clean(other)
 		if _, ok := pathMap[other]; !ok {
-			ins = append(ins, filepath.ToSlash(other))
+			ins = append(ins, other)
 		}
 	}
 	sort.Strings(ins)
