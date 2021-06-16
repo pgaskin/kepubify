@@ -2,8 +2,10 @@ package kepub
 
 import (
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"io"
+	"io/fs"
 	"path"
 	"strconv"
 	"strings"
@@ -580,6 +582,185 @@ func transformContentReplacements(w io.Writer, find, replace [][]byte) io.WriteC
 		})
 	}
 	return transform.NewWriter(w, transform.Chain(t...))
+}
+
+// TransformDummyTitlepage adds a dummy titlepage if forced or the heuristic
+// determines that is is necessary. If there was an error determining if the
+// titlepage is required, false and an error is returned. If it is not required,
+// false is returned. If it is required, but there was an error when adding it,
+// true and an error is returned.  If it was added successfully, the filename
+// and contents of the content document to add to the epub and true is returned.
+//
+// The heuristic determines whether the first content file in the spine is a
+// title page without other content, and if it isn't (or if force is true), it
+// adds a blank content document and modifies the OPF to add it to the manifest
+// and start of the spine. This is required because Kobo will treat the first
+// spine entry specially (e.g. no margins) for full-screen book covers. See #33.
+//
+// Note that the heuristic is subject to change between kepubify versions.
+func (c *Converter) TransformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer) (string, io.Reader, bool, error) {
+	if c.dummyTitlepageForce {
+		if !c.dummyTitlepageForceValue {
+			return "", nil, false, nil
+		}
+	} else {
+		if req, err := transformDummyTitlepageRequired(epub, opfF, bytes.NewReader(opf.Bytes())); err != nil {
+			return "", nil, false, fmt.Errorf("check if dummy titlepage is required: %w", err)
+		} else if !req {
+			return "", nil, false, nil
+		}
+	}
+	fn, r, err := transformDummyTitlepageAdd(opf, opfF)
+	if err != nil {
+		return "", nil, true, fmt.Errorf("apply title page fix: %w", err)
+	}
+	return fn, r, true, nil
+}
+
+func transformDummyTitlepageRequired(epub fs.FS, opfF string, opfR io.Reader) (bool, error) {
+	var opf struct {
+		XMLName      xml.Name `xml:"http://www.idpf.org/2007/opf package"`
+		ManifestItem []struct {
+			Id        string `xml:"id,attr"`
+			Href      string `xml:"href,attr"`
+			MediaType string `xml:"media-type,attr"`
+		} `xml:"http://www.idpf.org/2007/opf manifest>item"`
+		SpineItemref []struct {
+			Idref  string `xml:"idref,attr"`
+			Linear string `xml:"linear,attr"`
+		} `xml:"http://www.idpf.org/2007/opf spine>itemref"`
+	}
+
+	if err := xml.NewDecoder(opfR).Decode(&opf); err != nil {
+		return false, fmt.Errorf("parse OPF package: %w", err)
+	}
+
+	var idref string
+	for _, it := range opf.SpineItemref {
+		if it.Linear != "no" {
+			idref = it.Idref
+			break
+		}
+	}
+	if idref == "" {
+		return false, nil // there should always be at least one linear spine item, and it should always reference something, but we'll be lenient
+	}
+
+	var href string
+	for _, it := range opf.ManifestItem {
+		if it.Id == idref {
+			switch it.MediaType {
+			case "application/xhtml+xml", "text/html":
+				href = it.Href
+				break
+			}
+			switch strings.ToLower(path.Ext(it.Href)) {
+			case ".htm", ".html", ".xhtml":
+				href = it.Href
+				break
+			default:
+				return false, nil // the first spine item is not a content document, so let it be
+			}
+		}
+	}
+	if href == "" {
+		return false, nil // the thing it references should always exist, but we'll be lenient
+	}
+
+	if n := strings.ToLower(path.Base(href)); strings.Contains(n, "cover") || strings.Contains(n, "title") {
+		return false, nil // this is intended to be the cover/title page (or else why would it have cover/title in the name?)
+	}
+
+	href = path.Join(path.Dir(opfF), href)
+
+	rc, err := epub.Open(href)
+	if err != nil {
+		return false, nil // the file it references should exist, but we'll be lenient
+	}
+	defer rc.Close()
+
+	doc, err := html.ParseWithOptions(rc,
+		html.ParseOptionEnableScripting(true),
+		html.ParseOptionIgnoreBOM(true),
+		html.ParseOptionLenientSelfClosing(true))
+	if err != nil {
+		return false, nil // we'll ignore it here
+	}
+
+	var wc, pc, ic int
+	var cur *html.Node
+	var stack []*html.Node
+	stack = append(stack, findAtom(doc, atom.Body))
+	for len(stack) != 0 {
+		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
+		switch cur.Type {
+		case html.ElementNode:
+			switch cur.DataAtom {
+			case atom.P:
+				pc++
+				if pc > 4 {
+					return true, nil
+				}
+			case atom.Img, atom.Svg:
+				ic++
+				fallthrough
+			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video, atom.Math:
+				continue
+			default:
+				for c := cur.LastChild; c != nil; c = c.PrevSibling {
+					stack = append(stack, c)
+				}
+			}
+		case html.TextNode:
+			for _, w := range strings.Fields(cur.Data) {
+				if len(w) > 3 {
+					wc++
+				}
+			}
+			if wc > 20 {
+				return true, nil
+			}
+		}
+	}
+
+	if (ic == 0 && wc < 5) || ic > 4 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func transformDummyTitlepageAdd(opf *bytes.Buffer, opfF string) (string, io.Reader, error) {
+	id, mime := "kepubify-titlepage-dummy", "application/xhtml+xml"
+	href := id + ".xhtml"
+	fn := path.Join(path.Dir(opfF), href)
+
+	doc := etree.NewDocument()
+	if _, err := doc.ReadFrom(bytes.NewReader(opf.Bytes())); err != nil {
+		return "", nil, fmt.Errorf("parse opf: %w", err)
+	}
+
+	if m := doc.FindElement("/package/manifest"); m != nil {
+		it := m.CreateElement("item")
+		it.Space = m.Space // shouldn't usually be needed, but just in case they used a namespace prefix
+		it.CreateAttr("id", id)
+		it.CreateAttr("href", href)
+		it.CreateAttr("media-type", mime)
+	}
+	if m := doc.FindElement("/package/spine"); m != nil {
+		it := m.CreateElement("itemref")
+		it.Space = m.Space // shouldn't usually be needed, but just in case they used a namespace prefix
+		it.CreateAttr("idref", id)
+		m.InsertChildAt(1, it)
+	}
+	doc.Indent(4) // same as TransformOPF
+
+	opf.Reset()
+	if _, err := doc.WriteTo(opf); err != nil {
+		return "", nil, fmt.Errorf("render opf: %w", err)
+	}
+
+	return fn, strings.NewReader(`<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title></title></head><body><p style="text-align: center; margin: 4em 0; font-size: .7em; font-style: italic;">Page intentionally left blank by kepubify.</p></body></html>`), nil
 }
 
 // withText adds text to a node and returns it.

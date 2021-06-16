@@ -136,7 +136,8 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 
 	// start transforming and writing the content files in parallel
 	type File struct {
-		Index int
+		Index  int             // -1 for a new file
+		Header *zip.FileHeader // if Index is -1
 		// We could have passed around a *html.Node or a *etree.Document, and
 		// encoded it directly to the zip writer, but this gives better
 		// performance for a few reasons. Firstly, writing to the zip file can
@@ -208,6 +209,27 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 				switch a := fileAct[i]; a {
 				case FileActionTransformOPF:
 					err = c.TransformOPF(buf, rc)
+					if err == nil {
+						if fn, r, a, err1 := c.TransformDummyTitlepage(r, opf, buf); err1 != nil {
+							err = err1
+						} else if a {
+							buf1 := pool.Get().(*bytes.Buffer)
+							if _, err := buf1.ReadFrom(r); err != nil {
+								err = fmt.Errorf("apply title page fix: %w", err)
+							} else {
+								fh := &zip.FileHeader{
+									Name:   fn,
+									Method: zip.Deflate,
+								}
+								fh.SetMode(0666)
+								output <- File{
+									Index:  -1,
+									Header: fh,
+									Bytes:  buf1,
+								}
+							}
+						}
+					}
 				case FileActionTransformContent:
 					err = c.TransformContent(buf, rc)
 				default:
@@ -247,6 +269,14 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 
 	// write the files
 	for of := range output {
+		if of.Index == -1 {
+			if err := zipReplace(zw, of.Header, of.Bytes); err != nil {
+				return fmt.Errorf("write new file %q to output EPUB: %w", of.Header.Name, err)
+			}
+			of.Bytes.Reset()
+			pool.Put(of.Bytes)
+			continue
+		}
 		f := files[of.Index]
 		switch b := of.Bytes; b {
 		case nil:

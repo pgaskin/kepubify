@@ -13,6 +13,10 @@ type Converter struct {
 	// find/replace in raw html output
 	find    [][]byte
 	replace [][]byte
+
+	// titlepage fix
+	dummyTitlepageForce      bool
+	dummyTitlepageForceValue bool
 }
 
 // ConverterOption configures a Converter.
@@ -44,6 +48,17 @@ func ConverterOptionFindReplace(find, replace string) ConverterOption {
 	return func(c *Converter) {
 		c.find = append(c.find, []byte(find))
 		c.replace = append(c.replace, []byte(replace))
+	}
+}
+
+// ConverterOptionDummyTitlepage force-enables or force-disables the fix which
+// adds a dummy titlepage to the start of the book to fix layout issues on
+// certain books. If not set, a heuristic is used to determine whether it should
+// be added.
+func ConverterOptionDummyTitlepage(add bool) ConverterOption {
+	return func(c *Converter) {
+		c.dummyTitlepageForce = true
+		c.dummyTitlepageForceValue = add
 	}
 }
 
