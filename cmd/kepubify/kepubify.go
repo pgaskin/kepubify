@@ -48,9 +48,11 @@ func main() {
 	hyphenate := pflag.Bool("hyphenate", false, "Force enable hyphenation")
 	nohyphenate := pflag.Bool("no-hyphenate", false, "Force disable hyphenation")
 	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
+	adddummytitlepage := pflag.Bool("add-dummy-titlepage", false, "Force-enables the dummy titlepage to fix layout issues with the first content file on certain books (this is enabled when needed using a heuristic if not specified)")
+	noadddummytitlepage := pflag.Bool("no-add-dummy-titlepage", false, "Force-disables the dummy titlepage")
 	replace := pflag.StringArrayP("replace", "r", nil, "Find and replace on all html files (repeat any number of times) (format: find|replace)")
 
-	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "replace"} {
+	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "replace"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
 	}
 
@@ -99,6 +101,11 @@ func main() {
 	}
 	if *fullscreenfixes {
 		opts = append(opts, kepub.ConverterOptionFullScreenFixes())
+	}
+	if *adddummytitlepage {
+		opts = append(opts, kepub.ConverterOptionDummyTitlepage(true))
+	} else if *noadddummytitlepage {
+		opts = append(opts, kepub.ConverterOptionDummyTitlepage(false))
 	}
 	for _, r := range *replace {
 		spl := strings.SplitN(r, "|", 2)
