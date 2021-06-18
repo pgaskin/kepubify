@@ -32,8 +32,14 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 		FileActionTransformOPF     = 3
 	)
 
+	p := ctxProgress(ctx)
+
 	if tmp, ok := r.(*zip.ReadCloser); ok {
 		r = &tmp.Reader
+	}
+
+	if p != nil {
+		p(true, 0, 0)
 	}
 
 	var files []*zip.FileHeader
@@ -268,6 +274,7 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 	}
 
 	// write the files
+	var n int
 	for of := range output {
 		if of.Index == -1 {
 			if err := zipReplace(zw, of.Header, of.Bytes); err != nil {
@@ -296,6 +303,10 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 			b.Reset()
 			pool.Put(b)
 		}
+		if p != nil {
+			n++
+			p(false, n, len(files))
+		}
 	}
 	if err := g.Wait(); err != nil {
 		return err
@@ -306,6 +317,9 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 		return fmt.Errorf("finalize output EPUB: %w", err)
 	}
 
+	if p != nil {
+		p(true, n, n)
+	}
 	return nil
 }
 
