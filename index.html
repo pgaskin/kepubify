@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Kepubify</title>
+    <link rel="canonical" href="https://pgaskin.net/kepubify/">
+    <link rel="stylesheet" href="style.css">
+    <meta name="author" content="Patrick Gaskin">
+</head>
+
+<body>
+    <div class="nav">
+        <div class="brand">
+            <div class="name">kepubify</div>
+            <div class="description">Converts EPUBs to KEPUBs</div>
+        </div>
+        <div class="buttons">
+            <a href="https://github.com/pgaskin/kepubify/releases" class="button">Changelog</a>
+            <a href="https://github.com/pgaskin/kepubify" class="button">Source Code</a>
+            <a target="_blank" href="https://github.com/pgaskin/kepubify/releases/latest" id="download" class="button primary">Download</a>
+        </div>
+        <div class="clearfix"></div>
+    </div>
+    <div class="about">
+        <div class="text">
+            <p>
+                Kepubify converts EPUBs to KEPUBs. Kepubify is fast, lightweight, easy-to-use, and cross platform.
+            </p>
+            <b>Features</b>
+            <ul>
+                <li>Full support of all kepub features</li>
+                <li>Extremely fast (about 15x faster and uses 3x less memory than Calibre)</li>
+                <li>Batch conversion with full control over the directory structure</li>
+                <li>Works from the command line and can be embedded in other applications</li>
+                <li>Comprehensive test suite</li>
+                <li>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
+                <li>Optionally update Kobo series metadata (even before the book is imported)</li>
+                <li><b><a href="https://github.com/pgaskin/kepubify/releases/latest">Covergen</a>: </b>Optionally pre-generate covers (can also stretch it to a specific aspect ratio)</li>
+                <li><b><a href="https://github.com/pgaskin/kepubify/releases/latest">Seriesmeta</a>: </b>Optionally update Kobo series metadata (even before the book is imported)</li>
+            </ul>
+            <a style="display:none;font-size:12px;" target="_blank" id="other-platforms" href="https://github.com/pgaskin/kepubify/releases/latest">Download for other platforms</a>
+        </div>
+        <div class="screenshot">
+            <img id="screenshot" src="kepubify-windows.gif">
+        </div>
+    </div>
+    <br>
+    <div class="section" id="docs">
+        <div class="name">Installation</div>
+        <div class="text">
+            <b>Windows:</b>
+            <br>
+            <ol>
+                <li>Download kepubify</li>
+            </ol>
+            <b>Linux:</b>
+            <br>
+            <ol>
+                <li>Download kepubify</li>
+                <li>Open a terminal</li>
+                <li>Type
+                    <tt>cd ~/Downloads</tt> (or whatever location you downloaded kepubify to) and press enter</li>
+                <li>Type
+                    <tt>chmod +x kepubify-linux-*</tt> and press enter</li>
+            </ol>
+            <b>macOS:</b>
+            <br>
+            <ol>
+                <li>Download kepubify</li>
+                <li>Open a terminal</li>
+                <li>Type
+                    <tt>cd ~/Downloads</tt> and press enter</li>
+                <li>Type
+                    <tt>chmod +x kepubify-darwin-*</tt> (or whatever location you downloaded kepubify to) and press enter</li>
+            </ol>
+            <b>macOS (Homebrew):</b>
+            <br>
+            <ol>
+                <li>Open a terminal</li>
+                <li>Type
+                    <tt>brew install kepubify</tt> and press enter</li>
+            </ol>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">Usage</div>
+        <div class="text">
+            <pre>Usage: kepubify [options] input_path [input_path]...
+
+General Options:
+  -v, --verbose   Show extra information in output
+      --version   Show the version
+  -h, --help      Show this help text
+
+Output Options:
+  -u, --update             Don't reconvert files which have already been converted (i.e. don't overwrite output files)
+  -i, --inplace            Don't add the _converted suffix to converted files and directories
+      --no-preserve-dirs   Flatten the directory structure of the input (an error will be shown if there are conflicts)
+  -o, --output string      [>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with
+                           nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)
+      --calibre            Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
+  -x, --copy strings       Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the
+                           same)
+
+Conversion Options:
+      --smarten-punctuation        Smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
+  -c, --css stringArray            Custom CSS to add to ebook
+      --hyphenate                  Force enable hyphenation
+      --no-hyphenate               Force disable hyphenation
+      --fullscreen-reading-fixes   Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
+  -r, --replace stringArray        Find and replace on all html files (repeat any number of times) (format: find|replace)
+
+Links:
+  Website      - https://pgaskin.net/kepubify
+  Source Code  - https://github.com/pgaskin/kepubify
+  Bugs/Support - https://github.com/pgaskin/kepubify/issues
+  MobileRead   - http://mr.gd/forums/showthread.php?t=295287</pre>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">Examples</div>
+        <div class="text">
+            <p>
+                For the following examples, replace
+                <tt>kepubify</tt> with the path to the downloaded kepubify.
+            </p>
+
+            <p>
+                <b>To convert a single book by dragging and dropping on Windows</b>:
+                <br>Just drag the original epub file over
+                <tt>kepubify.exe</tt>. The resulting file will be saved to the same directory as the original epub.
+            </p>
+
+            <p>
+                <b>To convert a folder of books by dragging and dropping on Windows</b>:
+                <br>Just drag the folder over
+                <tt>kepubify.exe</tt>. The resulting file will be saved to the same directory as the originals, but with the suffix <tt>_converted</tt>.
+            </p>
+
+            <p>
+                <b>To convert a single book</b>:
+                <br>
+                <tt>kepubify /path/to/the/book.epub</tt>
+                <br>The resulting file will be saved to the current directory.
+            </p>
+
+            <p>
+                <b>To convert a single book with a different output folder</b>:
+                <br>
+                <tt>kepubify --output "/path/to/save/the/book/" /path/to/the/book.epub</tt>
+                <br>The resulting file will be saved to specified folder (in this example <tt>/path/to/save/the/book/</tt>).
+            </p>
+
+            <p>
+                <b>To convert all books in the current folder into a folder called converted</b>:
+                <br>
+                <tt>kepubify -o "converted" *.epub</tt>
+            </p>
+
+            <p>
+                <b>To batch convert a directory of ebooks</b>:
+                <br>
+                <tt>kepubify /path/to/the/books/</tt>
+                <br>The converted books will be saved to the original dir with the suffix <tt>_converted</tt> (e.g. /path/to/the/books_converted).The directory structure of the source
+                is preserved in the output.
+            </p>
+
+            <p>
+                <b>To batch convert a directory of ebooks with a different output folder</b>:
+                <br>
+                <tt>kepubify -o "/path/to/output/the/converted/books" /path/to/the/books/</tt>
+                <br>The directory structure of the source is preserved in the output.
+            </p>
+
+            <p>
+                <b>To convert a directory of ebooks, but skipping ones which have already been converted</b>:
+                <br>
+                <tt>kepubify --update /path/to/the/books/</tt>
+            </p>
+
+            <p>
+                <b>To convert a calibre library in-place</b>:
+                <br>
+                <tt>kepubify --update --inplace --calibre /path/to/calibre/library/</tt>
+            </p>
+
+            <p>
+                <b>To convert a folder of books directly on to a Kobo eReader, while simply copying PDF files</b>:
+                <br>
+                <tt>kepubify --output /path/to/kobo/kepubify --update --copy .pdf /path/to/books/</tt>
+            </p>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">Series metadata</div>
+        <div class="text">
+            <p>
+                You can update the series metadata on the Kobo using seriesmeta. Seriesmeta is available
+                <a href="https://github.com/pgaskin/kepubify/releases/latest">here</a>. It will automatically detect your Kobo when you run it.
+                Seriesmeta doesn't conflict with Calibre, and works on both EPUB and KEPUB books.
+            </p>
+            <p>
+                Seriesmeta supports Calibre-style (meta[name=calibre:series], meta[name=calibre:series-index]) and EPUB3-style
+                (meta[property=belongs-to-collection], meta[refines][property=collection-type], meta[refines][property=group-position])
+                series metadata.
+            </p>
+            <p>
+                <b>New:</b> Seriesmeta doesn't require the books to be already imported anymore! You can now run seriesmeta right after you transfer
+                you books, and the metadata will be updated on the next reboot.
+            </p>
+            <pre>Usage: seriesmeta [options] [kobo_path]
+
+Options:
+  -h, --help         Show this help message
+  -p, --no-persist   Don't ensure metadata is always set (this will cause series metadata to be lost if opening a book after an import but before a reboot)
+  -n, --no-replace   Don't replace existing series metadata (you probably don't want this option)
+  -u, --uninstall    Uninstall seriesmeta table and hooks (imported series metadata will be left untouched)
+
+Arguments:
+  kobo_path is the path to the Kobo eReader. If not specified, seriesmeta will
+  try to automatically detect the Kobo.</pre>
+            <p>
+                See <a href="https://github.com/pgaskin/kepubify/blob/master/README.md#seriesmeta">here</a> for more details.
+            </p>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">Cover images</div>
+        <div class="text">
+            <p>
+                You can pre-generate/re-generate cover images using covergen. Covergen is available
+                <a href="https://github.com/pgaskin/kepubify/releases/latest">here</a>. It will automatically detect your Kobo when you run it.
+                You cam use covergen without using kepubify (i.e. it works with EPUB books and won't conflict with Calibre).
+            </p>
+            <p>
+                This tool is useful to save time or for when Kobo automatically generates the cover incorrectly (for example taking an image of
+                the first page, or using a generic cover). It can also optionally stretch the covers to a specific aspect ratio for consistency.
+            </p>
+            <pre>Usage: covergen [options] [kobo_path]
+
+Options:
+  -a, --aspect-ratio float   Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)
+  -g, --grayscale            Convert images to grayscale
+  -h, --help                 Show this help message
+  -i, --invert               Invert images
+  -m, --method string        Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3) (default "lanczos3")
+  -r, --regenerate           Re-generate all covers
+
+Arguments:
+  kobo_path is the path to the Kobo eReader. If not specified, covergen will try
+  to automatically detect the Kobo.</pre>
+            <p>
+                See <a href="https://github.com/pgaskin/kepubify/blob/master/README.md#covergen">here</a> for more details.
+            </p>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">What is different about KEPUBs?</div>
+        <div class="text">
+            <p>
+                KEPUB is Kobo's ebook format based on EPUB. This format enables additional features such as chapter progress
+                stats, time left, faster page turns, page flipping (hold finger in bottom corner of screen), footnote previews, image zooming, and faster text selection. Also, ePub
+                3 is only supported using the kepub reader.
+            </p>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">Why would I use this over the Calibre kepub output plugin?</div>
+        <div class="text">
+            <ul>
+                <li>Kepubify is usually at least 15x faster and uses 3x less memory than the Calibre plugin</li>
+                <li>Kepubify produces output nearly identical to official KEPUB files (as of 2020-01-14, Kepubify has a few things which the Calibre plugin doesn't)</li>
+                <li>Kepubify works from the command line</li>
+                <li>Kepubify gives you complete control over the resulting file structure</li>
+                <li>Kepubify can be embedded in other applications</li>
+                <li>Calibre is an large application, which is unnecessary if all you want to do is convert books</li>
+                <li>Kepubify is written in Go, which is a compiled language</li>
+                <li>Kepubify can update the series metadata on your Kobo without managing your whole library</li>
+            </ul>
+            <p>If you are already using Calibre heavily to manage your books, kepubify is not for you (unless you want to use it to pre-convert your books). You may still like covergen or seriesmeta, though.</p>
+        </div>
+    </div>
+    <div class="section">
+        <div class="name">Reporting Issues</div>
+        <div class="text">
+            <p>
+                If you find any issues or have any questions, please
+                <a href="https://github.com/pgaskin/kepubify/issues">report them here</a>, or send me an email at
+                <tt>patrick (at) pgaskin (dot) net</tt>. Include the kepubify version, the operating system you are using, and if
+                possible, the book which you are having problems with. You can find the version by typing:
+                <tt>kepubify --version</tt>.
+            </p>
+        </div>
+    </div>
+    <div class="footer">Copyright 2017-2020 Patrick Gaskin</div>
+
+    <script async src="https://pg.gc.geek1011.net/count.js" data-goatcounter="https://pg.gc.geek1011.net/count"></script>
+
+    <script>
+        var getParameterByName = function (name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[\[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return "";
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+
+        var os = (function () {
+            var userAgent = window.navigator.userAgent,
+                platform = window.navigator.platform;
+
+            if (["macOS", "iOS", "Windows", "Android", "Linux"].indexOf(getParameterByName("os")) > -1) return getParameterByName(
+                "os");
+            if (["Macintosh", "MacIntel", "MacPPC", "Mac68K"].indexOf(platform) > -1) return "macOS";
+            if (["iPhone", "iPad", "iPod"].indexOf(platform) > -1) return "iOS";
+            if (["Win32", "Win64", "Windows", "WinCE"].indexOf(platform) > -1) return "Windows";
+            if (/Android/.test(userAgent)) return "Android";
+            if (/Linux/.test(platform)) return "Linux";
+        })();
+
+        var getRelease = function (onSuccess, onError) {
+            var req;
+            var url = "https://api.github.com/repos/pgaskin/kepubify/releases/latest";
+            //return;
+            if (XMLHttpRequest) {
+                req = new XMLHttpRequest();
+
+                if ('withCredentials' in req) {
+                    req.open("GET", url, true);
+                    req.onerror = onError;
+                    req.onreadystatechange = function () {
+                        if (req.readyState === 4) {
+                            if (req.status >= 200 && req.status < 400) {
+                                try {
+                                    onSuccess(JSON.parse(req.responseText));
+                                } catch (ex) {
+                                    onError(ex);
+                                }
+                            } else {
+                                onError(new Error('Response returned with non-OK status'));
+                            }
+                        }
+                    };
+                    req.send();
+                }
+            } else if (XDomainRequest) {
+                req = new XDomainRequest();
+                req.open("GET", url);
+                req.onerror = onError;
+                req.onload = function () {
+                    try {
+                        onSuccess(JSON.parse(req.responseText));
+                    } catch (ex) {
+                        onError(ex);
+                    }
+                };
+                req.send();
+            } else {
+                onError(new Error('CORS not supported'));
+            }
+        }
+
+        if (os == "Linux" || os == "macOS") document.getElementById("screenshot").src = "kepubify_macos.gif";
+
+        getRelease(function (release) {
+            console.log(release);
+
+            var button = document.getElementById("download");
+            var otherPlatforms = document.getElementById("other-platforms");
+
+            var urls = {};
+            for (var i = 0; i < release.assets.length; i++) {
+                urls[release.assets[i].name] = release.assets[i].browser_download_url;
+            }
+
+            if (os == "Windows" && urls["kepubify-windows-64bit.exe"]) {
+                otherPlatforms.style.display = "block";
+                button.href = urls["kepubify-windows-64bit.exe"];
+                button.target = "_blank";
+                button.innerHTML = "Download for Windows";
+            } else if (os == "Linux" && urls["kepubify-linux-64bit"]) {
+                otherPlatforms.style.display = "block";
+                button.href = urls["kepubify-linux-64bit"];
+                button.target = "_blank";
+                button.innerHTML = "Download for Linux";
+            } else if (os == "macOS" && urls["kepubify-darwin-64bit"]) {
+                otherPlatforms.style.display = "block";
+                button.href = urls["kepubify-darwin-64bit"];
+                button.target = "_blank";
+                button.innerHTML = "Download for macOS";
+            }
+
+            button.addEventListener("click", function () {
+                document.getElementById("docs").scrollIntoView(true);
+            })
+        }, function (err) {
+            console.error(err);
+        })
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,25 @@
+name: website
+
+on:
+  push:
+    branches:
+      - gh-pages
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build
+        run: |
+          touch .nojekyll
+      - name: Deploy
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan gh-pages-dist
+          git reset
+          git add .nojekyll *.html *.gif *.css
+          git commit -m "Build ${{github.sha}}"
+          git push -u origin gh-pages-dist --force
