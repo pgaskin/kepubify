@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var version = "v3-dev"
+var version = "v4-dev"
 
 func main() {
 	pflag.CommandLine.SortFlags = false
