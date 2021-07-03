@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "dbaeumer.vscode-eslint",
+        "golang.go",
+        "stkb.rewrap",
+        "yo1dog.cursor-align"
+    ]
+}

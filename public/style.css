@@ -1,0 +1,579 @@
+* {
+    box-sizing: border-box;
+}
+html {
+    background: #eee8d5;
+    font-family: 'Source Serif Pro', 'PT Serif', 'Libre Baskerville', Georgia, serif;
+    font-size: 16px;
+}
+body {
+    font-size: 1rem;
+    padding: 1.25rem;
+    margin: 0 auto;
+    max-width: 920px;
+    line-height: 1.25;
+}
+a:link,
+a:visited {
+    color: #005b9c;
+}
+a:not(:hover) {
+    text-decoration: none;
+}
+pre, code {
+    font-family: 'Source Code Pro', monospace;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    line-height: 1.15;
+}
+code {
+    display: inline-block;
+    vertical-align: baseline;
+    padding: 0 .125em;
+    font-size: 0.875em;
+}
+pre {
+    display: block;
+    padding: .5rem;
+    overflow-x: auto;
+    font-size: 0.7em;
+}
+a.btn {
+    display: inline-block;
+    vertical-align: middle;
+    padding: .75em;
+    margin-right: .5em;
+    font-size: .875em;
+    background: rgba(0, 91, 156, 0.219);
+    color: inherit;
+    line-height: 1;
+    white-space: nowrap;
+}
+a.btn.btn--primary {
+    background: rgba(26, 156, 0, 0.219);
+}
+a.btn:hover {
+    filter: brightness(75%);
+}
+nav.main {
+    font-size: 1.2rem;
+    white-space: nowrap;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    margin: 0 -.625rem;
+}
+nav.main > h1 {
+    margin: .25rem .625rem;
+    padding: 0;
+    font-size: 1.2em;
+    flex: 1;
+}
+nav.main > h1 > a {
+    color: inherit;
+}
+nav.main > a {
+    display: block;
+    margin: .25rem .625rem;
+    padding-bottom: 2px;
+    border-bottom: 2px solid transparent;
+    text-decoration: none;
+}
+nav.main > a:hover,
+nav.main > a:focus:focus-visible {
+    border-color: rgba(0, 0, 0, 0.4);
+}
+nav.main > a.active {
+    border-color: currentColor;
+}
+nav.main > a:focus:focus-visible {
+    outline: 0;
+}
+@media screen and (max-width: 40rem) {
+    nav.main {
+        text-align: center;
+    }
+    nav.main > h1 {
+        flex: 0 0 100%;
+    }
+}
+header.main {
+    background: rgba(134, 25, 19, 8%);
+    padding: 1.25rem;
+    margin: 1rem -1.25rem;
+}
+header.main > h2 {
+    margin: 0;
+    padding: 0;
+    font-weight: 700;
+    color: #861913;
+}
+header.main > p {
+    margin: 1rem 0 .25rem 0;
+    padding: 0;
+    line-height: 1.35;
+}
+section {
+    margin: 1.5rem 0;
+}
+section > h2 {
+    margin: 1rem 0 .5rem 0;
+    padding: 0;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 1.6rem;
+    color: #861913;
+    border-bottom: 1px solid currentColor;
+}
+section > h2 > span.mini {
+    font-size: .8rem;
+    margin-left: 1rem;
+}
+section > h3 {
+    margin: 1rem 0 .25rem 0;
+    padding: 0;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #861913;
+}
+section > p {
+    margin: .75rem 0;
+}
+section > ul,
+section > ol {
+    margin-left: -1rem;
+}
+section > ul > li,
+section > ol > li {
+    margin-bottom: .25rem;
+}
+section > ul.extra-space > li,
+section > ol.extra-space > li {
+    margin-bottom: 1rem;
+}
+section > ul.some-space > li,
+section > ol.some-space > li {
+    margin-bottom: .5rem;
+}
+footer {
+    color: #111;
+    border-top: .25rem dotted rgba(0, 0, 0, 0.05);
+    text-align: center;
+    font-size: .75rem;
+}
+footer > p {
+    margin: 1em;
+    padding: 0;
+}
+.hidden {
+    display: none !important;
+}
+
+/* Homepage */
+section > div.highlights {
+    margin: -1rem;
+    padding: .5rem;
+    /* older browsers */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: space-between;
+    /* newer browsers */
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}
+section > div.highlights > div {
+    margin: .5rem;
+    padding: .5rem 0;
+    /*border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.03);
+    border-radius: .25rem;
+    background-color: #fdf6e3;*/
+    /* older browsers */
+    flex: 1;
+    min-width: 18em;
+}
+section > div.highlights > div > div {
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin: 0 0 .5rem 0;
+    line-height: 1;
+    color: #5a0a06;
+}
+section > div.highlights > div > p {
+    margin: 0;
+    padding: 0;
+    line-height: 1.35;
+    font-size: 0.93rem;
+}
+
+/* Download */
+section > div.dl {
+    margin: -.5rem;
+    /* older browsers */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: space-between;
+    /* newer browsers */
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+}
+section > div.dl > div {
+    margin: .5rem;
+    /* older browsers */
+    flex: 1;
+    min-width: 20em;
+    border: 1px solid #861913;
+    background: rgba(0, 0, 0, 0.05);
+}
+section > div.dl > div > h3 {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    line-height: 1;
+    font-weight: 700;
+    font-size: 1rem;
+    background: #861913;
+    color: #fff;
+}
+section > div.dl > div > h3 > svg {
+    flex: 0 0 1em;
+    display: block;
+    fill: currentColor;
+    margin: .5rem;
+}
+section > div.dl > div > h3 > span {
+    flex: 1;
+    display: block;
+    margin: .5rem;
+}
+section > div.dl > div > h3 > svg + span {
+    margin-left: 0;
+}
+section > div.dl > div ul,
+section > div.dl > div li {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+section > div.dl > div > ul > li {
+    padding: .5rem;
+}
+section > div.dl > div > ul > li:first-child {
+    font-weight: 700;
+}
+section > div.dl > div > ul > li:nth-child(even) {
+    background: rgba(0, 0, 0, 0.05);
+}
+section > div.dl > div > ul > li > span {
+    display: block;
+}
+section > div.dl > div > ul > li > ul {
+    display: flex;
+    margin-top: .5em;
+}
+section > div.dl > div > ul > li > ul > li {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 3em;
+    margin-right: 2em;
+}
+
+/* Try */
+section#try {
+    display: flex;
+    flex-direction: row;
+    border: 0 solid rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.2);
+    -webkit-user-select: none;
+    user-select: none;
+}
+section#try > .try__pane {
+    display: block;
+    border: inherit;
+    min-width: 0;
+}
+section#try > .try__pane:not(:first-child) {
+    border-width: 1px 1px 1px 0;
+}
+section#try > .try__pane > .try__pane__title {
+    display: block;
+    padding: .5rem;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+section#try > .try__pane > .try__pane__title::before {
+    display: inline;
+    content: '\0200B';
+}
+section#try > .try__pane > .try__pane__contents {
+    display: block;
+    padding: .5rem;
+    min-height: 20rem;
+}
+section#try > .try__pane.try__pane--files {
+    flex: 2;
+    border: inherit;
+    border-width: 1px;
+}
+section#try > .try__pane.try__pane--files > .try__pane__contents.dragover {
+    background: rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.2) inset;
+}
+section#try > .try__pane.try__pane--files > .try__pane__contents.dragover > * {
+    pointer-events: none !important;
+}
+section#try .file.file--placeholder {
+    all: unset;
+}
+section#try .file,
+section#try .file.file--placeholder {
+    display: block;
+    width: 100%;
+    margin-bottom: .5rem;
+    border: 0 solid rgba(0, 0, 0, 0.1);
+}
+section#try .file.file--placeholder {
+    cursor: pointer;
+}
+section#try .file.file--placeholder:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+section#try .file.file--placeholder:active {
+    background: rgba(0, 0, 0, 0.1);
+}
+section#try .file > .file__info {
+    display: flex;
+    position: relative;
+    border: inherit;
+    border-width: 1px;
+    font-size: 0.825em;
+}
+section#try .file.file--placeholder:focus > .file__info {
+    border-color: rgba(0, 0, 0, 0.6);
+}
+section#try .file.file--placeholder:focus:not(:focus-visible) > .file__info {
+    border-color: inherit;
+}
+section#try .file.file--placeholder .file__info {
+    border-style: dashed;
+}
+section#try .file > .file__info > .file__info__progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    background: rgba(0, 0, 128, 0.1);
+    pointer-events: none;
+    width: 0;
+    transition: width .1s linear, background .2s linear;
+}
+section#try .file > .file__info > .file__info__progress.file__info__progress--success {
+    background: rgba(0, 128, 0, 0.1);
+}
+section#try .file > .file__info > .file__info__progress.file__info__progress--error {
+    background: rgba(128, 0, 0, 0.1);
+}
+section#try .file > .file__info > .file__info__name {
+    flex: 1;
+    min-width: 0;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    padding: .25rem;
+}
+section#try .file > .file__info > .file__info__name:link:not(:hover) {
+    text-decoration: underline dotted 1px;
+}
+section#try .file > .file__info > button {
+    all: unset;
+    display: block;
+    flex: 0 0 auto;
+    border: inherit;
+    padding: .25rem .5rem;
+    border-width: 0 0 0 1px;
+}
+section#try .file > .file__info > button:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+section#try .file > .file__info > button:active {
+    background: rgba(0, 0, 0, 0.1);
+}
+section#try .file > .file__info > button:focus {
+    outline: 1px dotted currentColor;
+}
+section#try .file > .file__info > button:focus:not(:focus-visible) {
+    outline: 0;
+}
+section#try .file > .file__status {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    padding: .25rem;
+    font-size: 0.825em;
+    border: 0 solid rgba(0, 0, 0, 0.1);
+    border-width: 0 1px 1px 1px;
+}
+section#try .file:not(:focus):not(:hover) > .file__status {
+    display: none;
+}
+section#try .file > .file__status:not(:focus):not(:hover) {
+    white-space: nowrap;
+}
+section#try > .try__pane.try__pane--options {
+    flex: 1;
+}
+section#try > .try__pane.try__pane--options > .try__pane__contents {
+    padding: 0;
+}
+section#try .options {
+    font-size: 0.875em;
+}
+section#try .options > .options__option {
+    border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+section#try .options > .options__option > .options__option__header {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    background: rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+section#try .options > .options__option > .options__option__header > .options__option__header__title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1;
+    padding: .5em;
+}
+section#try .options > .options__option > .options__option__header > button {
+    all: unset;
+    display: block;
+    flex: 0 0 auto;
+    padding: .25em;
+}
+section#try .options > .options__option > .options__option__header > button:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+section#try .options > .options__option > .options__option__header > button:active {
+    background: rgba(0, 0, 0, 0.1);
+}
+section#try .options > .options__option > .options__option__header > button:focus {
+    outline: 1px dotted currentColor;
+}
+section#try .options > .options__option > .options__option__header > button:focus:not(:focus-visible) {
+    outline: 0;
+}
+section#try .options > .options__option > .options__option__header > button.options__option__header__help {
+    font: inherit;
+}
+section#try .options > .options__option > .options__option__header > button.options__option__header__help::before {
+    display: inline;
+    content: '\00a0?\00a0';
+    font-family: sans-serif;
+    font-size: .875rem;
+    line-height: 1;
+}
+section#try .options > .options__option > .options__option__header > button.options__option__header__help > span {
+    display: block;
+    position: absolute;
+    right: 1%;
+    top: 110%;
+    width: 50vw;
+    max-width: 20em;
+    padding: .25rem;
+    pointer-events: none;
+    z-index: 1000;
+    background: inherit;
+    background: #f5f3ef;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    color: #000;
+    font-size: .875rem;
+    box-shadow: 0 0 8px 0 rgba(0, 0, 0, 0.2);
+}
+section#try .options > .options__option > .options__option__header > button.options__option__header__help:not(:active):not(:hover) > span {
+    display: none;
+}
+section#try .options > .options__option > .options__option__content > textarea {
+    display: block;
+    border: 0;
+    min-width: 100%;
+    max-width: 100%;
+    min-height: 3rem;
+    max-height: 6rem;
+    padding: .5em;
+    background: transparent;
+    font-family: 'Source Code Pro', monospace;
+    font-size: .625em;
+}
+section#try .options > .options__option > .options__option__content > textarea:focus {
+    outline: 1px solid #000;
+}
+section#try .options > .options__option > .options__option__content > label {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    flex-direction: row;
+    justify-content: flex-start;
+    font-size: .875rem;
+    line-height: 1;
+    overflow: hidden;
+    white-space: nowrap;
+}
+section#try .options > .options__option > .options__option__content > label:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+section#try .options > .options__option > .options__option__content > label:active {
+    background: rgba(0, 0, 0, 0.04);
+}
+section#try .options > .options__option > .options__option__content > label > input[type="radio"] {
+    margin: .5em;
+    flex: 0 0 auto;
+    -webkit-appearance: initial;
+    -moz-appearance: initial;
+    appearance: initial;
+    text-align: center;
+    outline: 0;
+}
+section#try .options > .options__option > .options__option__content > label > input[type="radio"]:before {
+    visibility: visible;
+    content: "\2713";
+    color: #000;
+}
+section#try .options > .options__option > .options__option__content > label > input[type="radio"]:focus:before {
+    text-decoration: underline;
+}
+section#try .options > .options__option > .options__option__content > label > input[type="radio"]:focus:not(:focus-visible):before {
+    text-decoration: none;
+}
+section#try .options > .options__option > .options__option__content > label > input[type="radio"]:not(:checked):before {
+    opacity: 0;
+}
+section#try .options > .options__option > .options__option__content > label > input[type="radio"]:not(:checked):active:before {
+    opacity: 0.25;
+}
+section#try .options > .options__option > .options__option__content > label > span {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    text-overflow: ellipsis;
+    padding: .5em;
+    overflow: hidden;
+}
+section#try .options > .options__option > .options__option__content > label > input[type="radio"] + span {
+    padding-left: 0;
+}
+@media screen and (max-width: 40rem) {
+    section#try {
+        flex-direction: column;
+    }
+    section#try > .try__pane:not(:first-child) {
+        border-width: 0 1px 1px 1px;
+    }
+}

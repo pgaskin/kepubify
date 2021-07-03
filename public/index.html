@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kepubify</title>
+    <link rel="canonical" href="https://pgaskin.net/kepubify/">
+    <meta name="author" content="Patrick Gaskin">
+    <meta name="description" content="Kepubify converts EPUB e-books to Kobo's KEPUB format. It's fast, reliable, standalone and cross-platform.">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <nav class="main">
+        <h1><a href="./">kepubify</a></h1>
+        <a href="./" class="active">Home</a>
+        <a href="./docs/">Docs</a>
+        <a href="./dl/">Download</a>
+        <a href="./try/">Try</a>
+    </nav>
+    <header class="main">
+        <h2>Convert EPUBs to Kobo EPUBs.</h2>
+        <p>Kepubify is the fastest tool for converting EPUBs to Kobo's enhanced KEPUB format for use on Kobo eReaders.</p>
+        <p>It works with malformed e-books, doesn't modify the book's layout more than absolutely necessary, doesn't depend on any external software, and works from the command-line.</p>
+        <p>
+            <a href="./dl/" class="btn btn--primary">Download</a>
+            <a href="./try/" class="btn">Web Version <span style="color: #a00; font-weight: 700; position: absolute; margin-top: -.75em; margin-left: -1.5em; font-size: .7em;">New!</span></a>
+        </p>
+    </header>
+    <main>
+        <section>
+            <h2>New in v4.0.0<span class="mini">2021-06-24</span></h2>
+            <ul class="some-space">
+                <li>Conversion is now 3 to 6 times faster than v3.</li>
+                <li>Kepubify has a new <a href="./try/">web app</a> which supports most conversion options and doesn't upload files to a remote server.</li>
+                <li>Kepubify can now fix layout issues caused by books without a standalone cover page (issue <a href="https://github.com/pgaskin/kepubify/issues/33">#33</a>).</li>
+                <li>HTML content files with non-standard extensions now work correctly (issue <a href="https://github.com/pgaskin/kepubify/issues/55">#55</a>).</li>
+                <li>There's now a new website with updated documentation and a more concise homepage.</li>
+                <li><a href="javascript:void(0)" onclick="document.querySelector('ul#dev-v4-0-0').classList.toggle('hidden')">Notes for developers/packagers &raquo;</a></li>
+            </ul>
+            <ul id="dev-v4-0-0" class="some-space hidden">
+                <li>Building kepubify now requires Go 1.16+.</li>
+                <li>Embedding kepubify in other applications doesn't require go.mod changes for the custom x/net/html fork.</li>
+                <li>Kepubify now supports the js/wasm platform.</li>
+                <li>The test suite now has nearly complete functionality and code coverage.</li>
+                <li>The Go API can now stream directly from a fs.FS to a zip.Writer, with additional optimizations for reading from zip.Reader.</li>
+                <li>Kepubify is now immune to Zip Slip when converting EPUBs with un-sanitized paths.</li>
+                <li>The kepubify CLI interface is identical to v3.</li>
+            </ul>
+        </section>
+        <section>
+            <h2>Features</h2>
+            <div class="highlights">
+                <div>
+                    <div>Fast</div>
+                    <p>Kepubify is fast, supports batch-processing, and converts most books in a fraction of a second&mdash;around 40-80x faster than Calibre.</p>
+                </div>
+                <div>
+                    <div>Reliable</div>
+                    <p>Kepubify can handle malformed books, and often produces better output for them than other software.</p>
+                </div>
+                <div>
+                    <div>Compliant</div>
+                    <p>Kepubify will handle complex books correctly, and will always output valid documents compatible with XHTML and HTML.</p>
+                </div>
+                <div>
+                    <div>Correct</div>
+                    <p>The conversion functions are tested against actual KEPUBs. And, where there are incompatibilities between EPUBs and KEPUBs, kepubify will attempt to fix them automatically.</p>
+                </div>
+                <div>
+                    <div>Standalone</div>
+                    <p>Other software isn't required to run kepubify.</p>
+                </div>
+                <div>
+                    <div>Customizable</div>
+                    <p>Options include converting new books only, punctuation smartening, find/replace, custom CSS, and controlling hyphenation.</p>
+                </div>
+                <div>
+                    <div>Interoperable</div>
+                    <p>Kepubify can be used at the same time or other e-book management tools, and it can even be used to pre-convert a Calibre library.</p>
+                </div>
+                <div>
+                    <div>Minimal</div>
+                    <p>The book layout isn't modified unnecessarily, and extraneous features unrelated to conversion aren't included.</p>
+                </div>
+                <div>
+                    <div>Secure</div>
+                    <p>Kepubify is safe to run on untrusted books—it's secure against vulnerabilities like Zip Slip.</p>
+                </div>
+                <div>
+                    <div>Extras</div>
+                    <p>The seriesmeta tool allows series metadata for sideloaded books to be displayed, and covergen can pre-generate cover thumbnails for faster library browsing.</p>
+                </div>
+            </div>
+        </section>
+        <section>
+            <h2>Kobo EPUB Features</h2>
+            <div class="highlights">
+                <div>
+                    <div>Performance</div>
+                    <p>Page turns, font changes, highlighting, and searching are much more responsive on KEPUBs.</p>
+                </div>
+                <div>
+                    <div>EPUB 3 Support</div>
+                    <p>Fixed-layout, page spreads, MathML, HTML5, and other EPUB 3 features are only supported on the KEPUB reader.</p>
+                </div>
+                <div>
+                    <div>Statistics</div>
+                    <p>Kobo EPUBs enable statistics including a chapter graph and estimated read time.</p>
+                </div>
+                <div>
+                    <div>Page Flip</div>
+                    <p>The Page Flip feature, which allows you to quickly skim pages by pressing the corner of the screen, is only available on KEPUBs.</p>
+                </div>
+                <div>
+                    <div>Footnotes</div>
+                    <p>On Kobo EPUBs, footnotes will appear as a pop-up dialog when supported by the original book.</p>
+                </div>
+                <div>
+                    <div>Image Zooming</div>
+                    <p>Tap an image to zoom and pan it in a pop-up window.</p>
+                </div>
+                <div>
+                    <div>Cover Images</div>
+                    <p>Kobo displays cover images for KEPUBs correctly, unlike normal EPUBs which often end up with an ugly white margin.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>Kepubify is free and <a href="https://github.com/pgaskin/kepubify">open-source</a> software.</p>
+        <p>Copyright 2017-2021 Patrick Gaskin</p>
+        <p>Other Stuff | <a href="https://pgaskin.net/KoboStuff/kobofirmware.html">Kobo Firmware Downloads</a> | <a href="https://pgaskin.net/NickelMenu">NickelMenu</a> | <a href="https://pgaskin.net/kobopatch-patches">kobopatch</a> | <a href="https://pgaskin.net/dictutil">dictutil</a></p>
+    </footer>
+    <script async src="https://pg.gc.geek1011.net/count.js" data-goatcounter="https://pg.gc.geek1011.net/count"></script>
+</html>

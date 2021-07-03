@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online EPUB to KEPUB converter - Kepubify</title>
+    <link rel="canonical" href="https://pgaskin.net/kepubify/try.html">
+    <meta name="description" content="Easily convert EPUB e-books to Kobo EPUBs (KEPUB) online using kepubify.">
+    <meta name="author" content="Patrick Gaskin">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <nav class="main">
+        <h1><a href="../">kepubify</a></h1>
+        <a href="../">Home</a>
+        <a href="../docs/">Docs</a>
+        <a href="../dl/">Download</a>
+        <a href="../try/" class="active">Try</a>
+    </nav>
+    <main>
+        <section>
+            <h2>Online EPUB to KEPUB converter</h2>
+            <p>
+                Quickly convert your EPUB e-books into Kobo EPUBs using kepubify
+                without downloading any software or sending your files to remote
+                servers.
+            </p>
+        </section>
+        <section>
+            <noscript>
+                <p style="text-align: center;">
+                    This page requires JavaScript.
+                </p>
+            </noscript>
+            <p style="text-align: center; color: red;" id="unsupported-browser" class="hidden">
+                Your browser appears to be unsupported, or there was an unknown
+                error when loading the script. Try using a different browser,
+                and if the issue still persists, <a
+                href="https://github.com/pgaskin/kepubify/issues/new">open an
+                issue</a>.
+            </p>
+        </section>
+        <section id="try">
+            <div class="try__pane try__pane--files">
+                <div class="try__pane__title">Loading...</div>
+                <div class="try__pane__contents"></div>
+            </div>
+            <div class="try__pane try__pane--options">
+                <div class="try__pane__title">Options</div>
+                <div class="try__pane__contents">
+                    <form class="options" onsubmit="return false">
+                        <div class="options__option">
+                            <div class="options__option__header">
+                                <span class="options__option__header__title">Smarten punctuation</span>
+                                <button class="options__option__header__help" aria-label="help">
+                                    <span role="tooltip">
+                                        Replace dashes, quotes, ellipses,
+                                        fractions, and certain symbols with
+                                        their "smart" versions.
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="options__option__content">
+                                <label for="c--smarten-punctuation--off">
+                                    <input type="radio" name="smarten-punctuation" id="c--smarten-punctuation--off" value="off" checked>
+                                    <span>Off</span>
+                                </label>
+                                <label for="c--smarten-punctuation--on">
+                                    <input type="radio" name="smarten-punctuation" id="c--smarten-punctuation--on" value="on">
+                                    <span>On</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="options__option">
+                            <div class="options__option__header">
+                                <span class="options__option__header__title">Add dummy titlepage</span>
+                                <button class="options__option__header__help" aria-label="help">
+                                    <span role="tooltip">
+                                        Fix layout issues on books without a
+                                        dedicated title page. By default,
+                                        kepubify automatically determines if it
+                                        is necessary.
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="options__option__content">
+                                <label for="c--dummy-titlepage--auto">
+                                    <input type="radio" name="dummy-titlepage" id="c--dummy-titlepage--auto" value="auto" checked>
+                                    <span>Auto</span>
+                                </label>
+                                <label for="c--dummy-titlepage--never">
+                                    <input type="radio" name="dummy-titlepage" id="c--dummy-titlepage--never" value="never">
+                                    <span>Never</span>
+                                </label>
+                                <label for="c--dummy-titlepage--always">
+                                    <input type="radio" name="dummy-titlepage" id="c--dummy-titlepage--always" value="always">
+                                    <span>Always</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="options__option">
+                            <div class="options__option__header">
+                                <span class="options__option__header__title">Custom CSS</span>
+                                <button class="options__option__header__help" aria-label="help">
+                                    <span role="tooltip">
+                                        Add a custom stylesheet to all content
+                                        files. Warning: If the stylesheet is
+                                        invalid, the book may fail to load.
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="options__option__content">
+                                <textarea name="custom-css" id="c--custom-css" spellcheck="false" aria-label="CSS"></textarea>
+                            </div>
+                        </div>
+                        <div class="options__option">
+                            <div class="options__option__header">
+                                <span class="options__option__header__title">Hyphenation</span>
+                                <button class="options__option__header__help" aria-label="help">
+                                    <span role="tooltip">
+                                        Enable or disable hyphenation.
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="options__option__content">
+                                <label for="c--hyphenation--default">
+                                    <input type="radio" name="hyphenation" id="c--hyphenation--default" value="default" checked>
+                                    <span>Publisher default</span>
+                                </label>
+                                <label for="c--hyphenation--enable">
+                                    <input type="radio" name="hyphenation" id="c--hyphenation--enable" value="enable">
+                                    <span>Force enable</span>
+                                </label>
+                                <label for="c--hyphenation--disable">
+                                    <input type="radio" name="hyphenation" id="c--hyphenation--disable" value="disable">
+                                    <span>Force disable</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="options__option">
+                            <div class="options__option__header">
+                                <span class="options__option__header__title">Full-screen reading fixes</span>
+                                <button class="options__option__header__help" aria-label="help">
+                                    <span role="tooltip">
+                                        Fixes layout issues with full-screen
+                                        enabled for firmware versions older than
+                                        4.19.11911.
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="options__option__content">
+                                <label for="c--full-screen-fixes--off">
+                                    <input type="radio" name="full-screen-fixes" id="c--full-screen-fixes--off" value="off" checked>
+                                    <span>Off</span>
+                                </label>
+                                <label for="c--full-screen-fixes--on">
+                                    <input type="radio" name="full-screen-fixes" id="c--full-screen-fixes--on" value="on">
+                                    <span>On</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="options__option" style="align-self: flex-end;">
+                            <div class="options__option__header">
+                                <span class="options__option__header__title"><i>Applies to future conversions.</i></span>
+                                <button type="reset">Reset</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+        <section>
+            <p style="text-align: center; font-size: 0.75rem;">
+                For more efficient (at least 8x faster) conversions and advanced
+                conversion options (e.g. find/replace, output layout),
+                <a href="./">download</a> kepubify.<br><br>
+                This page requires Chrome 57+, Safari 11+, Edge 17+, or Firefox
+                54+. <br><br>
+                <a href="https://github.com/pgaskin/kepubify/issues/new">Report an issue</a>
+            </p>
+        </section>
+    </main>
+    <footer>
+        <p>Kepubify is free and <a href="https://github.com/pgaskin/kepubify">open-source</a> software.</p>
+        <p>Copyright 2017-2021 Patrick Gaskin</p>
+        <p>Other Stuff | <a href="https://pgaskin.net/KoboStuff/kobofirmware.html">Kobo Firmware Downloads</a> | <a href="https://pgaskin.net/NickelMenu">NickelMenu</a> | <a href="https://pgaskin.net/kobopatch-patches">kobopatch</a> | <a href="https://pgaskin.net/dictutil">dictutil</a></p>
+    </footer>
+    <script src="../../dist/kepubify.js"></script>
+    <script src="../../dist/kepubify_try.js"></script>
+    <script async src="https://pg.gc.geek1011.net/count.js" data-goatcounter="https://pg.gc.geek1011.net/count"></script>
+    <script>
+        window.setTimeout(function() {
+            document.getElementById("unsupported-browser").className = "";
+        }, 1000)
+    </script>
+</html>

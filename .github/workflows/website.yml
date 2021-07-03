@@ -1,25 +1,43 @@
 name: website
 
-on:
-  push:
-    branches:
-      - gh-pages
+on: push
 
 jobs:
   build:
     runs-on: ubuntu-20.04
+    container: docker://node:16-buster
+    env:
+      NODE_ENV: production
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Build WebAssembly
+        uses: docker://golang:1.16-alpine
+        with:
+          entrypoint: /usr/local/go/bin/go
+          args: generate ./...
+
       - name: Build
         run: |
-          touch .nojekyll
-      - name: Deploy
+          yarn install --frozen-lockfile --production=false
+          yarn run build
+
+      - name: Commit
         run: |
           git config user.name "GitHub Actions"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan gh-pages-dist
           git reset
-          git add .nojekyll *.html *.gif *.css
+          git clean -fdxe/dist
+          mv -v dist/public/* ./
+          rm -rf dist
+          ls -lahRI.git
+          touch .nojekyll
+          git add .
           git commit -m "Build ${{github.sha}}"
+
+      - name: Deploy
+        if: github.ref == 'refs/heads/gh-pages'
+        run: |
           git push -u origin gh-pages-dist --force

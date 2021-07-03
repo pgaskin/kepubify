@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - Kepubify</title>
+    <link rel="canonical" href="https://pgaskin.net/kepubify/documentation.html">
+    <meta name="author" content="Patrick Gaskin">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <nav class="main">
+        <h1><a href="../">kepubify</a></h1>
+        <a href="../">Home</a>
+        <a href="../docs/" class="active">Docs</a>
+        <a href="../dl/">Download</a>
+        <a href="../try/">Try</a>
+    </nav>
+    <header class="main">
+        <h2>Documentation</h2>
+        <ul>
+            <li><a href="#getting-started">Getting Started</a></li>
+            <li><a href="#kepubify">Kepubify</a></li>
+            <li><a href="#seriesmeta">Seriesmeta</a></li>
+            <li><a href="#covergen">Covergen</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+            <li><a href="#bugs">Bugs</a></li>
+        </ul>
+    </header>
+    <main>
+        <section id="getting-started">
+            <h2>Getting Started</h2>
+            <h3>Windows</h3>
+            <ol>
+                <li>Download <code>kepubify-windows-32bit.exe</code> or <code>kepubify-windows-64bit.exe</code> from the <a href="https://github.com/pgaskin/kepubify/releases">releases</a> page. If you're unsure which one to choose, use  <code>kepubify-windows-32bit.exe</code>.</li>
+                <li>Drag your books or folder of books onto the downloaded executable. The converted files will be in the current directory with the suffix <code>_converted</code>.</li>
+            </ol>
+            <h3>macOS</h3>
+            <ol>
+                <li>Download <code>kepubify-darwin-64bit</code> from the <a href="https://github.com/pgaskin/kepubify/releases">releases</a> page. If you have a M1 chip, download <code>kepubify-darwin-arm64</code> instead. You can also install kepubify with <a href="https://formulae.brew.sh/formula/kepubify">Homebrew</a>.</li>
+                <li>Type <code>chmod +x </code> into the terminal (note the space at the end), drag the file you downloaded onto it (or type the path manually), and press enter.</li>
+                <li>Drag the file you downloaded onto the terminal again, then drag the folders or files onto it (or type them manually), pressing space before each one, then press enter. The converted files will be in your home folder with the suffix <code>_converted</code>.</li>
+            </ol>
+            <h3>Linux</h3>
+            <ol>
+                <li>Download the kepubify binary for your architecture from the <a href="https://github.com/pgaskin/kepubify/releases">releases</a> page.</li>
+                <li><code>chmod +x</code> the binary.</li>
+                <li>Run the binary with one or more files/directories to convert as arguments. The converted files will be in the current directory with the suffix <code>_converted</code>.</li>
+            </ol>
+            <h3>Building from source / other</h3>
+            <ol>
+                <li>Install Go 1.16 or later if you haven't already done so.</li>
+                <li>Run <code>go install github.com/pgaskin/kepubify/v4/cmd/kepubify@latest</code>. The resulting binary will be in <code>$HOME/go/bin</code>, or whatever <code>GOBIN</code> is set to. If you are using Go 1.16, I also recommend adding <code> -tags zip117</code> after <code>go build</code> for better performance.</li>
+            </ol>
+        </section>
+        <section id="kepubify">
+            <h2>Kepubify</h2>
+            <h3>About</h3>
+            <p>
+                Kepubify converts EPUBs to Kobo EPUBs.
+            </p>
+            <h3>Usage</h3>
+            <pre>Usage: kepubify [options] input_path [input_path]...
+
+General Options:
+  -v, --verbose   Show extra information in output
+      --version   Show the version
+  -h, --help      Show this help text
+
+Output Options:
+  -u, --update             Don't reconvert files which have already been converted (i.e. don't overwrite output files)
+  -i, --inplace            Don't add the _converted suffix to converted files and directories
+      --no-preserve-dirs   Flatten the directory structure of the input (an error will be shown if there are conflicts)
+  -o, --output string      [>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with
+                           nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)
+      --calibre            Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
+  -x, --copy strings       Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the same)
+
+Conversion Options:
+      --smarten-punctuation        Smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
+  -c, --css stringArray            Custom CSS to add to ebook
+      --hyphenate                  Force enable hyphenation
+      --no-hyphenate               Force disable hyphenation
+      --fullscreen-reading-fixes   Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
+  -r, --replace stringArray        Find and replace on all html files (repeat any number of times) (format: find|replace)</pre>
+            <h3>Examples</h3>
+            <p>For the following examples, replace kepubify with the path to the downloaded kepubify.</p>
+            <ul class="extra-space">
+                <li>
+                    <b>To convert a single book by dragging and dropping on Windows:</b><br>
+                    Just drag the original epub file over kepubify.exe. The
+                    resulting file will be saved to the same directory as the
+                    original epub.
+                </li>
+                <li>
+                    <b>To convert a folder of books by dragging and dropping on Windows:</b><br>
+                    Just drag the folder over kepubify.exe. The resulting file
+                    will be saved to the same directory as the originals, but
+                    with the suffix <code>_converted</code>.
+                </li>
+                <li>
+                    <b>To convert a single book:</b><br>
+                    <code>kepubify /path/to/the/book.epub</code><br>
+                    The resulting file will be saved to the current directory.
+                </li>
+                <li>
+                    <b>To convert a single book with a different output folder:</b><br>
+                    <code>kepubify --output "/path/to/save/the/book/" /path/to/the/book.epub</code><br>
+                    The resulting file will be saved to specified folder (in this example /path/to/save/the/book/).
+                </li>
+                <li>
+                    <b>To convert all books in the current folder into a folder called converted:</b><br>
+                    <code>kepubify -o "converted" *.epub</code>
+                </li>
+                <li>
+                    <b>To batch convert a directory of ebooks:</b><br>
+                    <code>kepubify /path/to/the/books/</code><br>
+                    The converted books will be saved to the original dir with the suffix _converted (e.g. /path/to/the/books_converted).The directory structure of the source is preserved in the output.
+                </li>
+                <li>
+                    <b>To batch convert a directory of ebooks with a different output folder:</b><br>
+                    <code>kepubify -o "/path/to/output/the/converted/books" /path/to/the/books/</code><br>
+                    The directory structure of the source is preserved in the output.
+                </li>
+                <li>
+                    <b>To convert a directory of ebooks, but skipping ones which have already been converted:</b><br>
+                    <code>kepubify --update /path/to/the/books/</code>
+                </li>
+                <li>
+                    <b>To convert a calibre library in-place:</b><br>
+                    <code>kepubify --update --inplace --calibre /path/to/calibre/library/</code>
+                </li>
+                <li>
+                    <b>To convert a folder of books directly on to a Kobo eReader, while simply copying PDF files:</b><br>
+                    <code>kepubify --output /path/to/kobo/kepubify --update --copy .pdf /path/to/books/</code>
+                </li>
+            </ul>
+            <h3>Kepubify vs Calibre</h3>
+            <p>
+                There are a few reasons why you would want to use kepubify
+                instead of the Calibre KEPUB plugin:
+            </p>
+            <ul>
+                <li>
+                    Kepubify is generally 40-60x faster than Calibre, and uses
+                    15-30% less memory.
+                </li>
+                <li>
+                    Kepubify modifies the source content less the Calibre, and
+                    it parses the HTML properly rather than using pattern
+                    matching. This often means that books which break when
+                    converted with Calibre will work fine with Kepubify.
+                </li>
+                <li>
+                    Kepubify can run standalone or be embedded into other
+                    applications. For example, <a
+                    href="https://github.com/janeczku/calibre-web">calibre-web</a>
+                    uses kepubify internally for conversions.
+                </li>
+                <li>
+                    Kepubify's output is usually closer to official KEPUB files
+                    than the Calibre plugin.
+                </li>
+            </ul>
+            <p>
+                But, if Calibre works well for you right now, you already use it
+                heavily for e-book management, and you're happy with it's
+                performance and results, you can continue to use it.
+            </p>
+            <p>
+                Remember that it is possible to use kepubify to pre-convert
+                individual books or your entire library, then import those into
+                Calibre.
+            </p>
+            <h3>Converting your Calibre library with kepubify (Windows)</h3>
+            <ol>
+                <li>Open PowerShell.</li>
+                <li>Type <code>$library = "C:\path\to\Calibre Library\"</code>, setting your library path accordingly, and press enter. This will set the path used in the next two commands.</li>
+                <li>Type <code>C:\path\to\kepubify.exe --update --inplace "$library"</code>, setting the path to kepubify accordingly, and press enter. This will convert any unconverted books. If you also want to re-convert books which are already converted, remove the <code>--update</code>.</li>
+                <li>Type <code>dir -Path "$library" -Filter *.kepub -Recurse | %{calibredb add -m 'ignore' $_.FullName}</code> and press enter. This will add the converted books to the Calibre database.</li>
+            </ol>
+            <h3>Converting your Calibre library with kepubify (Linux/macOS)</h3>
+            <ol>
+                <li>Open a terminal window.</li>
+                <li>Type <code>LIBRARY="/path/to/Calibre Library"</code>, setting your library path accordingly, and press enter. This will set the path used in the next two commands.</li>
+                <li>Type <code>kepubify --update --inplace "$library"</code>, setting the path to kepubify accordingly, and press enter. This will convert any unconverted books. If you also want to re-convert books which are already converted, remove the <code>--update</code>.</li>
+                <li>Type <code>find "$LIBRARY" -name '*.kepub' | xargs calibredb add -m 'ignore'</code>, and press enter. This will add the converted books to the Calibre database.</li>
+            </ol>
+        </section>
+        <section id="seriesmeta">
+            <h2>Seriesmeta</h2>
+            <h3>About</h3>
+            <p>
+                <b>Note:</b> I recommend using my new mod, <a
+                href="https://www.mobileread.com/forums/showthread.php?t=331680">NickelSeries</a>,
+                after you run seriesmeta once. NickelSeries will add built-in
+                support for series metadata to Kobo's import process and
+                eliminate the requirement to run seriesmeta every time you add
+                books.
+            </p>
+            <h3>Usage</h3>
+            <pre>Usage: seriesmeta [options] [kobo_path]
+
+Options:
+  -h, --help         Show this help message
+  -p, --no-persist   Don't ensure metadata is always set (this will cause series metadata to be lost if opening a book after an import but before a reboot)
+  -n, --no-replace   Don't replace existing series metadata (you probably don't want this option)
+  -u, --uninstall    Uninstall seriesmeta table and hooks (imported series metadata will be left untouched)
+
+Arguments:
+  kobo_path is the path to the Kobo eReader. If not specified, seriesmeta will try to automatically detect the Kobo.</pre>
+            <h3>NickelSeries</h3>
+            <p>
+                I've written a mod for the Kobo firmware, <a
+                href="https://www.mobileread.com/forums/showthread.php?t=331680">NickelSeries</a>,
+                which will add built-in support for series metadata to Kobo's
+                import process and eliminate the requirement to run seriesmeta
+                every time you add books.
+            </p>
+            <p>
+                After using seriesmeta to add metadata for existing books, I
+                recommend installing NickelSeries. Note that you can safely use
+                both at the same time, and neither conflict with Calibre.
+            </p>
+        </section>
+        <section id="covergen">
+            <h2>Covergen</h2>
+            <h3>About</h3>
+            <p>
+                Cover thumbnails on Kobo devices can generated or re-generated
+                using covergen. This will speed up library browsing, and will
+                improve the quality of resized covers.
+            </p>
+            <p>
+                This tool is standalone, and will not conflict with Calibre.
+            </p>
+            <h3>Usage</h3>
+            <pre>Usage: covergen [options] [kobo_path]
+
+Options:
+  -a, --aspect-ratio float   Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)
+  -g, --grayscale            Convert images to grayscale
+  -h, --help                 Show this help message
+  -i, --invert               Invert images
+  -m, --method string        Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3) (default "lanczos3")
+  -r, --regenerate           Re-generate all covers
+
+Arguments:
+  kobo_path is the path to the Kobo eReader. If not specified, covergen will try to automatically detect the Kobo.</pre>
+        </section>
+        <section id="troubleshooting">
+            <h2>Troubleshooting</h2>
+            <h3>Permission denied errors on macOS or Linux</h3>
+            <p>
+                Run <code>chmod +x /path/to/kepubify</code> from the terminal,
+                replacing the path to kepubify as necessary.
+            </p>
+            <h3>Kobo Elipsa markup not available on sideloaded KEPUBs</h3>
+            <p>
+                See <a href="https://github.com/pgaskin/kepubify/issues/66">#66</a>.
+            </p>
+        </section>
+        <section id="bugs">
+            <h2>Bugs</h2>
+            <p>
+                To report bugs or request new features, <a
+                href="https://github.com/pgaskin/kepubify/issues">open an
+                issue</a>, or send me an email at <code>patrick (at) pgaskin
+                (dot) net</code>.
+            </p>
+        </section>
+    </main>
+    <footer>
+        <p>Kepubify is free and <a href="https://github.com/pgaskin/kepubify">open-source</a> software.</p>
+        <p>Copyright 2017-2021 Patrick Gaskin</p>
+        <p>Other Stuff | <a href="https://pgaskin.net/KoboStuff/kobofirmware.html">Kobo Firmware Downloads</a> | <a href="https://pgaskin.net/NickelMenu">NickelMenu</a> | <a href="https://pgaskin.net/kobopatch-patches">kobopatch</a> | <a href="https://pgaskin.net/dictutil">dictutil</a></p>
+    </footer>
+    <script async src="https://pg.gc.geek1011.net/count.js" data-goatcounter="https://pg.gc.geek1011.net/count"></script>
+</html>

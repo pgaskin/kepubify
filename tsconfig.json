@@ -1,0 +1,30 @@
+{
+    "compilerOptions": {
+        "outDir": "./dist",
+        "target": "es6",
+        "lib": [
+            "es6",
+            "dom"
+        ],
+        "sourceMap": true,
+        "module": "esnext",
+        "moduleResolution": "node",
+        "downlevelIteration": true,
+        "useDefineForClassFields": true,
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noImplicitOverride": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": false,
+        "removeComments": true,
+        "declaration": false,
+        "stripInternal": true,
+        "strict": true
+    },
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
