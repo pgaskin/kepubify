@@ -1,0 +1,158 @@
+name: kepubify
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: test - Go ${{matrix.go}}${{fromJSON(format('["", " - {0}"]', matrix.tags))[matrix.tags != '']}}
+    runs-on: ubuntu-latest
+
+    container:
+      image: golang:${{matrix.go}}-alpine3.13
+
+    strategy:
+      matrix:
+        go:
+          - 1.16
+          - 1.17-rc
+        tags:
+          - ""
+        include:
+          - {go: 1.16, tags: zip117}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Tools
+        run: apk update && apk add --no-cache wine freetype libpng gcc libc-dev
+
+      - name: Build
+        run: go build${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} -v ./...
+
+      - name: Test (kepub)
+        run: go test${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} -v -cover ./kepub
+
+      - name: Test (kepubify)
+        run: go test${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} -v -cover ./cmd/kepubify
+
+      - name: Test - Wine (kepub)
+        env:
+          WINEPREFIX: /tmp/wine
+          WINEDEBUG: -all
+          GOOS: windows
+        run: go test${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} -v -cover -exec wine64 ./kepub
+
+      - name: Test - Wine (kepubify)
+        env:
+          WINEPREFIX: /tmp/wine
+          WINEDEBUG: -all
+          GOOS: windows
+        run: go test${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} -v -cover -exec wine64 ./cmd/kepubify
+
+      - name: Benchmark (kepub)
+        run: go test${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} -bench=. -benchmem ./kepub
+
+      - name: Run (kepubify)
+        run: go run${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} ./cmd/kepubify --help
+
+      - name: Run (covergen)
+        run: go run${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} ./cmd/covergen --help
+
+      - name: Run (seriesmeta)
+        run: go run${{fromJSON(format('["", " -tags {0}"]', matrix.tags))[matrix.tags != '']}} ./cmd/seriesmeta --help
+
+  build-release:
+    name: build
+    runs-on: ubuntu-latest
+
+    needs:
+      - test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Version
+        id: version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo ::set-output name=tag::${GITHUB_REF#refs/tags/}
+
+      - name: Build
+        run: |
+          mkdir build
+
+      - {name: Build - kepubify-linux-64bit,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-linux-64bit ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: amd64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-linux-32bit,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-linux-32bit ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: 386, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-linux-arm,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-linux-arm ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm, GOARM: 7, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-linux-arm64,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-linux-arm64 ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-darwin-64bit,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-darwin-64bit ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: darwin, GOARCH: amd64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-darwin-arm64,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-darwin-arm64 ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: darwin, GOARCH: arm64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-windows-64bit.exe,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-windows-64bit.exe ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: windows, GOARCH: amd64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-windows-32bit.exe,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -tags zip117 -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-windows-32bit.exe ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: windows, GOARCH: 386, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - kepubify-windows-arm64.exe,
+         uses: "docker://golang:1.17-rc-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/kepubify-windows-arm64.exe ./cmd/kepubify}, env: {CGO_ENABLED: 0, GOOS: windows, GOARCH: arm64, VER: "${{steps.version.outputs.tag}}"}}
+
+      - {name: Build - covergen-linux-64bit,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-linux-64bit ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: amd64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-linux-32bit,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-linux-32bit ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: 386, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-linux-arm,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-linux-arm ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm, GOARM: 7, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-linux-arm64,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-linux-arm64 ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-darwin-64bit,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-darwin-64bit ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: darwin, GOARCH: amd64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-darwin-arm64,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-darwin-arm64 ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: darwin, GOARCH: arm64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-windows-64bit.exe,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-windows-64bit.exe ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: windows, GOARCH: amd64, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-windows-32bit.exe,
+         uses: "docker://golang:1.16-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-windows-32bit.exe ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: windows, GOARCH: 386, VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - covergen-windows-arm64.exe,
+         uses: "docker://golang:1.17-rc-alpine", with: {entrypoint: go, args: build -v -ldflags "-s -w -X main.version=$VER" -trimpath -o ./build/covergen-windows-arm64.exe ./cmd/covergen}, env: {CGO_ENABLED: 0, GOOS: windows, GOARCH: arm64}}
+
+      - {name: Build - seriesmeta-linux-64bit,
+         uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.4-main", with: {entrypoint: /crossbuild,
+         args: --platforms linux/amd64 --build-cmd "CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=$VER' -trimpath -o ./build/seriesmeta-linux-64bit ./cmd/seriesmeta"}, env: {VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - seriesmeta-linux-arm,
+         uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.4-armhf", with: {entrypoint: /crossbuild,
+         args: --platforms linux/armv7 --build-cmd "CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=$VER' -trimpath -o ./build/seriesmeta-linux-arm ./cmd/seriesmeta"}, env: {VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - seriesmeta-linux-arm64,
+         uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.4-arm", with: {entrypoint: /crossbuild,
+         args: --platforms linux/arm64 --build-cmd "CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=$VER' -trimpath -o ./build/seriesmeta-linux-arm64 ./cmd/seriesmeta"}, env: {VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - seriesmeta-darwin-64bit,
+         uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.4-darwin", with: {entrypoint: /crossbuild,
+         args: --platforms darwin/amd64 --build-cmd "CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=$VER' -trimpath -o ./build/seriesmeta-darwin-64bit ./cmd/seriesmeta"}, env: {VER: "${{steps.version.outputs.tag}}"}}
+      - {name: Build - seriesmeta-windows-64bit.exe,
+         uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.4-main", with: {entrypoint: /crossbuild,
+         args: --platforms windows/amd64 --build-cmd "CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=$VER' -trimpath -o ./build/seriesmeta-windows-64bit.exe ./cmd/seriesmeta"}, env: {VER: "${{steps.version.outputs.tag}}"}}
+
+      - name: List
+        run: |
+          cd build
+          ls -lah
+          file *
+
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: Build
+          path: build
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          gh release create --draft --title $VER $VER build/*
+        env:
+          GH_TOKEN: ${{secrets.GH_TOKEN}}
+          VER: ${{steps.version.outputs.tag}}
