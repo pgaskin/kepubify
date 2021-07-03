@@ -1,0 +1,25 @@
+[SIZE=4][B]Changelogs[/B][/SIZE]
+
+v4.0.0: [SPOILER]dd1c0e1 all: Increase major version to v4
+bcce233 all: Increase minimum Go version to 1.16
+19982c2 cmd/kepubify: Fix pathtransform_test output on Windows
+59a7b15 all: Update license year
+2d34e47 docs: Replace GA with self-hosted GC
+e721d07 docs: Move website to gh-pages branch
+948788e kepub: Rewrite conversion code
+1031fd2 cmd/kepubify: Replace ioutil with os for Go 1.16
+0796deb all: Remove NFPM package builds
+40afb6d kepub: Switch to my forked+renamed html package instead of replacing it
+7848002 kepub/kobotest: Switch diff library, improve tree formatting and generation
+f35a7bf kepub: Process replacements while rendering the content
+6c4f7fa all: Update golang.org/x/sync to golang/sync@036812b2e83c0ddf193dd5a34e034151da389d09
+f368f3e kepub: Implement fix for books without a titlepage (fixes #33)
+9e645a9 cmd/kepubify: Add flag for ConverterOptionDummyTitlepage (#33)
+de62f6b kepub: Add tests for entire conversions
+195d19f all: Rename LICENSE.md to LICENSE
+ffc4d0e kepub: Add internal progress hook
+892ef2e cmd/kepubify: Bump major version
+2b4cbc3 all: Switch to GitHub Actions
+e556743 all: New README
+accdcc9 all: Update gitignore
+ef74497 all: Fix release build versioning[/SPOILER]

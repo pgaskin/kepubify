@@ -1,0 +1,19 @@
+[SIZE=4][B]What's new in Kepubify v4?[/B][/SIZE]
+
+[B]Highlights:[/B][LIST]
+[*]Conversion is now 3 to 6 times faster than v3 (making it 40 to 80 times faster than a Calibre conversion on average).
+[*]Kepubify has a new [URL=https://pgaskin.net/kepubify/try/]web app[/URL] which supports most conversion options and doesn't upload files to a remote server.
+[*]Kepubify can now fix layout issues caused by books without a standalone cover page.
+[*]HTML content files with non-standard extensions now work correctly.
+[*]There's now a new website with updated documentation and a more concise homepage.
+[/LIST]
+
+[B]For developers/packagers:[/B][LIST]
+[*]Building kepubify now requires Go 1.16+.
+[*]Embedding kepubify in other applications doesn't require go.mod changes for the custom x/net/html fork.
+[*]Kepubify now supports the js/wasm platform.
+[*]The test suite now has nearly complete functionality and code coverage.
+[*]The Go API can now stream directly from a fs.FS to a zip.Writer, with additional optimizations for reading from zip.Reader.
+[*]Kepubify is now immune to Zip Slip when converting EPUBs with un-sanitized paths.
+[*]The kepubify CLI interface is identical to v3.
+[/LIST]

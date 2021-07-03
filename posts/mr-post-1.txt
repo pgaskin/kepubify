@@ -1,0 +1,19 @@
+[SIZE=5][B]kepubify[/B] v4[/SIZE]
+[SIZE=4]Convert EPUBs to Kobo EPUBs.[/SIZE]
+
+[B]Features:[/B]
+[LIST]
+[*]Standalone and cross platform.
+[*]Works from the command line (also by dragging and dropping on Windows).
+[*]Also has a [URL="https://pgaskin.net/kepubify/try/"]web interface[/URL].
+[*]Fast (40-80x faster than converting with Calibre).
+[*]Optionally custom CSS, smarten punctuation, find/replace, and more.
+[*]Automatically fix common problems which cause layout issues for KEPUBs.
+[*]Optionally pre-convert books for use in Calibre.
+[*]Batch conversion with control over the output file structure (see [URL="https://ci.appveyor.com/project/pgaskin/kepubify/builds/30198538#L171"]here[/URL] for detailed examples).
+[*]Nearly identical output to KEPUBs from the Kobo Store.
+[*]Standalone tool to pre-generate cover images (including aspect ratio changes, grayscale, and color inversion).
+[*]Standalone tool to update the database with Calibre or EPUB3 series metadata.
+[*]Well-tested.
+[/LIST]
+[SIZE=4][URL="https://pgaskin.net/kepubify/"]Website[/URL] | [URL="https://pgaskin.net/kepubify/dl/"]Download[/URL] | [URL="https://pgaskin.net/kepubify/try/"]Web Version[/URL][/SIZE]
