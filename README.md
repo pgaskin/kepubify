@@ -1,106 +1,23 @@
 <h1 align="center">kepubify</h1>
 
-[![](https://img.shields.io/github/v/release/pgaskin/kepubify)](https://github.com/pgaskin/kepubify/releases/latest) [![kepubify](https://github.com/pgaskin/kepubify/actions/workflows/kepubify.yml/badge.svg?branch=master)](https://github.com/pgaskin/kepubify/actions/workflows/kepubify.yml) ![](https://img.shields.io/github/go-mod/go-version/pgaskin/kepubify) [![](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/mod/github.com/pgaskin/kepubify/v4?tab=versions) [![](https://goreportcard.com/badge/github.com/pgaskin/kepubify)](https://goreportcard.com/report/github.com/pgaskin/kepubify)
+**Kepubify converts EPUBs to Kobo EPUBs.** <a href="https://github.com/pgaskin/kepubify/actions/workflows/kepubify.yml"><img src="https://github.com/pgaskin/kepubify/actions/workflows/kepubify.yml/badge.svg?branch=master" align="right"/></a>
 
-Kepubify converts EPUBs to KEPUBS. Kepubify also includes two standalone utilities
-which do not depend on kepubify (and don't conflict with Calibre): [covergen](./cmd/covergen)
-(which pre-generates cover images), and [seriesmeta](./cmd/seriesmeta) (which updates
-Calibre or EPUB3 series metadata).
+**[`Website`](https://pgaskin.net/kepubify/)** &nbsp; **[`Download`](https://pgaskin.net/kepubify/dl/)** &nbsp; **[`Web Version`](https://pgaskin.net/kepubify/try/)** &nbsp; **[`pkg.go.dev`](https://pkg.go.dev/github.com/pgaskin/kepubify/v4)**
 
-See the [releases](https://github.com/pgaskin/kepubify/releases/latest) page for
-download links, and the [website](https://pgaskin.net/kepubify) for more information.
-Kepubify can also be installed via Homebrew (kepubify).
+## About
 
-## Usage
-```
-Usage: kepubify [options] input_path [input_path]...
+Kepubify is standalone (it also works as a library or a webapp), converts most books in a fraction of a second (40-80x faster than Calibre), handles malformed HTML/XHTML without causing further issues, has multiple optional conversion options (punctuation smartening, custom CSS, text replacement, and more), has a full test suite, is interoperable with other applications, and is safe to use with untrusted books.
 
-General Options:
-  -v, --verbose   Show extra information in output
-      --version   Show the version
-  -h, --help      Show this help text
+Two additional standalone utilities are included with kepubify. [`covergen`](./cmd/covergen) pre-generates cover images to speed up library browsing on Kobo eReaders while providing higher-quality resizing. [`seriesmeta`](./cmd/seriesmeta) scans for EPUBs and KEPUBs, and updates the Kobo database with the Calibre or EPUB3 series metadata.
 
-Output Options:
-  -u, --update             Don't reconvert files which have already been converted (i.e. don't overwrite output files)
-  -i, --inplace            Don't add the _converted suffix to converted files and directories
-      --no-preserve-dirs   Flatten the directory structure of the input (an error will be shown if there are conflicts)
-  -o, --output string      [>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with
-                           nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)
-      --calibre            Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)
-  -x, --copy strings       Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the
-                           same)
+See the [releases](https://github.com/pgaskin/kepubify/releases/latest) page for pre-built binaries for Windows, Linux, and macOS. See the [website](https://pgaskin.net/kepubify/) for more [documentation](https://pgaskin.net/kepubify/docs/), pre-built [binaries](https://pgaskin.net/kepubify/dl/) for Windows, Linux, and macOS, and a [web version](https://pgaskin.net/kepubify/try/).
+ 
+## Building
 
-Conversion Options:
-      --smarten-punctuation        Smarten punctuation (smart quotes, dashes, etc) (excluding pre and code tags)
-  -c, --css stringArray            Custom CSS to add to ebook
-      --hyphenate                  Force enable hyphenation
-      --no-hyphenate               Force disable hyphenation
-      --fullscreen-reading-fixes   Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16
-  -r, --replace stringArray        Find and replace on all html files (repeat any number of times) (format: find|replace)
+Kepubify requires Go 1.16 or later. To install kepubify directly, run `go install github.com/pgaskin/kepubify@latest`. To build from source, clone this repository, and run `go build ./cmd/kepubify`.
 
-Links:
-  Website      - https://pgaskin.net/kepubify
-  Source Code  - https://github.com/pgaskin/kepubify
-  Bugs/Support - https://github.com/pgaskin/kepubify/issues
-  MobileRead   - http://mr.gd/forums/showthread.php?t=295287
-```
+On Go 1.17 or later, additional optimizations are automatically used to significantly improve kepubify's performance by preventing unchanged files from being re-compressed. To use a [backported](https://github.com/pgaskin/kepubify/tree/forks/go116-zip.go117) version of these optimizations on Go 1.16, add the option `-tags zip117` to the build/install command. If you are using kepubify as a library in another application with `-tags zip117` enabled on Go 1.16, it must also use the backported package when passing a `*zip.Reader` to `(*kepub.Converter).Transform`.
 
-## seriesmeta
-Seriesmeta updates series metadata for sideloaded books. **New:** Seriesmeta now
-supports updating metadata for unimported books, so you don't have to connect
-twice (this is implemented using SQLite triggers). A reboot may be required in
-some cases for the updated metadata to appear.
+To build `seriesmeta`, a C compiler must be installed and CGO must be enabled.
 
-Seriesmeta works on EPUB and KEPUB books, and does not conflict with Calibre
-(unless persistence is used, in which case seriesmeta will take precedence). It
-will detect Calibre (`meta[name=calibre:series]`) and EPUB3
-(`meta[property=belongs-to-collection]`) series metadata.
-
-```
-Usage: seriesmeta [options] [kobo_path]
-
-Options:
-  -h, --help         Show this help message
-  -p, --no-persist   Don't ensure metadata is always set (this will cause series metadata to be lost if opening a book after an import but before a reboot)
-  -n, --no-replace   Don't replace existing series metadata (you probably don't want this option)
-  -u, --uninstall    Uninstall seriesmeta table and hooks (imported series metadata will be left untouched)
-
-Arguments:
-  kobo_path is the path to the Kobo eReader. If not specified, seriesmeta will
-  try to automatically detect the Kobo.
-```
-
-## covergen
-Covergen (re)generates cover images for nickel, with optional stretching to fit
-a specific aspect ratio (I use 1.5). This speeds up browsing the library, and if
-stretching is used, will also make it more consistent. In addition, covergen is
-useful when the automatically generated cover images are not satisfactory (too
-small, white margins, etc).
-
-Covergen works on EPUB and KEPUB books, and does not conflict with Calibre or any
-other tool. It is also quite lenient about the way the cover image is referenced
-by the book. The following methods are supported: `meta[name=cover]` with the path
-as the content, `meta[name=cover]` with a manifest id reference as the content, and
-`manifest>item[properties=cover-image]` with the image path as the href. Each
-detected path can be relative to the epub root or to the package document.
-Covergen does not support the external SD on older devices, and will ignore it.
-
-The N3_LIBRARY_FULL, N3_LIBRARY_LIST, and N3_LIBRARY_GRID images are generated
-using the same resizing algorithm as nickel (see [koboutils](https://github.com/pgaskin/koboutils/blob/master/kobo/device.go) for more info).
-
-```
-Usage: covergen [options] [kobo_path]
-
-Options:
-  -a, --aspect-ratio float   Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)
-  -g, --grayscale            Convert images to grayscale
-  -h, --help                 Show this help message
-  -i, --invert               Invert images
-  -m, --method string        Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3) (default "lanczos3")
-  -r, --regenerate           Re-generate all covers
-
-Arguments:
-  kobo_path is the path to the Kobo eReader. If not specified, covergen will try
-  to automatically detect the Kobo.
-```
-
+Note that kepubify uses a custom [fork](https://github.com/pgaskin/kepubify/tree/forks/html) of [`golang.org/x/net/html`](https://pkg.go.dev/golang.org/x/net/html). This fork provides additional options used by kepubify to allow reading malformed HTML/XHTML and to produce polyglot HTML/XHTML output for maximum compatibility. Previously, kepubify replaced it using a `replace` directive in `go.mod`, but since the fork is now a standalone package, this is not necessary anymore, and will no longer cause conflicts if used as a dependency in applications requiring `golang.org/x/net/html` directly.
