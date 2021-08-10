@@ -1,9 +1,9 @@
-//go:build go1.16 && !go1.17 && !zip117
-// +build go1.16,!go1.17,!zip117
+//go:build go1.16 && zip117
+// +build go1.16,zip117
 
 package zip
 
-import "archive/zip"
+import "github.com/pgaskin/kepubify/_/go116-zip.go117/archive/zip"
 
 const Deflate = zip.Deflate
 const Store = zip.Store

@@ -1,5 +1,5 @@
-//go:build go1.17 || (go1.16 && zip117)
-// +build go1.17 go1.16,zip117
+//go:build go1.17 || zip117
+// +build go1.17 zip117
 
 package kepub
 
