@@ -18,11 +18,13 @@ import (
 )
 
 // Convert converts the EPUB root r into a new EPUB written to w. If r is a
-// (*zip.Reader), the original zip metadata is preserved where possible, and
-// additional optimizations are applied to prevent re-compressing unchanged
-// data where possible. If processing untrusted EPUBs, r should not point to an
-// unrestricted on-disk filesystem since paths are not sanitized; it should
-// point to a (*zip.Reader) or other in-memory or synthetic filesystem.
+// (*zip.Reader) (from archive/zip by default, or from
+// github.com/pgaskin/kepubify/_/go116-zip.go117/archive/zip if the zip117 build
+// tag is used (even on Go 1.17)), the original zip metadata is preserved where
+// possible, and additional optimizations are applied to prevent re-compressing
+// unchanged data where possible. If processing untrusted EPUBs, r should not
+// point to an unrestricted on-disk filesystem since paths are not sanitized; it
+// should point to a (*zip.Reader) or other in-memory or synthetic filesystem.
 func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 	type FileAction int
 	const (
