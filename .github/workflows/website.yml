@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Build WebAssembly
-        uses: docker://golang:1.16-alpine
+        uses: docker://golang:1.17-alpine
         with:
           entrypoint: /usr/local/go/bin/go
           args: generate ./...

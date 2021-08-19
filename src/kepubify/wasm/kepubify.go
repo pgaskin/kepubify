@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"fmt"
@@ -9,11 +10,10 @@ import (
 	"syscall/js"
 	_ "unsafe"
 
-	"github.com/pgaskin/kepubify/_/go116-zip.go117/archive/zip"
 	"github.com/pgaskin/kepubify/v4/kepub"
 )
 
-//go:generate env GOOS=js GOARCH=wasm go build -tags zip117 -trimpath -o kepubify.wasm
+//go:generate env GOOS=js GOARCH=wasm go build -trimpath -o kepubify.wasm
 
 //go:linkname withProgress github.com/pgaskin/kepubify/v4/kepub.withProgress
 func withProgress(ctx context.Context, delta float64, fn func(n, total int)) context.Context
