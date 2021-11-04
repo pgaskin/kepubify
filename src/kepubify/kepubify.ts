@@ -15,9 +15,9 @@ export class Kepubify {
 
     constructor() {
         // set some sane defaults for the queue
-        if ((window as any).chrome) {
-            // chrome has better memory management and performance for workers
-            this.#queueLimitWorkers = Math.max(Math.min(navigator.hardwareConcurrency || 2, 1), /Mobi/i.test(window.navigator.userAgent) ? 2 : 8)
+        if (isChrome() || isFirefox94()) {
+            // chrome and firefox 94+ has better memory management and performance for workers
+            this.#queueLimitWorkers = Math.max(Math.min(Math.ceil(navigator.hardwareConcurrency / (isChrome() ? 1 : 2)) || 2, 1), isMobile() ? 2 : 8)
             this.#queueLimitFileSize = Math.max(Math.min(((navigator as any).deviceMemory || 2 as number)*1_000_000_000 / 2, 4_000_000_000) / this.#queueLimitWorkers, 50_000_000) / 2
             this.#queueLimitFileSizeHard = 300_000_000
         } else {
@@ -423,4 +423,17 @@ function formatBytes(bytes: number): string {
     } else {
         return `${Math.round(bytes)} bytes`
     }
+}
+
+function isChrome(): boolean {
+    return !!(window as any).chrome
+}
+
+function isFirefox94(): boolean {
+    const m = navigator.userAgent.match(/\sFirefox\/([0-9]+)\./)
+    return m?.length == 2 && parseInt(m[1], 10) >= 94
+}
+
+function isMobile(): boolean {
+    return /Mobi/i.test(window.navigator.userAgent)
 }
