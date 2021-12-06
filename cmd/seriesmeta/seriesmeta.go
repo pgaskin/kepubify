@@ -262,7 +262,11 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 	var epubs []string
 	err := filepath.Walk(k.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("error scanning %q: %w", path, err)
+			if path != k.Path {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to scan %q: %v.\n", path, err)
+			} else {
+				return fmt.Errorf("error scanning %q: %w", path, err)
+			}
 		}
 		if !info.IsDir() && strings.EqualFold(filepath.Ext(path), ".epub") {
 			epubs = append(epubs, path)
