@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"mime"
 	"path"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/atom"
+	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/charset"
 )
 
 // TransformFileFilter returns true if a file should be filtered from the EPUB.
@@ -152,14 +154,24 @@ func transformOPFCalibreMeta(doc *etree.Document) {
 //  * [optional] find/replace
 //    To allow users to apply quick one-off fixes to the generated HTML.
 //
+//  * [important] ensure charset is UTF-8
+//    EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
+//
 func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
-	doc, err := html.ParseWithOptions(r,
+	cr, err := charset.NewReader(r, "")
+	if err != nil {
+		return fmt.Errorf("parse html: %w", err)
+	}
+
+	doc, err := html.ParseWithOptions(cr,
 		html.ParseOptionEnableScripting(true),
 		html.ParseOptionIgnoreBOM(true),
 		html.ParseOptionLenientSelfClosing(true))
 	if err != nil {
 		return fmt.Errorf("parse html: %w", err)
 	}
+
+	transformContentCharsetUTF8(doc) // charset.NewReader always outputs UTF-8
 
 	transformContentKoboStyles(doc) // mandatory
 	transformContentKoboDivs(doc)   // mandatory
@@ -189,6 +201,44 @@ func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 	}
 
 	return nil
+}
+
+func transformContentCharsetUTF8(doc *html.Node) {
+	var stack []*html.Node
+	var cur *html.Node
+	stack = append(stack, findAtom(doc, atom.Head))
+
+	// update the meta[charset] or meta[http-equiv="content-type"] if it's there
+	for len(stack) != 0 {
+		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
+		if cur.Type == html.ElementNode {
+			if cur.DataAtom == atom.Meta {
+				for i, a := range cur.Attr {
+					if a.Key == "charset" {
+						cur.Attr[i].Val = "UTF-8"
+						break
+					}
+					if a.Key == "http-equiv" && strings.ToLower(a.Val) == "content-type" {
+						for j, b := range cur.Attr {
+							if b.Key == "content" {
+								if t, p, err := mime.ParseMediaType(b.Val); err == nil {
+									if _, ok := p["charset"]; ok {
+										p["charset"] = "utf-8"
+										cur.Attr[j].Val = mime.FormatMediaType(t, p)
+									}
+								}
+								break
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+		for c := cur.LastChild; c != nil; c = c.PrevSibling {
+			stack = append(stack, c)
+		}
+	}
 }
 
 func transformContentKoboStyles(doc *html.Node) {

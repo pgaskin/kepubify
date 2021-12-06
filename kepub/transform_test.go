@@ -95,6 +95,25 @@ func TestTransformContent(t *testing.T) {
 }
 
 func TestTransformContentParts(t *testing.T) {
+	t.Run("Charset", func(t *testing.T) {
+		transformContentCase{
+			Func:     transformContentCharsetUTF8,
+			What:     "charset meta element",
+			Fragment: false,
+			Contains: true,
+			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="iso-8859-1"/></head><body></body></html>`,
+			Out:      `meta charset="UTF-8"`,
+		}.Run(t)
+		transformContentCase{
+			Func:     transformContentCharsetUTF8,
+			What:     "http-equiv content-type charset meta element",
+			Fragment: false,
+			Contains: true,
+			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta http-equiv="content-type" content="application/xhtml+xml; charset=iso-8859-1"/></head><body></body></html>`,
+			Out:      `meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8"`,
+		}.Run(t)
+	})
+
 	t.Run("KoboStyles", func(t *testing.T) {
 		transformContentCase{
 			Func:     transformContentKoboStyles,
