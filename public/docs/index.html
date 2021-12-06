@@ -180,15 +180,15 @@ Conversion Options:
             <ol>
                 <li>Open PowerShell.</li>
                 <li>Type <code>$library = "C:\path\to\Calibre Library\"</code>, setting your library path accordingly, and press enter. This will set the path used in the next two commands.</li>
-                <li>Type <code>C:\path\to\kepubify.exe --update --inplace "$library"</code>, setting the path to kepubify accordingly, and press enter. This will convert any unconverted books. If you also want to re-convert books which are already converted, remove the <code>--update</code>.</li>
+                <li>Type <code>C:\path\to\kepubify.exe --calibre --update --inplace "$library"</code>, setting the path to kepubify accordingly, and press enter. This will convert any unconverted books. If you also want to re-convert books which are already converted, remove the <code>--update</code>.</li>
                 <li>Type <code>dir -Path "$library" -Filter *.kepub -Recurse | %{calibredb add -m 'ignore' $_.FullName}</code> and press enter. This will add the converted books to the Calibre database.</li>
             </ol>
             <h3>Converting your Calibre library with kepubify (Linux/macOS)</h3>
             <ol>
                 <li>Open a terminal window.</li>
                 <li>Type <code>LIBRARY="/path/to/Calibre Library"</code>, setting your library path accordingly, and press enter. This will set the path used in the next two commands.</li>
-                <li>Type <code>kepubify --update --inplace "$library"</code>, setting the path to kepubify accordingly, and press enter. This will convert any unconverted books. If you also want to re-convert books which are already converted, remove the <code>--update</code>.</li>
-                <li>Type <code>find "$LIBRARY" -name '*.kepub' | xargs calibredb add -m 'ignore'</code>, and press enter. This will add the converted books to the Calibre database.</li>
+                <li>Type <code>kepubify --calibre --update --inplace "$library"</code>, setting the path to kepubify accordingly, and press enter. This will convert any unconverted books. If you also want to re-convert books which are already converted, remove the <code>--update</code>.</li>
+                <li>Type <code>find "$LIBRARY" -name '*.kepub' | xargs -I _ calibredb add -m 'ignore' _</code>, and press enter. This will add the converted books to the Calibre database.</li>
             </ol>
         </section>
         <section id="seriesmeta">
