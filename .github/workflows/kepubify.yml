@@ -135,7 +135,7 @@ jobs:
          uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.17.3-arm", with: {entrypoint: /crossbuild,
          args: "--platforms linux/arm64 --build-cmd \"CGO_ENABLED=1 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-linux-arm64 ./cmd/seriesmeta\""}}
       - {name: Build - seriesmeta-darwin-64bit,
-         uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.9-darwin", with: {entrypoint: /crossbuild,
+         uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.9-darwin-debian10", with: {entrypoint: /crossbuild,
          args: "--platforms darwin/amd64 --build-cmd \"CGO_ENABLED=1 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-darwin-64bit ./cmd/seriesmeta\""}}
       - {name: Build - seriesmeta-windows-64bit.exe,
          uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.17.3-main", with: {entrypoint: /crossbuild,
