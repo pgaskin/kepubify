@@ -106,11 +106,27 @@ func TestTransformContentParts(t *testing.T) {
 		}.Run(t)
 		transformContentCase{
 			Func:     transformContentCharsetUTF8,
+			What:     "charset meta element (case-insensitive, unchanged)",
+			Fragment: false,
+			Contains: true,
+			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="UTf-8"/></head><body></body></html>`,
+			Out:      `meta charset="UTf-8"`,
+		}.Run(t)
+		transformContentCase{
+			Func:     transformContentCharsetUTF8,
 			What:     "http-equiv content-type charset meta element",
 			Fragment: false,
 			Contains: true,
 			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta http-equiv="content-type" content="application/xhtml+xml; charset=iso-8859-1"/></head><body></body></html>`,
 			Out:      `meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8"`,
+		}.Run(t)
+		transformContentCase{
+			Func:     transformContentCharsetUTF8,
+			What:     "http-equiv content-type charset meta element (case-insensitive, unchanged)",
+			Fragment: false,
+			Contains: true,
+			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta http-equiv="content-type" content="application/xhtml+xml; charset=UTf-8"/></head><body></body></html>`,
+			Out:      `meta http-equiv="content-type" content="application/xhtml+xml; charset=UTf-8"`,
 		}.Run(t)
 	})
 

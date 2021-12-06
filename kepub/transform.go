@@ -214,7 +214,7 @@ func transformContentCharsetUTF8(doc *html.Node) {
 		if cur.Type == html.ElementNode {
 			if cur.DataAtom == atom.Meta {
 				for i, a := range cur.Attr {
-					if a.Key == "charset" {
+					if a.Key == "charset" && strings.ToUpper(cur.Attr[i].Val) != "UTF-8" {
 						cur.Attr[i].Val = "UTF-8"
 						break
 					}
@@ -222,7 +222,7 @@ func transformContentCharsetUTF8(doc *html.Node) {
 						for j, b := range cur.Attr {
 							if b.Key == "content" {
 								if t, p, err := mime.ParseMediaType(b.Val); err == nil {
-									if _, ok := p["charset"]; ok {
+									if _, ok := p["charset"]; ok && strings.ToLower(p["charset"]) != "utf-8" {
 										p["charset"] = "utf-8"
 										cur.Attr[j].Val = mime.FormatMediaType(t, p)
 									}
