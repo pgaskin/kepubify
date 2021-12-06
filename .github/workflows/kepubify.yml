@@ -127,19 +127,19 @@ jobs:
 
       - {name: Build - seriesmeta-linux-64bit,
          uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.6-main", with: {entrypoint: /crossbuild,
-         args: "--platforms linux/amd64 --build-cmd \"CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-linux-64bit ./cmd/seriesmeta\""}}
+         args: "--platforms linux/amd64 --build-cmd \"CGO_ENABLED=1 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-linux-64bit ./cmd/seriesmeta\""}}
       - {name: Build - seriesmeta-linux-arm,
          uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.6-armhf", with: {entrypoint: /crossbuild,
-         args: "--platforms linux/armv7 --build-cmd \"CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-linux-arm ./cmd/seriesmeta\""}}
+         args: "--platforms linux/armv7 --build-cmd \"CGO_ENABLED=1 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-linux-arm ./cmd/seriesmeta\""}}
       - {name: Build - seriesmeta-linux-arm64,
          uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.6-arm", with: {entrypoint: /crossbuild,
-         args: "--platforms linux/arm64 --build-cmd \"CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-linux-arm64 ./cmd/seriesmeta\""}}
+         args: "--platforms linux/arm64 --build-cmd \"CGO_ENABLED=1 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-linux-arm64 ./cmd/seriesmeta\""}}
       - {name: Build - seriesmeta-darwin-64bit,
          uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.6-darwin", with: {entrypoint: /crossbuild,
-         args: "--platforms darwin/amd64 --build-cmd \"CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-darwin-64bit ./cmd/seriesmeta\""}}
+         args: "--platforms darwin/amd64 --build-cmd \"CGO_ENABLED=1 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-darwin-64bit ./cmd/seriesmeta\""}}
       - {name: Build - seriesmeta-windows-64bit.exe,
          uses: "docker://docker.elastic.co/beats-dev/golang-crossbuild:1.16.6-main", with: {entrypoint: /crossbuild,
-         args: "--platforms windows/amd64 --build-cmd \"CGO_ENABLED=0 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-windows-64bit.exe ./cmd/seriesmeta\""}}
+         args: "--platforms windows/amd64 --build-cmd \"CGO_ENABLED=1 go build -v -ldflags '-s -w -X main.version=${{steps.version.outputs.version}}' -trimpath -o ./build/seriesmeta-windows-64bit.exe ./cmd/seriesmeta\""}}
 
       - name: List
         run: |
