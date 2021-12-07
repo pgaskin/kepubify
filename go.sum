@@ -9,8 +9,8 @@ github.com/pgaskin/kepubify/_/go116-zip.go117 v0.0.0-20210611152744-2d89b3182523
 github.com/pgaskin/kepubify/_/go116-zip.go117 v0.0.0-20210611152744-2d89b3182523/go.mod h1:FNMbV/TSSnhqyzjq8jsS+VD0o/gwpuCH0dh8G1uQ/fw=
 github.com/pgaskin/kepubify/_/html v0.0.0-20210611145339-337924fbbaf0 h1:qYHfG66zDgts5KsVYmDxHuIqEXOBZQ1lVdjS6tMAnHI=
 github.com/pgaskin/kepubify/_/html v0.0.0-20210611145339-337924fbbaf0/go.mod h1:fxzoIpMFAReNKunZ+ttVbf3hNVrJGtrSZMI4olZizbs=
-github.com/pgaskin/kepubify/v4 v4.0.1 h1:p07nDGNKnqTJe3tWXkSG89V2cXIVR3/nMlbZMDyU8D4=
-github.com/pgaskin/kepubify/v4 v4.0.1/go.mod h1:yXgeLLFjUsjTSGAf+zhytMmQBXSIiLgj76JpU/z4kOo=
+github.com/pgaskin/kepubify/v4 v4.0.2 h1:6gIbMyLLithZSAET5MqrMxWstr8KpZEo3gJY8V/1XkM=
+github.com/pgaskin/kepubify/v4 v4.0.2/go.mod h1:yXgeLLFjUsjTSGAf+zhytMmQBXSIiLgj76JpU/z4kOo=
 github.com/pgaskin/koboutils/v2 v2.1.1/go.mod h1:wTzkDIlsxmUyfwfspGcm0Ap+HOxSUYV0S8kMYrf+0gM=
 github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c h1:5KslGYwFpkhGh+Q16bwMP3cOontH8FOep7tGV86Y7SQ=
