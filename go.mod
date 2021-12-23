@@ -16,7 +16,7 @@ require (
 require (
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/mattn/go-sqlite3 v1.14.8
+	github.com/mattn/go-sqlite3 v1.14.9
 	github.com/pgaskin/koboutils/v2 v2.1.1
 	github.com/spf13/pflag v1.0.5
 )
