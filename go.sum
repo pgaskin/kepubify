@@ -10,8 +10,8 @@ github.com/mattn/go-sqlite3 v1.14.8 h1:gDp86IdQsN/xWjIEmr9MF6o9mpksUgh0fu+9ByFxz
 github.com/mattn/go-sqlite3 v1.14.8/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
 github.com/pgaskin/kepubify/_/go116-zip.go117 v0.0.0-20210611152744-2d89b3182523 h1:pYGj3rKTy+TDs5Z707kT+ztjoIDCy76lc2UPkZocAFM=
 github.com/pgaskin/kepubify/_/go116-zip.go117 v0.0.0-20210611152744-2d89b3182523/go.mod h1:FNMbV/TSSnhqyzjq8jsS+VD0o/gwpuCH0dh8G1uQ/fw=
-github.com/pgaskin/kepubify/_/html v0.0.0-20210611145339-337924fbbaf0 h1:qYHfG66zDgts5KsVYmDxHuIqEXOBZQ1lVdjS6tMAnHI=
-github.com/pgaskin/kepubify/_/html v0.0.0-20210611145339-337924fbbaf0/go.mod h1:fxzoIpMFAReNKunZ+ttVbf3hNVrJGtrSZMI4olZizbs=
+github.com/pgaskin/kepubify/_/html v0.0.0-20211223234002-6ee2cc632cdc h1:mJk4TIXTO+JmxgHJ5iyil42PLQJWkyaKB/qNcjJU6h4=
+github.com/pgaskin/kepubify/_/html v0.0.0-20211223234002-6ee2cc632cdc/go.mod h1:fxzoIpMFAReNKunZ+ttVbf3hNVrJGtrSZMI4olZizbs=
 github.com/pgaskin/koboutils/v2 v2.1.1 h1:Or5y+z8rXlip0Al8tiSj+Fb9NkuLhkcw1UPpzPPvKWY=
 github.com/pgaskin/koboutils/v2 v2.1.1/go.mod h1:wTzkDIlsxmUyfwfspGcm0Ap+HOxSUYV0S8kMYrf+0gM=
 github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=
