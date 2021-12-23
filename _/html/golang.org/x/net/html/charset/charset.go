@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -46,7 +47,7 @@ func (h *htmlEncoding) NewEncoder() *encoding.Encoder {
 	return encoding.HTMLEscapeUnsupported(h.Encoding.NewEncoder())
 }
 
-// DetermineEncoding determines the encoding of an HTML document by examining
+// DetermineEncoding determines the encoding of a (X)HTML document by examining
 // up to the first 1024 bytes of content and the declared Content-Type.
 //
 // See http://www.whatwg.org/specs/web-apps/current-work/multipage/parsing.html#determining-the-character-encoding
@@ -71,6 +72,10 @@ func DetermineEncoding(content []byte, contentType string) (e encoding.Encoding,
 	}
 
 	if len(content) > 0 {
+		e, name = prescanXML(content)
+		if e != nil {
+			return e, name, false
+		}
 		e, name = prescan(content)
 		if e != nil {
 			return e, name, false
@@ -135,6 +140,21 @@ func NewReaderLabel(label string, input io.Reader) (io.Reader, error) {
 		return nil, fmt.Errorf("unsupported charset: %q", label)
 	}
 	return transform.NewReader(input, e.NewDecoder()), nil
+}
+
+// https://www.w3.org/TR/2008/REC-xml-20081126/#sec-prolog-dtd
+var xmlDeclRe = regexp.MustCompile(`^<\?xml[ \t\r\n]+version[ \t\r\n]*=[ \t\r\n]*(?:"1\.[0-9]+"|'1\.[0-9]+')(?:[ \t\r\n]+encoding[ \t\r\n]*=[ \t\r\n]*(?:"([A-Za-z][A-Za-z0-9._-]*)"|'([A-Za-z][A-Za-z0-9._-]*)'))?(?:[ \t\r\n]+standalone[ \t\r\n]*=[ \t\r\n]*(?:"(?:yes|no)"|'(?:yes|no)'))?[ \t\r\n]*\?>`)
+
+func prescanXML(content []byte) (e encoding.Encoding, name string) {
+	if m := xmlDeclRe.FindSubmatch(content); m != nil {
+		for _, x := range m[1:] {
+			if len(x) != 0 {
+				e, name = Lookup(string(x))
+				break
+			}
+		}
+	}
+	return
 }
 
 func prescan(content []byte) (e encoding.Encoding, name string) {

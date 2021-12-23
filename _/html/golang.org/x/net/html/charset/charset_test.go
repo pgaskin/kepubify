@@ -133,6 +133,7 @@ var sniffTestCases = []struct {
 	{"HTTP-vs-meta-charset.html", "text/html; charset=iso-8859-15", "iso-8859-15"},
 	{"UTF-8-BOM-vs-meta-content.html", "text/html", "utf-8"},
 	{"UTF-8-BOM-vs-meta-charset.html", "text/html", "utf-8"},
+	{"Simple-XHTML.xhtml", "application/xhtml+xml", "utf-8"},
 }
 
 func TestSniff(t *testing.T) {
