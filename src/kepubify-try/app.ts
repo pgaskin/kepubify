@@ -144,7 +144,7 @@ export class KepubifyApp {
 
             const elStatus = el.appendChild(document.createElement("div"))
             elStatus.classList.add("file__status")
-            elStatus.textContent = ex.toString()
+            elStatus.textContent = `${ex}`
 
             const elInfoRemove = elInfo.appendChild(document.createElement("button"))
             elInfoRemove.textContent = "−"

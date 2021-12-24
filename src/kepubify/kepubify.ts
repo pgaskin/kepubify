@@ -6,7 +6,7 @@ type QueueTask = {
     config: KepubifyWasmOption[],
     progress?: (n: number, total: number) => void,
     resolve: (kepub: Blob) => void,
-    reject: (err: Error) => void,
+    reject: (err?: any) => void,
 }
 
 export class Kepubify {
