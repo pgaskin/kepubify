@@ -22,6 +22,9 @@ type Converter struct {
 	// titlepage fix
 	dummyTitlepageForce      bool
 	dummyTitlepageForceValue bool
+
+	// charset override
+	charset string // "auto" for auto-detection
 }
 
 // ConverterOption configures a Converter.
@@ -85,6 +88,14 @@ func ConverterOptionHyphenate(hyphenate bool) ConverterOption {
 // older than 4.19.11911.
 func ConverterOptionFullScreenFixes() ConverterOption {
 	return converterOptionAddCSS("kepubify-fullscreenfixes", cssFullScreenFixes)
+}
+
+// ConverterOptionCharset overrides the charset for all content documents. Use
+// "auto" to automatically detect the charset.
+func ConverterOptionCharset(charset string) ConverterOption {
+	return func(c *Converter) {
+		c.charset = charset
+	}
 }
 
 func converterOptionAddCSS(class, css string) ConverterOption {

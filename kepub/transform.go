@@ -158,12 +158,24 @@ func transformOPFCalibreMeta(doc *etree.Document) {
 //    EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
 //
 func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
-	cr, err := charset.NewReader(r, "")
-	if err != nil {
-		return fmt.Errorf("parse html: %w", err)
+	switch strings.ToLower(c.charset) {
+	case "utf-8", "":
+		// do nothing
+	case "auto":
+		cr, err := charset.NewReader(r, "")
+		if err != nil {
+			return fmt.Errorf("parse html: detect charset: %w", err)
+		}
+		r = cr
+	default:
+		enc, _ := charset.Lookup(c.charset)
+		if enc == nil {
+			return fmt.Errorf("parset html: invalid charset %q", c.charset)
+		}
+		r = enc.NewDecoder().Reader(r)
 	}
 
-	doc, err := html.ParseWithOptions(cr,
+	doc, err := html.ParseWithOptions(r,
 		html.ParseOptionEnableScripting(true),
 		html.ParseOptionIgnoreBOM(true),
 		html.ParseOptionLenientSelfClosing(true))
