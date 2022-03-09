@@ -93,6 +93,8 @@ jobs:
          uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/kepubify-linux-32bit ./cmd/kepubify"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: 386}}
       - {name: Build - kepubify-linux-arm,
          uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/kepubify-linux-arm ./cmd/kepubify"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm, GOARM: 7}}
+      - {name: Build - kepubify-linux-armv6,
+         uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/kepubify-linux-armv6 ./cmd/kepubify"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm, GOARM: 6}}
       - {name: Build - kepubify-linux-arm64,
          uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/kepubify-linux-arm64 ./cmd/kepubify"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm64}}
       - {name: Build - kepubify-darwin-64bit,
@@ -112,6 +114,8 @@ jobs:
          uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/covergen-linux-32bit ./cmd/covergen"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: 386}}
       - {name: Build - covergen-linux-arm,
          uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/covergen-linux-arm ./cmd/covergen"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm, GOARM: 7}}
+      - {name: Build - covergen-linux-armv6,
+         uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/covergen-linux-armv6 ./cmd/covergen"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm, GOARM: 6}}
       - {name: Build - covergen-linux-arm64,
          uses: "docker://golang:1.17-alpine", with: {entrypoint: go, args: "build -v -ldflags \"-s -w -X main.version=${{steps.version.outputs.version}}\" -trimpath -o ./build/covergen-linux-arm64 ./cmd/covergen"}, env: {CGO_ENABLED: 0, GOOS: linux, GOARCH: arm64}}
       - {name: Build - covergen-darwin-64bit,
