@@ -51,8 +51,9 @@ func main() {
 	adddummytitlepage := pflag.Bool("add-dummy-titlepage", false, "Force-enables the dummy titlepage to fix layout issues with the first content file on certain books (this is enabled when needed using a heuristic if not specified)")
 	noadddummytitlepage := pflag.Bool("no-add-dummy-titlepage", false, "Force-disables the dummy titlepage")
 	replace := pflag.StringArrayP("replace", "r", nil, "Find and replace on all html files (repeat any number of times) (format: find|replace)")
+	charset := pflag.String("charset", "utf-8", "Override the HTML charset (use \"auto\" to detect it from the content)")
 
-	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "replace"} {
+	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "replace", "charset"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
 	}
 
@@ -116,6 +117,7 @@ func main() {
 		}
 		opts = append(opts, kepub.ConverterOptionFindReplace(spl[0], spl[1]))
 	}
+	opts = append(opts, kepub.ConverterOptionCharset(*charset))
 	converter := kepub.NewConverterWithOptions(opts...)
 
 	// --- Transform paths --- //
