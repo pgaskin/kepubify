@@ -424,6 +424,15 @@ section#try .file:not(:focus):not(:hover) > .file__status {
 section#try .file > .file__status:not(:focus):not(:hover) {
     white-space: nowrap;
 }
+section#try .hint {
+    font-size: 0.75em;
+    padding: .25rem;
+    text-align: center;
+    opacity: 0.75;
+}
+section#try .hint.hint--hidden {
+    display: none;
+}
 section#try > .try__pane.try__pane--options {
     flex: 1;
 }

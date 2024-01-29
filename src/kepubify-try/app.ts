@@ -11,6 +11,7 @@ export class KepubifyApp {
         files: HTMLElement,
         options: HTMLFormElement,
         placeholder?: HTMLElement,
+        hint?: HTMLElement,
     }
     #initializedUI = false
 
@@ -70,6 +71,11 @@ export class KepubifyApp {
             ? "Choose a file..."
             : "Drop your files here, or click to browse..."
 
+        this.#ref.hint = this.#ref.files.appendChild(document.createElement("div"))
+        this.#ref.hint.classList.add("hint")
+        this.#ref.hint.classList.add("hint--hidden")
+        this.#ref.hint.textContent = "Each file will turn green when the conversion is complete. Click the blue filename link to download the converted file."
+
         this.#ref.placeholder = el
 
         this.#ref.placeholder.addEventListener("click", () => {
@@ -115,6 +121,8 @@ export class KepubifyApp {
         Sentry.addBreadcrumb({
             message: `Enqueuing ${epub.name} (size=${epub.size}, type=${epub.type})`,
         })
+
+        this.#ref.hint!.classList.remove("hint--hidden")
 
         const el = this.#ref.placeholder!.insertAdjacentElement("beforebegin", document.createElement("div"))!
         el.classList.add("file")
