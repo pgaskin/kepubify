@@ -1,0 +1,106 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NickelSeries</title>
+    <link rel="canonical" href="https://pgaskin.net/kepubify/">
+    <meta name="author" content="Patrick Gaskin">
+    <meta name="description" content="NickelSeries allows Kobo eReaders to parse series and subtitle metadata from sideloaded books.">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,700;1,400;1,700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/style-69fd4081.css">
+</head>
+<body>
+    <header class="main">
+        <h2>NickelSeries</h2>
+        <p>NickelSeries allows Kobo eReaders to parse series and subtitle metadata from sideloaded books.</p>
+        <p>
+            <a href="https://ns.storage.pgaskin.net/NickelSeries_v3-a06f1ac.zip" class="btn btn--primary">Download</a>
+            <a href="https://github.com/pgaskin/kobo-mods/tree/master/NickelSeries" class="btn">Source Code</a>
+        </p>
+    </header>
+    <section>
+        <h3>Getting Started</h3>
+        <p>To install or update NickelSeries, <a href="https://ns.storage.pgaskin.net/NickelSeries_v3-a06f1ac.zip">download</a> it and copy <code>KoboRoot.tgz</code> to the <code>.kobo</code> folder (you may need to show hidden files).</p>
+        <p>After a reboot, series and subtitle metadata from sideloaded EPUBs or KEPUBs will be automatically imported with the book.</p>
+    </section>
+    <section>
+        <h3>Features</h3>
+        <ul>
+            <li>Works on EPUB and KEPUB files.</li>
+            <li>Compatible with the Calibre Kobo plugin.</li>
+            <li>Compatible with Calibre or EPUB3 series metadata (Calibre takes precedence).</li>
+            <li>Will not override Nickel if Kobo ends up implementing it.</li>
+            <li>Compatible with firmware 3.19.5761+.</li>
+            <li>Survives firmware updates.</li>
+            <li>Does not modify any system files, single file only.</li>
+            <li>Easy to uninstall (either delete it over telnet/ssh or create a file named <code>ns_uninstall</code> in the KOBOeReader partition).</li>
+            <li>Metadata appears instantly.</li>
+            <li>Will also add subtitle metadata (EPUB3 or a Calibre custom column named <code>#subtitle</code>).</li>
+        </ul>
+    </section>
+    <section>
+        <h3>Troubleshooting</h3>
+        <ul class="extra-space">
+            <li>
+                <b>How do I uninstall NickelSeries?</b><br>
+                Create a file named <code>ns_uninstall</code> (without any extension) in the KOBOeReader partition and reboot.
+            </li>
+            <li>
+                <b>How do I uninstall NickelSeries manually?</b><br>
+                Connect over Telnet/SSH and delete <code>/usr/local/Kobo/imageformats/libns.so</code>, or perform a full factory reset.
+            </li>
+            <li>
+                <b>Series metadata is incorrect or missing for imported books.</b><br>
+                Please report the issue and post a copy of the OPF document from within the EPUB.
+            </li>
+            <li>
+                <b>I installed NickelSeries and nothing changed!</b><br>
+                NickelSeries doesn't parse metadata for existing books. To do this, you can use seriesmeta with the argument <code>--no-persist</code>, or you can use the Calibre Kobo Touch Extended plugin.
+            </li>
+            <li>
+                <b>The series metadata changes after a reboot or USB connection.</b><br>
+                If you use Calibre or seriesmeta, those will take precedence.
+            </li>
+            <li>
+                <b>Will this conflict with Calibre or Kobo-UNCaGED?</b><br>
+                No. For the initial import, NickelSeries prioritizes the <code>calibre:series</code> meta tags. For changes afterwards, NickelSeries doesn't override them.
+            </li>
+            <li>
+                <b>My Kobo crashes when I try and import a book.</b><br>
+                This issue is unlikely to occur, but if it does, you can uninstall NickelSeries the usual way (see above).
+            </li>
+            <li>
+                <b>Where can I report a bug or get more help?</b><br>
+                See the <a href="https://www.mobileread.com/forums/showthread.php?t=331680">MobileRead discussion thread</a>, email me at <code>patrick (at) pgaskin (dot) net</code>, or <a href="https://github.com/pgaskin/kobo-mods/issues/new?title=NickelSeries">open an issue on GitHub</a>.
+            </li>
+        </ul>
+    </section>
+    <section>
+        <h3>Changelog</h3>
+        <ul class="extra-space">
+            <li>
+                <b>v4 (2023-10-13, 0deffca)</b> (<a href="https://ns.storage.pgaskin.net/NickelSeries_v4-0deffca.zip">download</a>)<br>
+                Fix bug in EPUB3 series metadata parsing due to undefined behavior.
+            </li>
+            <li>
+                <b>v3 (2020-08-12, a06f1ac)</b> (<a href="https://ns.storage.pgaskin.net/NickelSeries_v3-a06f1ac.zip">download</a>)<br>
+                Added support for using series metadata without an index.
+            </li>
+            <li>
+                <b>v2 (2020-07-24, 3c77ac0)</b> (<a href="https://ns.storage.pgaskin.net/NickelSeries_v2-3c77ac0.zip">download</a>)<br>
+                Switched to NickelHook, improved metadata parsing, added support for subtitle metadata, fixed parsing books with Unicode filenames.
+            </li>
+            <li>
+                <b>v1 (2020-07-19, 8c5d318)</b> (<a href="https://ns.storage.pgaskin.net/NickelSeries_v1-8c5d318.zip">download</a>)<br>
+                First stable version, all features implemented.
+            </li>
+        </ul>
+    </section>
+    <footer>
+        <p><a href="https://www.mobileread.com/forums/showthread.php?t=331680">MobileRead discussion thread</a></p>
+        <p>Copyright 2020-2022 Patrick Gaskin</p>
+    </footer>
+    <script async="" src="https://pg.ctr.pgaskin.net/count.js" data-goatcounter="https://pg.ctr.pgaskin.net/count"></script>
+
+</body></html>
