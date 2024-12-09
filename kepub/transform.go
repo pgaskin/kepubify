@@ -50,6 +50,16 @@ func (c *Converter) TransformFileFilter(fn string) bool {
 	return false
 }
 
+func (c *Converter) IsAudioFile(fn string) bool {
+	switch path.Ext(fn) {
+	case ".mp3", ".m4a", ".m4b", ".m4p", ".m4r", ".m4v", ".mp4", ".aac", ".flac", ".ogg", ".oga", ".opus", ".webm", ".wav":
+		return true
+	case ".smil": // The media overlay
+		return true
+	}
+	return false
+}
+
 // TransformOPF transforms the OPF document for a KEPUB.
 //
 //  * [mandatory] add the cover-image property to the cover.

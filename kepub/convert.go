@@ -137,6 +137,14 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 		}
 	}
 
+	if !c.leaveAudio {
+		for i, f := range files {
+			if c.IsAudioFile(f.Name) {
+				fileAct[i] = FileActionIgnore
+			}
+		}
+	}
+
 	// we'll manually create the mimetype file
 	if i, ok := fileIdx["mimetype"]; ok {
 		fileAct[i] = FileActionIgnore

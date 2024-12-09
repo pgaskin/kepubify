@@ -52,6 +52,7 @@ func main() {
 	noadddummytitlepage := pflag.Bool("no-add-dummy-titlepage", false, "Force-disables the dummy titlepage")
 	replace := pflag.StringArrayP("replace", "r", nil, "Find and replace on all html files (repeat any number of times) (format: find|replace)")
 	charset := pflag.String("charset", "utf-8", "Override the HTML charset (use \"auto\" to detect it from the content)")
+	leaveaudio := pflag.Bool("leave-audio", false, "Leave audio files in the book")
 
 	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "replace", "charset"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
@@ -107,6 +108,9 @@ func main() {
 		opts = append(opts, kepub.ConverterOptionDummyTitlepage(true))
 	} else if *noadddummytitlepage {
 		opts = append(opts, kepub.ConverterOptionDummyTitlepage(false))
+	}
+	if *leaveaudio {
+		opts = append(opts, kepub.ConverterOptionLeaveAudio(true))
 	}
 	for _, r := range *replace {
 		spl := strings.SplitN(r, "|", 2)

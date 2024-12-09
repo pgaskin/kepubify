@@ -25,6 +25,9 @@ type Converter struct {
 
 	// charset override
 	charset string // "auto" for auto-detection
+
+	// do not strip audio files (audiobook data)
+	leaveAudio bool
 }
 
 // ConverterOption configures a Converter.
@@ -42,6 +45,13 @@ func NewConverterWithOptions(opts ...ConverterOption) *Converter {
 		f(c)
 	}
 	return c
+}
+
+// ConverterOptionLeaveAudio enables or disables leaving audio files in the book.
+func ConverterOptionLeaveAudio(leave bool) ConverterOption {
+	return func(c *Converter) {
+		c.leaveAudio = leave
+	}
 }
 
 // ConverterOptionSmartypants enables smart punctuation.
