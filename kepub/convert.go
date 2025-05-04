@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pgaskin/kepubify/v4/internal/zip"
+	"github.com/pgaskin/kepubify/v5/internal/zip"
 	"golang.org/x/sync/errgroup"
 )
 

@@ -1,6 +1,6 @@
-module github.com/pgaskin/kepubify/v4
+module github.com/pgaskin/kepubify/v5
 
-go 1.16
+go 1.24.0
 
 // kepub
 require (

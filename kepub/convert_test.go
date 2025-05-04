@@ -18,7 +18,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/pgaskin/kepubify/v4/internal/zip"
+	"github.com/pgaskin/kepubify/v5/internal/zip"
 )
 
 // The intention of these tests are to provide quick checks for important
