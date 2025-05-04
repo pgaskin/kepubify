@@ -1,19 +1,18 @@
 package kepub
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"io/fs"
-	"math"
 	"path"
 	"runtime"
 	"strings"
 	"sync"
 
-	"github.com/pgaskin/kepubify/v5/internal/zip"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -64,12 +63,7 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 				Name:               path,
 				Method:             zip.Deflate,
 				UncompressedSize64: uint64(i.Size()),
-			}
-			fh.SetModTime(i.ModTime())
-			if fh.UncompressedSize64 > math.MaxUint32 {
-				fh.UncompressedSize = math.MaxUint32
-			} else {
-				fh.UncompressedSize = uint32(fh.UncompressedSize64)
+				Modified:           i.ModTime(),
 			}
 
 			// because it's an epub (but this won't matter because we skip it)
@@ -222,8 +216,8 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 							err = err1
 						} else if a {
 							buf1 := pool.Get().(*bytes.Buffer)
-							if _, err := buf1.ReadFrom(r); err != nil {
-								err = fmt.Errorf("apply title page fix: %w", err)
+							if _, err1 := buf1.ReadFrom(r); err1 != nil {
+								err = fmt.Errorf("apply title page fix: %w", err1)
 							} else {
 								fh := &zip.FileHeader{
 									Name:   fn,
@@ -291,7 +285,7 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 		case nil:
 			var err error
 			if zr, ok := r.(*zip.Reader); ok {
-				err = zipCopy(zw, zr.File[of.Index])
+				err = zw.Copy(zr.File[of.Index])
 			} else {
 				err = zipCopyFS(zw, f, r)
 			}
@@ -443,13 +437,6 @@ func zipReplace(z *zip.Writer, f *zip.FileHeader, r io.Reader) error {
 	return err
 }
 
-// zipCopy copies a file from one zip archive to another. On Go 1.17+, this uses
-// (*zip.Writer).Copy, which is much faster than reading and re-compressing the
-// data.
-func zipCopy(z *zip.Writer, f *zip.File) error {
-	return zipCopyImpl(z, f)
-}
-
 // zipCopy copies a file from a FS to a zip using the information in the
 // provided FileHeader.
 func zipCopyFS(z *zip.Writer, f *zip.FileHeader, fs fs.FS) error {
@@ -464,8 +451,6 @@ func zipCopyFS(z *zip.Writer, f *zip.FileHeader, fs fs.FS) error {
 		Comment:       f.Comment,
 		Method:        f.Method,
 		Modified:      f.Modified,
-		ModifiedTime:  f.ModifiedTime,
-		ModifiedDate:  f.ModifiedDate,
 		Extra:         f.Extra,
 		ExternalAttrs: f.ExternalAttrs,
 	})

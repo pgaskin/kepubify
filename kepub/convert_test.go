@@ -1,6 +1,7 @@
 package kepub
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha1"
@@ -10,15 +11,12 @@ import (
 	"image/png"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
-
-	"github.com/pgaskin/kepubify/v5/internal/zip"
 )
 
 // The intention of these tests are to provide quick checks for important
@@ -646,7 +644,7 @@ func FileShould(file string, fn func(contents string) error) ShouldFunc {
 		}
 		defer rc.Close()
 
-		buf, err := ioutil.ReadAll(rc)
+		buf, err := io.ReadAll(rc)
 		if err != nil {
 			return fmt.Errorf("failed to read file %q in kepub: %v", file, err)
 		}
@@ -728,6 +726,9 @@ func epubFsToZip(epub fs.FS) (*zip.Reader, error) {
 	}
 
 	if err := fs.WalkDir(epub, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if d.IsDir() || d.Name() == "mimetype" {
 			return nil
 		}
