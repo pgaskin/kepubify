@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -1223,7 +1224,7 @@ var testSentences = []string{
 
 func TestSplitSentences(t *testing.T) {
 	for _, v := range testSentences {
-		sss := splitSentences(v, nil)
+		sss := slices.Collect(splitSentencesSeq(v))
 		ssr := splitSentencesRegexp(v)
 
 		if len(sss) == len(ssr) {
@@ -1245,17 +1246,18 @@ func TestSplitSentences(t *testing.T) {
 func BenchmarkSplitSentences(b *testing.B) {
 	b.SetParallelism(1) // for more accurate results
 	b.Run("Regexp", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			for _, v := range testSentences {
 				splitSentencesRegexp(v)
 			}
 		}
 	})
 	b.Run("StateMachine", func(b *testing.B) {
-		sentences := make([]string, 0, 8)
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			for _, v := range testSentences {
-				sentences = splitSentences(v, sentences[:0])
+				for range splitSentencesSeq(v) {
+					// nop
+				}
 			}
 		}
 	})

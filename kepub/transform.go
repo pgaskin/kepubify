@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"iter"
 	"mime"
 	"path"
 	"strconv"
@@ -24,14 +25,13 @@ import (
 
 // TransformFileFilter returns true if a file should be filtered from the EPUB.
 //
-//  * [extra] remove calibre_bookmarks.txt
+//   - [extra] remove calibre_bookmarks.txt
 //
-//  * [extra] remove iBooks metadata
+//   - [extra] remove iBooks metadata
 //
-//  * [extra] remove macOS metadata
+//   - [extra] remove macOS metadata
 //
-//  * [extra] remove Windows metadata
-//
+//   - [extra] remove Windows metadata
 func (c *Converter) TransformFileFilter(fn string) bool {
 	switch path.Base(fn) {
 	case "calibre_bookmarks.txt": // Calibre
@@ -52,16 +52,15 @@ func (c *Converter) TransformFileFilter(fn string) bool {
 
 // TransformOPF transforms the OPF document for a KEPUB.
 //
-//  * [mandatory] add the cover-image property to the cover.
-//    Kobo only supports the standardized EPUB3-style method of specifying the
-//    cover (`manifest>item[properties="cover-image"]`), but most older EPUBs
-//    will reference the manifest item with a meta element like
-//    `meta[name="cover"][content="{manifest-item-id}"]`. or just set the
-//    manifest item ID to `cover` instead of using `properties`.
+//   - [mandatory] add the cover-image property to the cover.
+//     Kobo only supports the standardized EPUB3-style method of specifying the
+//     cover (`manifest>item[properties="cover-image"]`), but most older EPUBs
+//     will reference the manifest item with a meta element like
+//     `meta[name="cover"][content="{manifest-item-id}"]`. or just set the
+//     manifest item ID to `cover` instead of using `properties`.
 //
-//  * [extra] remove unnecessary Calibre metadata.
-//    Removes extraneous metadata elements commonly added by Calibre.
-//
+//   - [extra] remove unnecessary Calibre metadata.
+//     Removes extraneous metadata elements commonly added by Calibre.
 func (c *Converter) TransformOPF(w io.Writer, r io.Reader) error {
 	doc := etree.NewDocument()
 	if _, err := doc.ReadFrom(r); err != nil {
@@ -101,62 +100,61 @@ func transformOPFCalibreMeta(doc *etree.Document) {
 
 // TransformContent transforms an HTML4/HTML5/XHTML1.1 document for a KEPUB.
 //
-//  * [important] parses the XHTML with XHTML/XML/HTML4/HTML5-compatible rules
-//    Quite a few books have invalid XHTML, and this prevents the markup from
-//    being mangled any more than absolutely necessary. This also has the side
-//    effect of fixing bad markup when combined with the render step at the end.
-//    The intention is to match or exceed the kepub renderer's leniency. This
-//    lenient parsing is also why kepubify often works better with badly-formed
-//    HTML than Calibre. See the documentation in the x/net/html fork for more
-//    information about how this works.
+//   - [important] parses the XHTML with XHTML/XML/HTML4/HTML5-compatible rules
+//     Quite a few books have invalid XHTML, and this prevents the markup from
+//     being mangled any more than absolutely necessary. This also has the side
+//     effect of fixing bad markup when combined with the render step at the end.
+//     The intention is to match or exceed the kepub renderer's leniency. This
+//     lenient parsing is also why kepubify often works better with badly-formed
+//     HTML than Calibre. See the documentation in the x/net/html fork for more
+//     information about how this works.
 //
-//    The most important changes to default HTML5 parsing rules are to allow
-//    more tags to be self-closing, to ignore UTF-8 byte order marks, and to
-//    preserve XML instructions.
+//     The most important changes to default HTML5 parsing rules are to allow
+//     more tags to be self-closing, to ignore UTF-8 byte order marks, and to
+//     preserve XML instructions.
 //
-//  * [mandatory] add Kobo style tweaks
-//    To match official KEPUBs.
+//   - [mandatory] add Kobo style tweaks
+//     To match official KEPUBs.
 //
-//  * [mandatory] add Kobo div wrappers
-//    To match official KEPUBs. Kobo wraps the body with two div tags,
-//    `div#book-columns > div#book-inner`, to provide a target for applying
-//    pagination styles.
+//   - [mandatory] add Kobo div wrappers
+//     To match official KEPUBs. Kobo wraps the body with two div tags,
+//     `div#book-columns > div#book-inner`, to provide a target for applying
+//     pagination styles.
 //
-//  * [mandatory] add Kobo spans
-//    To match official KEPUBs. Kobo adds spans surrounding each fragment (see
-//    the regexp and matching logic) to provide better references to chunks of
-//    text. Highlighting, bookmarking, and other related features don't work
-//    without this.
+//   - [mandatory] add Kobo spans
+//     To match official KEPUBs. Kobo adds spans surrounding each fragment (see
+//     the regexp and matching logic) to provide better references to chunks of
+//     text. Highlighting, bookmarking, and other related features don't work
+//     without this.
 //
-//  * [optional] add extra CSS
-//    For customization or to fix common issues.
+//   - [optional] add extra CSS
+//     For customization or to fix common issues.
 //
-//  * [optional] smarten punctuation
-//    A common tweak to improve badly-formatted books.
+//   - [optional] smarten punctuation
+//     A common tweak to improve badly-formatted books.
 //
-//  * [extra] content cleanup
-//    Removes Adept tags, extraneous MS Office tags, Unicode replacement chars,
-//    etc.
+//   - [extra] content cleanup
+//     Removes Adept tags, extraneous MS Office tags, Unicode replacement chars,
+//     etc.
 //
-//  * [important] renders the HTML as polyglot XHTML/HTML4/HTML5
-//    The HTML is rendered for maximum compatibility and to be as close to the
-//    original HTML as possible. See the documentation in the x/net/html fork
-//    for more information about how this works.
+//   - [important] renders the HTML as polyglot XHTML/HTML4/HTML5
+//     The HTML is rendered for maximum compatibility and to be as close to the
+//     original HTML as possible. See the documentation in the x/net/html fork
+//     for more information about how this works.
 //
-//    The most important aspects are: the use of &#160; for non-breaking spaces,
-//    always specifying xmlns on html/math/svg, always specifying a type on
-//    script and style, always specifying a value for boolean attributes, always
-//    adding a closing slash to void elements, never self-closing non-void
-//    elements, only using XML-defined named escapes `<>&`, only using
-//    HTML-style comments, ensuring table contents are well-formed, and
-//    preserving the XML declaration if in the original code.
+//     The most important aspects are: the use of &#160; for non-breaking spaces,
+//     always specifying xmlns on html/math/svg, always specifying a type on
+//     script and style, always specifying a value for boolean attributes, always
+//     adding a closing slash to void elements, never self-closing non-void
+//     elements, only using XML-defined named escapes `<>&`, only using
+//     HTML-style comments, ensuring table contents are well-formed, and
+//     preserving the XML declaration if in the original code.
 //
-//  * [optional] find/replace
-//    To allow users to apply quick one-off fixes to the generated HTML.
+//   - [optional] find/replace
+//     To allow users to apply quick one-off fixes to the generated HTML.
 //
-//  * [important] ensure charset is UTF-8
-//    EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
-//
+//   - [important] ensure charset is UTF-8
+//     EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
 func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 	switch strings.ToLower(c.charset) {
 	case "utf-8", "":
@@ -310,19 +308,15 @@ func transformContentKoboSpans(doc *html.Node) {
 	var cur *html.Node
 	stack = append(stack, findAtom(doc, atom.Body))
 
-	sentences := make([]string, 0, 8)
-
 	for len(stack) != 0 {
 		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
 		switch cur.Type {
 		case html.TextNode:
-			sentences = splitSentences(cur.Data, sentences[:0])
-
 			// wrap each sentence in a span (don't wrap whitespace unless it is
 			// directly under a P tag [TODO: are there any other cases we wrap
 			// whitespace? ... I need to find a kepub like this]) and add it
 			// back to the parent.
-			for _, sentence := range sentences {
+			for sentence := range splitSentencesSeq(cur.Data) {
 				if isSpace(sentence) && cur.Parent.DataAtom != atom.P {
 					cur.Parent.InsertBefore(&html.Node{
 						Type: html.TextNode,
@@ -385,7 +379,7 @@ func transformContentKoboSpans(doc *html.Node) {
 	}
 }
 
-// splitSentences splits the string into sentences using the rules for creating
+// splitSentencesSeq iterates over sentences in str using the rules for creating
 // koboSpans. To make this zero-allocation, pass a zero-length slice for
 // splitSentences to take ownership of. To re-use the slice, pass the returned
 // slice, sliced to zero. If the slice is too small, it will be grown, causing
@@ -395,7 +389,7 @@ func transformContentKoboSpans(doc *html.Node) {
 // regexp-based one on average, and even faster when pre-allocating and re-using
 // the sentences slice. It should have the same output. For the original
 // implementation, see splitSentencesRegexp in the tests.
-func splitSentences(str string, sentences []string) []string {
+func splitSentencesSeq(str string) iter.Seq[string] {
 	const (
 		InputPunct   = iota // sentence-terminating punctuation
 		InputExtra          // additional punctuation (one is optionionally consumed after punct if present)
@@ -415,126 +409,126 @@ func splitSentences(str string, sentences []string) []string {
 		StateAfterPunctExtra        // after the optional additional punctuation rune
 		StateAfterSpace             // the trailing whitespace after the sentence
 	)
+	return func(yield func(string) bool) {
+		var emitted bool
+		for i, state := 0, 0; state != -1; {
+			x, z := utf8.DecodeRuneInString(str[i:])
 
-	if sentences == nil {
-		sentences = make([]string, 0, 4) // pre-allocate some room
+			var input int
+			switch x {
+			case utf8.RuneError:
+				switch z {
+				case 0:
+					input = InputEOS
+				default:
+					input = InputInvalid
+				}
+			case '.', '!', '?':
+				input = InputPunct
+			case '\'', '"', '”', '’', '“', '…':
+				input = InputExtra
+			case '\t', '\n', '\f', '\r', ' ': // \s only matches only ASCII whitespace
+				input = InputSpace
+			default:
+				input = InputAny
+			}
+
+			var output int
+			switch state {
+			case StateDefault:
+				switch input {
+				case InputPunct:
+					output, state = OutputNone, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNone, StateDefault
+				case InputSpace:
+					output, state = OutputNone, StateDefault
+				case InputAny:
+					output, state = OutputNone, StateDefault
+				case InputInvalid:
+					output, state = OutputNone, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			case StateAfterPunct:
+				switch input {
+				case InputPunct:
+					output, state = OutputNone, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNone, StateAfterPunctExtra
+				case InputSpace:
+					output, state = OutputNone, StateAfterSpace
+				case InputAny:
+					output, state = OutputNone, StateDefault
+				case InputInvalid:
+					output, state = OutputNone, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			case StateAfterPunctExtra:
+				switch input {
+				case InputPunct:
+					output, state = OutputNone, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNone, StateDefault
+				case InputSpace:
+					output, state = OutputNone, StateAfterSpace
+				case InputAny:
+					output, state = OutputNone, StateDefault
+				case InputInvalid:
+					output, state = OutputNone, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			case StateAfterSpace:
+				switch input {
+				case InputPunct:
+					output, state = OutputNext, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNext, StateDefault
+				case InputSpace:
+					output, state = OutputNone, StateAfterSpace
+				case InputAny:
+					output, state = OutputNext, StateDefault
+				case InputInvalid:
+					output, state = OutputNext, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			default:
+				panic("unhandled state")
+			}
+
+			switch output {
+			case OutputNone:
+				i += z
+			case OutputNext:
+				if emitted = true; !yield(str[:i]) {
+					return
+				}
+				str, i = str[i:], z
+			case OutputRest:
+				if len(str) != 0 || !emitted {
+					if !yield(str) {
+						return
+					}
+				}
+				if state != -1 {
+					panic("invalid state")
+				}
+			default:
+				panic("unhandled output")
+			}
+		}
 	}
-
-	for i, state := 0, 0; state != -1; {
-		x, z := utf8.DecodeRuneInString(str[i:])
-
-		var input int
-		switch x {
-		case utf8.RuneError:
-			switch z {
-			case 0:
-				input = InputEOS
-			default:
-				input = InputInvalid
-			}
-		case '.', '!', '?':
-			input = InputPunct
-		case '\'', '"', '”', '’', '“', '…':
-			input = InputExtra
-		case '\t', '\n', '\f', '\r', ' ': // \s only matches only ASCII whitespace
-			input = InputSpace
-		default:
-			input = InputAny
-		}
-
-		var output int
-		switch state {
-		case StateDefault:
-			switch input {
-			case InputPunct:
-				output, state = OutputNone, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNone, StateDefault
-			case InputSpace:
-				output, state = OutputNone, StateDefault
-			case InputAny:
-				output, state = OutputNone, StateDefault
-			case InputInvalid:
-				output, state = OutputNone, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		case StateAfterPunct:
-			switch input {
-			case InputPunct:
-				output, state = OutputNone, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNone, StateAfterPunctExtra
-			case InputSpace:
-				output, state = OutputNone, StateAfterSpace
-			case InputAny:
-				output, state = OutputNone, StateDefault
-			case InputInvalid:
-				output, state = OutputNone, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		case StateAfterPunctExtra:
-			switch input {
-			case InputPunct:
-				output, state = OutputNone, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNone, StateDefault
-			case InputSpace:
-				output, state = OutputNone, StateAfterSpace
-			case InputAny:
-				output, state = OutputNone, StateDefault
-			case InputInvalid:
-				output, state = OutputNone, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		case StateAfterSpace:
-			switch input {
-			case InputPunct:
-				output, state = OutputNext, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNext, StateDefault
-			case InputSpace:
-				output, state = OutputNone, StateAfterSpace
-			case InputAny:
-				output, state = OutputNext, StateDefault
-			case InputInvalid:
-				output, state = OutputNext, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		default:
-			panic("unhandled state")
-		}
-
-		switch output {
-		case OutputNone:
-			i += z
-		case OutputNext:
-			sentences = append(sentences, str[:i])
-			str, i = str[i:], z
-		case OutputRest:
-			if len(str) != 0 || len(sentences) == 0 {
-				sentences = append(sentences, str)
-			}
-			if state != -1 {
-				panic("invalid state")
-			}
-		default:
-			panic("unhandled output")
-		}
-	}
-
-	return sentences
 }
 
 func koboSpan(para, seg int) *html.Node {
