@@ -1,4 +1,4 @@
-package main
+package pathtransform
 
 import (
 	"os"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestTransformPaths(t *testing.T) {
-	mkTestTransformer := func(t transformer) transformer {
+	mkTestTransformer := func(t Transformer) Transformer {
 		t.Suffixes = []string{".epub"}
 		t.ExcludeSuffixes = []string{".kepub.epub"}
 		t.TargetSuffix = ".kepub.epub"
@@ -22,7 +22,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Inputs:      []string{"book.epub"},
 		Outputs: []string{
 			"book_converted.kepub.epub",
@@ -34,7 +34,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "whatever.kepub.epub",
 		Inputs:      []string{"book.epub"},
 		Outputs: []string{
@@ -47,7 +47,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "whatever.zip",
 		Inputs:      []string{"book.epub"},
 		Outputs: []string{
@@ -61,7 +61,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book.epub",
 			"./output/placeholder.txt",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "output",
 		Inputs:      []string{"book.epub"},
 		Outputs: []string{
@@ -75,7 +75,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book.epub",
 			"./output/placeholder.txt",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Inplace: true,
 		}),
 		Output: "output/whatever.kepub.epub",
@@ -91,7 +91,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book.epub",
 			"./output/placeholder.txt",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "output/whatever.zip",
 		Inputs:      []string{"book.epub"},
 		Outputs: []string{
@@ -104,7 +104,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "output" + string(os.PathSeparator),
 		Inputs:      []string{"book.epub"},
 		Outputs: []string{
@@ -120,7 +120,7 @@ func TestTransformPaths(t *testing.T) {
 			"./subdir/book1.epub",
 			"./dontconvert.txt",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Inputs:      []string{"book.epub", "subdir/book1.epub"},
 		Outputs: []string{
 			"book_converted.kepub.epub",
@@ -136,7 +136,7 @@ func TestTransformPaths(t *testing.T) {
 			"./subdir/book1.epub",
 			"./dontconvert.txt",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Inputs:      []string{"book.epub", "subdir/book1.epub", "book.epub"},
 		Outputs: []string{
 			"book_converted.kepub.epub",
@@ -150,7 +150,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book.epub",
 			"./subdir/book1.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			NoPreserveDirs: true,
 		}),
 		Inputs: []string{"book.epub", "subdir/book1.epub"},
@@ -166,7 +166,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book.epub",
 			"./subdir/book1.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Inputs:      []string{"book.epub", "subdir/book1.epub"},
 		Output:      "./output",
 		Outputs: []string{
@@ -181,7 +181,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book.epub",
 			"./subdir/book1.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Inplace: true,
 		}),
 		Inputs: []string{"book.epub", "subdir/book1.epub"},
@@ -201,7 +201,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dontconvert.txt",
 			"./book1_converted.kepub.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Update: true,
 		}),
 		Inputs: []string{"book.epub", "subdir/book1.epub"},
@@ -215,7 +215,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Inplace: true,
 		}),
 		Inputs: []string{"book.epub"},
@@ -233,7 +233,7 @@ func TestTransformPaths(t *testing.T) {
 				"./subdir/book1.epub",
 				"./dontconvert." + tp,
 			},
-			Transformer: mkTestTransformer(transformer{}),
+			Transformer: mkTestTransformer(Transformer{}),
 			Inputs:      []string{"book.epub", "dontconvert." + tp},
 			ShouldError: true,
 		}.Run(t)
@@ -246,7 +246,7 @@ func TestTransformPaths(t *testing.T) {
 			"./another.epub",
 			"./subdir/book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Inputs:      []string{"book.epub", "another.epub", "subdir/book.epub"},
 		ShouldError: true, // 2x book_converted.kepub.epub
 	}.Run(t)
@@ -258,7 +258,7 @@ func TestTransformPaths(t *testing.T) {
 			"./another.epub",
 			"./subdir/book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Update: true,
 		}),
 		Inputs:      []string{"book.epub", "another.epub", "subdir/book.epub"},
@@ -271,7 +271,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book.epub",
 			"./subdir/book.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Inplace: true,
 		}),
 		Inputs:      []string{"book.epub", "subdir/book.epub"},
@@ -286,7 +286,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir2/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Inputs:      []string{"./dir1"},
 		Outputs: []string{
 			"dir1_converted/book1.kepub.epub",
@@ -303,7 +303,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir2/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			NoPreserveDirs: true,
 		}),
 		Inputs: []string{"./dir1"},
@@ -322,7 +322,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir2/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "dir3",
 		Inputs:      []string{"./dir1"},
 		Outputs: []string{
@@ -340,7 +340,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir2/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			NoPreserveDirs: true,
 		}),
 		Output: "dir3",
@@ -360,7 +360,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/another/book3.epub",
 			"./dir2/subdir/another/one/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Inplace: true,
 		}),
 		Inputs: []string{"./dir1/subdir", "./dir2/subdir"},
@@ -380,7 +380,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir2/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "dir3",
 		Inputs:      []string{"./dir1", "./dir2"},
 		Outputs: []string{
@@ -399,7 +399,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir2/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			NoPreserveDirs: true,
 		}),
 		Output: "dir3",
@@ -420,7 +420,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir2/book3.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			NoPreserveDirs: true,
 		}),
 		Output:      "dir3",
@@ -440,7 +440,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir4/subdir/another/book7.epub",
 			"./dir4/subdir/another/one/book8.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Inputs:      []string{"./dir1", "./dir2", "./book5.epub", "./dir3/subdir/book6.epub", "./dir4"},
 		Outputs: []string{
 			"dir1_converted/book1.kepub.epub",
@@ -463,7 +463,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir2/book4.epub",
 			"./book5.epub",
 		},
-		Transformer: mkTestTransformer(transformer{}),
+		Transformer: mkTestTransformer(Transformer{}),
 		Output:      "dir3",
 		Inputs:      []string{"./dir1", "./dir2", "./book5.epub"},
 		Outputs: []string{
@@ -484,7 +484,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir2/book4.epub",
 			"./book5.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Inplace: true,
 		}),
 		Inputs: []string{"./dir1", "./dir2", "./book5.epub"},
@@ -505,7 +505,7 @@ func TestTransformPaths(t *testing.T) {
 			"./dir1/subdir/book3.epub",
 			"./dir1/subdir/book4.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			Inplace: true,
 		}),
 		Inputs:      []string{"./dir1", "./dir1/subdir"},
@@ -517,7 +517,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./dir1/book1.pdf",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf"},
 		}),
 		Inputs:  []string{"./dir1/book1.pdf"},
@@ -529,7 +529,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./dir1/book1.pdf",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf"},
 		}),
 		Inputs:  []string{"./dir1"},
@@ -541,7 +541,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./book1.pdf",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf"},
 		}),
 		Inputs:  []string{"./book1.pdf"},
@@ -554,7 +554,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book1.pdf",
 			"./out/book1.pdf",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf"},
 		}),
 		Output:  "out",
@@ -568,7 +568,7 @@ func TestTransformPaths(t *testing.T) {
 			"./book1.pdf",
 			"./out/book1.pdf",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf"},
 			Update:           true,
 		}),
@@ -582,7 +582,7 @@ func TestTransformPaths(t *testing.T) {
 		Input: []string{
 			"./dir1/book1.pdf",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf"},
 		}),
 		Output:  "./dir1/",
@@ -602,7 +602,7 @@ func TestTransformPaths(t *testing.T) {
 			"./tmp/dir1/asd.pdf",
 			"./test.epub",
 		},
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf", ".asd"},
 			Inplace:          true,
 		}),
@@ -619,7 +619,7 @@ func TestTransformPaths(t *testing.T) {
 
 	transformPathsCase{
 		What: "preserve should error when an ext is the target suffix",
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf", ".kepub.epub"},
 			Inplace:          true,
 		}),
@@ -628,7 +628,7 @@ func TestTransformPaths(t *testing.T) {
 
 	transformPathsCase{
 		What: "preserve should error when an ext is an input suffix",
-		Transformer: mkTestTransformer(transformer{
+		Transformer: mkTestTransformer(Transformer{
 			PreserveSuffixes: []string{".pdf", ".epub"},
 			Inplace:          true,
 		}),
@@ -660,7 +660,7 @@ func TestHasSuffixFold(t *testing.T) {
 type transformPathsCase struct {
 	What        string
 	Input       []string
-	Transformer transformer
+	Transformer Transformer
 
 	Output string
 	Inputs []string

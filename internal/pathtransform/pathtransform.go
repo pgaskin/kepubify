@@ -1,4 +1,4 @@
-package main
+package pathtransform
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type transformer struct {
+type Transformer struct {
 	NoPreserveDirs bool
 	Inplace        bool
 	Update         bool // if not set, output files set may already exist
@@ -26,7 +26,7 @@ type transformer struct {
 // TransformPaths transforms the input paths into the output dir. See the test
 // cases for more details. All inputs must exist, but this may or may not be
 // checked. Output should be left blank if not specified by the user.
-func (t transformer) TransformPaths(output string, inputs ...string) (map[string]string, []string, error) {
+func (t Transformer) TransformPaths(output string, inputs ...string) (map[string]string, []string, error) {
 	oneInput := len(inputs) == 1
 
 	matchingInputFiles := map[string][]string{}

@@ -15,11 +15,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pgaskin/kepubify/v5/internal/pathtransform"
 	"github.com/pgaskin/kepubify/v5/kepub"
 	"github.com/spf13/pflag"
 )
 
-var version = "v4-dev"
+var version = "v5-dev"
 
 func main() {
 	pflag.CommandLine.SortFlags = false
@@ -127,7 +128,7 @@ func main() {
 		ext = ".kepub"
 	}
 
-	pathMap, skipList, err := transformer{
+	pathMap, skipList, err := pathtransform.Transformer{
 		NoPreserveDirs:   *nopreservedirs,
 		Update:           *update,
 		Inplace:          *inplace,
