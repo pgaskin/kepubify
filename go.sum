@@ -1,17 +1,11 @@
-github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b h1:5Ci5wpOL75rYF6RQGRoqhEAU6xLJ6n/D4SckXX1yB74=
-github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b/go.mod h1:obBQGGIFbbv9KWg92Qu9UHeD94JXmHD1jovY/z6I3O8=
 github.com/beevik/etree v1.1.0 h1:T0xke/WvNtMoCqgzPhkX2r4rjY3GDZFi+FjpRZY2Jbs=
 github.com/beevik/etree v1.1.0/go.mod h1:r8Aw8JqVegEf0w2fDnATrX9VpkMcyFeM0FhwO62wh+A=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
 github.com/kr/smartypants v0.1.0 h1:Sn8hn5XrY+uXrxSWUdcr621Gfpk11mOGGVs4XX06kEw=
 github.com/kr/smartypants v0.1.0/go.mod h1:EcTX9ge+SWNaGwbQvHwNICsMGavh98FLUqyOWFr+j9c=
-github.com/mattn/go-sqlite3 v1.14.12 h1:TJ1bhYJPV44phC+IMu1u2K/i5RriLTPe+yc68XDJ1Z0=
-github.com/mattn/go-sqlite3 v1.14.12/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
 github.com/pgaskin/kepubify/_/html v0.0.0-20211223234002-6ee2cc632cdc h1:mJk4TIXTO+JmxgHJ5iyil42PLQJWkyaKB/qNcjJU6h4=
 github.com/pgaskin/kepubify/_/html v0.0.0-20211223234002-6ee2cc632cdc/go.mod h1:fxzoIpMFAReNKunZ+ttVbf3hNVrJGtrSZMI4olZizbs=
-github.com/pgaskin/koboutils/v2 v2.1.2-0.20220306004009-a07e72ebae42 h1:wwU2E+7+IN4HBv9v5p+TkoaaFSnF5BtguW5bTxopuvk=
-github.com/pgaskin/koboutils/v2 v2.1.2-0.20220306004009-a07e72ebae42/go.mod h1:wTzkDIlsxmUyfwfspGcm0Ap+HOxSUYV0S8kMYrf+0gM=
 github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=
 github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c h1:5KslGYwFpkhGh+Q16bwMP3cOontH8FOep7tGV86Y7SQ=

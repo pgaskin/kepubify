@@ -1,0 +1,10 @@
+github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b h1:5Ci5wpOL75rYF6RQGRoqhEAU6xLJ6n/D4SckXX1yB74=
+github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b/go.mod h1:obBQGGIFbbv9KWg92Qu9UHeD94JXmHD1jovY/z6I3O8=
+github.com/beevik/etree v1.5.1 h1:TC3zyxYp+81wAmbsi8SWUpZCurbxa6S8RITYRSkNRwo=
+github.com/beevik/etree v1.5.1/go.mod h1:gPNJNaBGVZ9AwsidazFZyygnd+0pAU38N4D+WemwKNs=
+github.com/mattn/go-sqlite3 v1.14.12 h1:TJ1bhYJPV44phC+IMu1u2K/i5RriLTPe+yc68XDJ1Z0=
+github.com/mattn/go-sqlite3 v1.14.12/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
+github.com/pgaskin/koboutils/v2 v2.1.2-0.20220306004009-a07e72ebae42 h1:wwU2E+7+IN4HBv9v5p+TkoaaFSnF5BtguW5bTxopuvk=
+github.com/pgaskin/koboutils/v2 v2.1.2-0.20220306004009-a07e72ebae42/go.mod h1:wTzkDIlsxmUyfwfspGcm0Ap+HOxSUYV0S8kMYrf+0gM=
+github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=
+github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
