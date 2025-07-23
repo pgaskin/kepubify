@@ -17,6 +17,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pgaskin/koboutils/v2/kobo"
 	"github.com/spf13/pflag"
+	"golang.org/x/text/unicode/norm"
 )
 
 var version = "dev"
@@ -301,7 +302,9 @@ func (k *Kobo) UpdateSeries(log func(filename string, i, total int, series strin
 
 		if _, err := tx.Exec(
 			"INSERT OR REPLACE INTO _seriesmeta (ImageId, Series, SeriesNumber) VALUES (?, ?, ?)",
-			kobo.ContentIDToImageID(kobo.PathToContentID(relEpub)),
+			// Normalize the ID to NFC since Kobo runs Linux, meaning database entries use NFC as well.
+			// Helps with Unicode file names since without this SQLite cannot match values as expected.
+			norm.NFC.String(kobo.ContentIDToImageID(kobo.PathToContentID(relEpub))),
 			sql.NullString{String: series, Valid: len(series) > 0},
 			sql.NullString{String: strconv.FormatFloat(index, 'f', -1, 64), Valid: index > 0},
 		); err != nil {
