@@ -1,33 +1,30 @@
 package kepub
 
 import (
+	"bufio"
 	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
-	"iter"
-	"mime"
 	"net/url"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/pgaskin/htmlstream"
 	"github.com/pgaskin/htmlstream/ascii"
+	"github.com/pgaskin/htmlstream/htmlutil"
 	"github.com/pgaskin/htmlstream/polyglot"
 	"github.com/pgaskin/htmlstream/xmlutil"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/htmlindex"
+	xunicode "golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/encoding/unicode/utf32"
-
-	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
-	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/atom"
-	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/charset"
+	"golang.org/x/text/transform"
 )
 
 // TransformFileFilter returns true if a file should be filtered from the EPUB.
@@ -245,12 +242,11 @@ func isBlankText(tok *htmlstream.Token) bool {
 //     effect of fixing bad markup when combined with the render step at the end.
 //     The intention is to match or exceed the kepub renderer's leniency. This
 //     lenient parsing is also why kepubify often works better with badly-formed
-//     HTML than Calibre. See the documentation in the x/net/html fork for more
-//     information about how this works.
+//     HTML than Calibre.
 //
-//     The most important changes to default HTML5 parsing rules are to allow
-//     more tags to be self-closing, to ignore UTF-8 byte order marks, and to
-//     preserve XML instructions.
+//     The document is mostly parsed as HTML5, except that self-closing non-void
+//     elements, CDATA, and other XML-isms are accepted, and UTF-8 BOMs are
+//     ignored.
 //
 //   - [mandatory] add Kobo style tweaks
 //     To match official KEPUBs.
@@ -276,65 +272,25 @@ func isBlankText(tok *htmlstream.Token) bool {
 //     Removes Adept tags, extraneous MS Office tags, Unicode replacement chars,
 //     etc.
 //
-//   - [important] renders the HTML as polyglot XHTML/HTML4/HTML5
+//   - [important] renders the HTML as polyglot XHTML/HTML5
 //     The HTML is rendered for maximum compatibility and to be as close to the
-//     original HTML as possible. See the documentation in the x/net/html fork
-//     for more information about how this works.
-//
-//     The most important aspects are: the use of &#160; for non-breaking spaces,
-//     always specifying xmlns on html/math/svg, always specifying a type on
-//     script and style, always specifying a value for boolean attributes, always
-//     adding a closing slash to void elements, never self-closing non-void
-//     elements, only using XML-defined named escapes `<>&`, only using
-//     HTML-style comments, ensuring table contents are well-formed, and
-//     preserving the XML declaration if in the original code.
+//     original HTML (the way it would be parsed by browsers) as possible. See
+//     pgaskin.net/htmlstream/polyglottify for more information about how this
+//     works.
 //
 //   - [optional] find/replace
 //     To allow users to apply quick one-off fixes to the generated HTML.
 //
 //   - [important] ensure charset is UTF-8
 //     EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
+//
+// The document is streamed, so existing Kobo divs and spans are only detected
+// if they are close to the start of the body (which they should be).
 func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
-	switch strings.ToLower(c.charset) {
-	case "utf-8", "":
-		// do nothing
-	case "auto":
-		cr, err := charset.NewReader(r, "")
-		if err != nil {
-			return fmt.Errorf("parse html: detect charset: %w", err)
-		}
-		r = cr
-	default:
-		enc, _ := charset.Lookup(c.charset)
-		if enc == nil {
-			return fmt.Errorf("parset html: invalid charset %q", c.charset)
-		}
-		r = enc.NewDecoder().Reader(r)
-	}
-
-	doc, err := html.ParseWithOptions(r,
-		html.ParseOptionEnableScripting(true),
-		html.ParseOptionIgnoreBOM(true),
-		html.ParseOptionLenientSelfClosing(true))
+	r, err := transformContentCharset(r, c.charset)
 	if err != nil {
 		return fmt.Errorf("parse html: %w", err)
 	}
-
-	transformContentCharsetUTF8(doc) // charset.NewReader always outputs UTF-8
-
-	transformContentKoboStyles(doc) // mandatory
-	transformContentKoboDivs(doc)   // mandatory
-	transformContentKoboSpans(doc)  // mandatory
-
-	for i := range c.extraCSS {
-		transformContentAddStyle(doc, c.extraCSSClass[i], c.extraCSS[i])
-	}
-
-	if c.smartypants {
-		transformContentPunctuation(doc)
-	}
-
-	transformContentClean(doc)
 
 	var wc io.WriteCloser
 	if len(c.find) != 0 {
@@ -342,11 +298,14 @@ func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 		w = wc
 	}
 
-	err = html.RenderWithOptions(w, doc,
-		html.RenderOptionAllowXMLDeclarations(true),
-		html.RenderOptionPolyglot(true))
-	if err != nil {
-		return fmt.Errorf("render html: %w", err)
+	k := newKobo(c)
+	if err := convert(w, r, polyglot.Options{
+		DoctypeMode: polyglot.KeepDoctype,
+		XMLDecl:     polyglot.KeepXMLDecl, // only at the start (see #95)
+		OnTag:       k.OnTag,
+		OnText:      k.OnText,
+	}); err != nil {
+		return fmt.Errorf("transform html: %w", err)
 	}
 
 	if wc != nil {
@@ -358,406 +317,47 @@ func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 	return nil
 }
 
-func transformContentCharsetUTF8(doc *html.Node) {
-	var stack []*html.Node
-	var cur *html.Node
-	stack = append(stack, findAtom(doc, atom.Head))
-
-	// update the meta[charset] or meta[http-equiv="content-type"] if it's there
-	for len(stack) != 0 {
-		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
-		if cur.Type == html.ElementNode {
-			if cur.DataAtom == atom.Meta {
-				for i, a := range cur.Attr {
-					if a.Key == "charset" && strings.ToUpper(cur.Attr[i].Val) != "UTF-8" {
-						cur.Attr[i].Val = "UTF-8"
-						break
-					}
-					if a.Key == "http-equiv" && strings.ToLower(a.Val) == "content-type" {
-						for j, b := range cur.Attr {
-							if b.Key == "content" {
-								if t, p, err := mime.ParseMediaType(b.Val); err == nil {
-									if _, ok := p["charset"]; ok && strings.ToLower(p["charset"]) != "utf-8" {
-										p["charset"] = "utf-8"
-										cur.Attr[j].Val = mime.FormatMediaType(t, p)
-									}
-								}
-								break
-							}
-						}
+// transformContentCharset returns a reader decoding r to UTF-8 from the
+// specified encoding, or the detected encoding if "auto" (same prescan rules as
+// browsers), or otherwise guessed (UTF-8 if valid, or latin1/windows-1252).
+func transformContentCharset(r io.Reader, label string) (io.Reader, error) {
+	switch strings.ToLower(label) {
+	case "utf-8", "":
+		return r, nil
+	case "auto":
+		br := bufio.NewReaderSize(r, 1024)
+		head, err := br.Peek(1024)
+		if err != nil && err != io.EOF {
+			return nil, fmt.Errorf("detect charset: %w", err)
+		}
+		name, ok := htmlutil.PrescanCharset(head)
+		if !ok {
+			// note: ignore a partial rune at the end
+			if i := len(head) - utf8.UTFMax; i > 0 {
+				for j := len(head) - 1; j > i; j-- {
+					if utf8.RuneStart(head[j]) {
+						head = head[:j]
 						break
 					}
 				}
 			}
-		}
-		for c := cur.LastChild; c != nil; c = c.PrevSibling {
-			stack = append(stack, c)
-		}
-	}
-}
-
-func transformContentKoboStyles(doc *html.Node) {
-	// behavior based on Kobo (checked with 3 books) as of 2020-01-12
-	// original looks like the following at the end of the head element:
-	//     <style xmlns="http://www.w3.org/1999/xhtml" type="text/css" id="kobostylehacks">div#book-inner p, div#book-inner div { font-size: 1.0em; } a { color: black; } a:link, a:visited, a:hover, a:active { color: blue; } div#book-inner * { margin-top: 0 !important; margin-bottom: 0 !important;}</style>
-	// modified to:
-	// - get rid of the font size stuff, as it causes more problems than it solves
-	// - get rid of the link colouring, as it's useless on e-ink (remember this same stylesheet is used on the apps and desktop too)
-	// - not override all margins
-	transformContentAddStyle(doc, "kobostylehacks", `div#book-inner { margin-top: 0; margin-bottom: 0;}`)
-}
-
-func transformContentKoboDivs(doc *html.Node) {
-	// behavior matches Kobo (checked with 3 books) as of 2020-01-12
-	// wrap body contents with div#book-columns > div#book-inner
-	body := findAtom(doc, atom.Body)
-	for c := body.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && matchAttr(c, "id", "book-columns") {
-			for ci := c.FirstChild; ci != nil; ci = ci.NextSibling {
-				if ci.Type == html.ElementNode && matchAttr(ci, "id", "book-inner") {
-					return // already has them
-				}
+			if name = "windows-1252"; utf8.Valid(head) {
+				name = "utf-8"
 			}
 		}
-	}
-	for _, layer := range []string{"book-inner", "book-columns"} {
-		div := &html.Node{
-			Type:     html.ElementNode,
-			DataAtom: atom.Div,
-			Data:     "div",
-			Attr: []html.Attribute{{
-				Key: "id",
-				Val: layer,
-			}},
+		enc, err := htmlindex.Get(name)
+		if err != nil {
+			return nil, fmt.Errorf("detect charset: %w", err)
 		}
-
-		// wrap the body contents with the div
-		for child := body.FirstChild; child != nil; child = child.NextSibling {
-			child.Parent = div // put each child in the chain into the div
+		// note: BOMOverride decodes UTF-8 or UTF-16 instead if there is a
+		// byte order mark, and removes it
+		return transform.NewReader(br, xunicode.BOMOverride(enc.NewDecoder())), nil
+	default:
+		enc, err := htmlindex.Get(label)
+		if err != nil {
+			return nil, fmt.Errorf("invalid charset %q", label)
 		}
-		div.FirstChild, div.LastChild = body.FirstChild, body.LastChild // put the chain in the div
-		div.Parent, body.FirstChild, body.LastChild = body, div, div    // replace body's contents with the div
-	}
-}
-
-func transformContentKoboSpans(doc *html.Node) {
-	// behavior matches Kobo (checked with 3 books) as of 2020-01-12
-	if findClass(findAtom(doc, atom.Body), "koboSpan") != nil {
-		return // already has kobo spans
-	}
-
-	var para, seg int
-	var incParaNext bool
-
-	var stack []*html.Node
-	var cur *html.Node
-	stack = append(stack, findAtom(doc, atom.Body))
-
-	for len(stack) != 0 {
-		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
-		switch cur.Type {
-		case html.TextNode:
-			// wrap each sentence in a span (don't wrap whitespace unless it is
-			// directly under a P tag [TODO: are there any other cases we wrap
-			// whitespace? ... I need to find a kepub like this]) and add it
-			// back to the parent.
-			for sentence := range splitSentencesSeq(cur.Data) {
-				if isSpace(sentence) && cur.Parent.DataAtom != atom.P {
-					cur.Parent.InsertBefore(&html.Node{
-						Type: html.TextNode,
-						Data: sentence,
-					}, cur)
-				} else {
-					if incParaNext {
-						para++
-						seg = 0
-						incParaNext = false
-					}
-
-					seg++
-					cur.Parent.InsertBefore(withText(koboSpan(para, seg), sentence), cur)
-				}
-			}
-
-			// remove the old TextNode with everything
-			cur.Parent.RemoveChild(cur)
-
-		case html.ElementNode:
-			switch cur.DataAtom {
-			case atom.Img:
-				// increment the paragraph immediately
-				para++
-				seg = 0
-				incParaNext = false
-
-				// add a span around the image
-				seg++
-				s := koboSpan(para, seg)
-				s.AppendChild(&html.Node{
-					Type:      cur.Type,
-					DataAtom:  cur.DataAtom,
-					Namespace: cur.Namespace,
-					Data:      cur.Data,
-					Attr:      cur.Attr,
-					// note: img elements don't have children
-				})
-				cur.Parent.InsertBefore(s, cur)
-				cur.Parent.RemoveChild(cur)
-
-				fallthrough
-			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video, atom.Svg, atom.Math:
-				continue // don't add spans to elements which should keep text as-is
-			case atom.P, atom.Ol, atom.Ul, atom.Table, atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-				incParaNext = true // increment it only if it will have spans in it
-				fallthrough
-			default:
-				if cur.Data == "math" || cur.Data == "svg" {
-					continue
-				}
-				// add the next nodes to the stack (in reverse order, since
-				// we're doing a depth-first traversal from top to bottom).
-				for c := cur.LastChild; c != nil; c = c.PrevSibling {
-					stack = append(stack, c)
-				}
-			}
-		}
-	}
-}
-
-// splitSentencesSeq iterates over sentences in str using the rules for creating
-// koboSpans. To make this zero-allocation, pass a zero-length slice for
-// splitSentences to take ownership of. To re-use the slice, pass the returned
-// slice, sliced to zero. If the slice is too small, it will be grown, causing
-// an allocation.
-//
-// This state-machine based implementation is around three times as fast as the
-// regexp-based one on average, and even faster when pre-allocating and re-using
-// the sentences slice. It should have the same output. For the original
-// implementation, see splitSentencesRegexp in the tests.
-func splitSentencesSeq(str string) iter.Seq[string] {
-	const (
-		InputPunct   = iota // sentence-terminating punctuation
-		InputExtra          // additional punctuation (one is optionionally consumed after punct if present)
-		InputSpace          // whitespace
-		InputAny            // any valid rune not previously matched
-		InputInvalid        // an invalid byte
-		InputEOS            // end-of-string
-	)
-	const (
-		OutputNone = iota // moves to the next rune.
-		OutputNext        // adds everything from the last call up to (but not including) the current rune, and moves to the next rune.
-		OutputRest        // adds everything not yet added by OutputNext (state must be -1)
-	)
-	const (
-		StateDefault         = iota // in a sentence
-		StateAfterPunct             // after the sentence-terminating rune
-		StateAfterPunctExtra        // after the optional additional punctuation rune
-		StateAfterSpace             // the trailing whitespace after the sentence
-	)
-	return func(yield func(string) bool) {
-		var emitted bool
-		for i, state := 0, 0; state != -1; {
-			x, z := utf8.DecodeRuneInString(str[i:])
-
-			var input int
-			switch x {
-			case utf8.RuneError:
-				switch z {
-				case 0:
-					input = InputEOS
-				default:
-					input = InputInvalid
-				}
-			case '.', '!', '?':
-				input = InputPunct
-			case '\'', '"', '”', '’', '“', '…':
-				input = InputExtra
-			case '\t', '\n', '\f', '\r', ' ': // \s only matches only ASCII whitespace
-				input = InputSpace
-			default:
-				input = InputAny
-			}
-
-			var output int
-			switch state {
-			case StateDefault:
-				switch input {
-				case InputPunct:
-					output, state = OutputNone, StateAfterPunct
-				case InputExtra:
-					output, state = OutputNone, StateDefault
-				case InputSpace:
-					output, state = OutputNone, StateDefault
-				case InputAny:
-					output, state = OutputNone, StateDefault
-				case InputInvalid:
-					output, state = OutputNone, StateDefault
-				case InputEOS:
-					output, state = OutputRest, -1
-				default:
-					panic("unhandled input")
-				}
-			case StateAfterPunct:
-				switch input {
-				case InputPunct:
-					output, state = OutputNone, StateAfterPunct
-				case InputExtra:
-					output, state = OutputNone, StateAfterPunctExtra
-				case InputSpace:
-					output, state = OutputNone, StateAfterSpace
-				case InputAny:
-					output, state = OutputNone, StateDefault
-				case InputInvalid:
-					output, state = OutputNone, StateDefault
-				case InputEOS:
-					output, state = OutputRest, -1
-				default:
-					panic("unhandled input")
-				}
-			case StateAfterPunctExtra:
-				switch input {
-				case InputPunct:
-					output, state = OutputNone, StateAfterPunct
-				case InputExtra:
-					output, state = OutputNone, StateDefault
-				case InputSpace:
-					output, state = OutputNone, StateAfterSpace
-				case InputAny:
-					output, state = OutputNone, StateDefault
-				case InputInvalid:
-					output, state = OutputNone, StateDefault
-				case InputEOS:
-					output, state = OutputRest, -1
-				default:
-					panic("unhandled input")
-				}
-			case StateAfterSpace:
-				switch input {
-				case InputPunct:
-					output, state = OutputNext, StateAfterPunct
-				case InputExtra:
-					output, state = OutputNext, StateDefault
-				case InputSpace:
-					output, state = OutputNone, StateAfterSpace
-				case InputAny:
-					output, state = OutputNext, StateDefault
-				case InputInvalid:
-					output, state = OutputNext, StateDefault
-				case InputEOS:
-					output, state = OutputRest, -1
-				default:
-					panic("unhandled input")
-				}
-			default:
-				panic("unhandled state")
-			}
-
-			switch output {
-			case OutputNone:
-				i += z
-			case OutputNext:
-				if emitted = true; !yield(str[:i]) {
-					return
-				}
-				str, i = str[i:], z
-			case OutputRest:
-				if len(str) != 0 || !emitted {
-					if !yield(str) {
-						return
-					}
-				}
-				if state != -1 {
-					panic("invalid state")
-				}
-			default:
-				panic("unhandled output")
-			}
-		}
-	}
-}
-
-func koboSpan(para, seg int) *html.Node {
-	return &html.Node{
-		Type:     html.ElementNode,
-		Data:     "span",
-		DataAtom: atom.Span,
-		Attr: []html.Attribute{
-			{Key: "class", Val: "koboSpan"},
-			{Key: "id", Val: "kobo." + strconv.Itoa(para) + "." + strconv.Itoa(seg)},
-		},
-	}
-}
-
-func transformContentAddStyle(doc *html.Node, class, css string) {
-	findAtom(doc, atom.Head).AppendChild(withText(&html.Node{
-		Type:     html.ElementNode,
-		DataAtom: atom.Style,
-		Data:     "style",
-		Attr: []html.Attribute{
-			{Key: "type", Val: "text/css"},
-			{Key: "class", Val: class},
-		},
-	}, css))
-}
-
-func transformContentPunctuation(doc *html.Node) {
-	var stack []*html.Node
-	var cur *html.Node
-	stack = append(stack, findAtom(doc, atom.Body))
-
-	for len(stack) != 0 {
-		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
-		switch cur.Type {
-		case html.ElementNode:
-			switch cur.DataAtom {
-			case atom.Pre, atom.Code, atom.Style, atom.Script:
-				continue
-			default:
-				for c := cur.LastChild; c != nil; c = c.PrevSibling {
-					stack = append(stack, c)
-				}
-			}
-		case html.TextNode:
-			if !isSpace(cur.Data) {
-				var sp smartypants
-				cur.Data = string(sp.Convert(nil, []byte(cur.Data), true))
-			}
-		}
-	}
-}
-
-func transformContentClean(doc *html.Node) {
-	var stack []*html.Node
-	var cur *html.Node
-	stack = append(stack, doc)
-
-	for len(stack) != 0 {
-		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
-		switch cur.Type {
-		case html.TextNode:
-			if strings.ContainsRune(cur.Data, '�') {
-				cur.Data = strings.ReplaceAll(cur.Data, "�", "")
-			}
-		case html.ElementNode:
-			var remove bool
-
-			// Adobe Adept meta tags
-			remove = remove || (cur.DataAtom == atom.Meta && (matchAttr(cur, "name", "Adept.expected.resource") || matchAttr(cur, "name", "Adept.resource")))
-
-			// Empty MS Word o:p and smart tags
-			remove = remove || ((cur.Data == "o:p" || strings.HasPrefix(cur.Data, "st1:")) && matchEmpty(cur))
-
-			if remove {
-				cur.Parent.RemoveChild(cur)
-				break
-			}
-
-			fallthrough
-		case html.DocumentNode:
-			for c := cur.LastChild; c != nil; c = c.PrevSibling {
-				stack = append(stack, c)
-			}
-		}
+		return enc.NewDecoder().Reader(r), nil
 	}
 }
 
@@ -1101,7 +701,7 @@ func convert(w io.Writer, r io.Reader, popt polyglot.Options) (err error) {
 			return err
 		}
 	}
-	return nil // the deferred Close ends the document and reports the errors
+	return nil // the deferred Close ends the document and sets the error
 }
 
 // filter filters content document tokens, skipping adept meta elements, and
@@ -1118,7 +718,6 @@ type filter struct {
 }
 
 func (f *filter) Filter(tok *htmlstream.Token) error {
-	const holdMax = 64 << 10
 	if f.holding {
 		switch kind := tok.Kind(); {
 		case kind == htmlstream.EndTag && tok.StartPos() == f.holdPos:
@@ -1157,7 +756,7 @@ func (f *filter) Filter(tok *htmlstream.Token) error {
 // isSpace returns true if the decoded text token is whitespace.
 func (f *filter) isSpace(tok *htmlstream.Token) bool {
 	f.buf = tok.AppendText(f.buf[:0])
-	return isSpace(string(f.buf))
+	return isOnlyUnicodeSpace(f.buf)
 }
 
 var isAdeptMeta = htmlstream.Tag("meta", htmlstream.Or(
@@ -1169,106 +768,6 @@ func isMSOTag(tok *htmlstream.Token) bool {
 	var b [16]byte
 	n := tok.AppendLocalName(b[:0])
 	return string(n) == "o:p" || bytes.HasPrefix(n, []byte("st1:"))
-}
-
-// withText adds text to a node and returns it.
-func withText(node *html.Node, text string) *html.Node {
-	if node.Type != html.ElementNode {
-		panic("not an element node")
-	}
-	node.AppendChild(&html.Node{
-		Type: html.TextNode,
-		Data: text,
-	})
-	return node
-}
-
-// matchAttr compares the value of an attribute on an ElementNode, ignoring
-// namespaces.
-func matchAttr(n *html.Node, key, value string) bool {
-	if n.Type == html.ElementNode {
-		for _, a := range n.Attr {
-			if a.Key == key && a.Val == value {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// findAtom finds the first occurrence of an ElementNode matching the Atom.
-func findAtom(n *html.Node, a atom.Atom) *html.Node {
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && (c.DataAtom == a || (c.DataAtom == 0 && strings.ToLower(c.Data) == a.String())) {
-			return c
-		}
-		if m := findAtom(c, a); m != nil {
-			return m
-		}
-	}
-	return nil
-}
-
-// findAtom finds the first occurrence of an ElementNode containing the class.
-func findClass(n *html.Node, t string) *html.Node {
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode {
-			for _, a := range c.Attr {
-				if a.Key == "class" && includes(a.Val, t) {
-					return c
-				}
-			}
-		}
-		if m := findClass(c, t); m != nil {
-			return m
-		}
-	}
-	return nil
-}
-
-// matchEmpty checks if a node only has comments or whitespace as direct children.
-func matchEmpty(n *html.Node) bool {
-	for child := n.FirstChild; child != nil; child = child.NextSibling {
-		switch child.Type {
-		case html.CommentNode:
-			continue
-		case html.TextNode:
-			if !isSpace(child.Data) {
-				return false
-			}
-			continue
-		case html.ErrorNode:
-			continue
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-// isSpace returns true if the string consists of only Unicode whitespace.
-func isSpace(s string) bool {
-	for _, c := range s {
-		if !unicode.IsSpace(c) {
-			return false
-		}
-	}
-	return true
-}
-
-// includes returns true if the token is in the whitespace-delimited string.
-func includes(s, token string) bool {
-	for s != "" {
-		i := strings.IndexAny(s, " \t\r\n\f")
-		if i == -1 {
-			return s == token
-		}
-		if s[:i] == token {
-			return true
-		}
-		s = s[i+1:]
-	}
-	return false
 }
 
 // replaceWriter replaces a string in the data written to it, before writing it

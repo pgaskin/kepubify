@@ -3,44 +3,63 @@ package kepub
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"path"
 	"regexp"
-	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
 	"testing/iotest"
+	"unicode/utf8"
 
 	xunicode "golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/encoding/unicode/utf32"
-
-	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 )
 
-func TestTransformContent(t *testing.T) {
-	c := &Converter{
-		extraCSS:      []string{"body { color: black; }"},
-		extraCSSClass: []string{"kepubify-test"},
-		find: [][]byte{
-			[]byte("Test sentence 2."),
-			[]byte("<a id=\"test\">"),
-			[]byte("sdfsdfsdf"),
-			[]byte(" sentence 2"),
-		},
-		replace: [][]byte{
-			[]byte("Replaced sentence 2."),
-			[]byte("<a id=\"test1\">"),
-			[]byte("dfgdfgdfg"),
-			[]byte(nil),
-		},
-		smartypants: true,
+func transformContent(t *testing.T, in string, opts ...ConverterOption) string {
+	t.Helper()
+	c := NewConverterWithOptions(opts...)
+	var a, b bytes.Buffer
+	if err := c.TransformContent(&a, strings.NewReader(in)); err != nil {
+		t.Fatalf("transform: %v", err)
 	}
+	// one-byte reader to ensure streaming works correctly
+	if err := c.TransformContent(&b, iotest.OneByteReader(strings.NewReader(in))); err != nil {
+		t.Fatalf("transform (one byte reader): %v", err)
+	}
+	if a.String() != b.String() {
+		t.Fatalf("output differs with a one byte reader:\n%s\n%s", a.String(), b.String())
+	}
+	return a.String()
+}
 
-	// yes, I know it isn't valid XML, but I'm testing preserving the XML declaration
-	buf := bytes.NewBuffer(nil)
-	if err := c.TransformContent(buf, strings.NewReader(strings.TrimSpace(`
+func fragmentDoc(s string) string {
+	return `<!DOCTYPE html><head><title>kepubify test</title><meta charset="utf-8"/></head><body>` + s + `</body></html>`
+}
+
+func bookInner(t *testing.T, out string) string {
+	t.Helper()
+	const start, end = `<body><div id="book-columns"><div id="book-inner">`, `</div></div></body>` // yeah, we hard-code it, but it's fine
+	i, j := strings.Index(out, start), strings.LastIndex(out, end)
+	if i < 0 || j < i {
+		t.Fatalf("no wrapper divs in %q", out)
+	}
+	return out[i+len(start) : j]
+}
+
+func TestTransformContent(t *testing.T) {
+	opts := []ConverterOption{
+		ConverterOptionAddCSS("body { color: black; }"),
+		ConverterOptionFindReplace("Test sentence 2.", "Replaced sentence 2."),
+		ConverterOptionFindReplace(`<a id="test">`, `<a id="test1">`),
+		ConverterOptionFindReplace("sdfsdfsdf", "dfgdfgdfg"),
+		ConverterOptionFindReplace(" sentence 2", ""),
+		ConverterOptionSmartypants(),
+	}
+	in := strings.TrimSpace(`
 <?xml version="1.0" charset="utf-8"?>
 <!DOCTYPE html>
 <html>
@@ -64,18 +83,17 @@ func TestTransformContent(t *testing.T) {
     <p>&nbsp;</p>
     <svg></svg>
 </body>
-</html>`))); err != nil {
-		t.Fatalf("transform: unexpected error: %v", err)
-	}
-
-	if a, b := strings.TrimSpace(buf.String()), strings.TrimSpace(`
-<?xml version="1.0" charset="utf-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head>
+</html>`)
+	want := strings.TrimSpace(`
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" />
     <title>Kepubify Test</title>
-    <meta charset="utf-8"/>
+` + "    " + `
     <!-- Note: this tests a few of the extended features from my fork of
          x/net/html, but this isn't the focus. Those features are fully tested
          in my tests for that library. -->
-<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style><style type="text/css" class="kepubify-test">body { color: black; }</style></head>
+<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style><style type="text/css" class="kepubify-extracss">body { color: black; }</style></head>
 <body><div id="book-columns"><div id="book-inner">
     <p><span class="koboSpan" id="kobo.1.1">Test sentence 1. </span><a id="test1"></a><span class="koboSpan" id="kobo.1.2"> Replaced. </span><b><span class="koboSpan" id="kobo.1.3">Test sentence 3</span><i><span class="koboSpan" id="kobo.1.4">Test sentence 4</span></i></b></p><b><i>
     <p><span class="koboSpan" id="kobo.2.1">Test sentence 5. </span><i><span class="koboSpan" id="kobo.2.2">“This is quoted”</span></i><span class="koboSpan" id="kobo.2.3"> – </span><b><span class="koboSpan" id="kobo.2.4">and this is not</span></b><span class="koboSpan" id="kobo.2.5">.</span></p>
@@ -85,388 +103,507 @@ func TestTransformContent(t *testing.T) {
     <table borders=""><tbody><tr><td><span class="koboSpan" id="kobo.6.1">test</span></td></tr></tbody></table>
     <p><span class="koboSpan" id="kobo.7.1">  </span></p>
     <p></p>
-    <span class="koboSpan" id="kobo.8.1"><img src="test"/></span>
+    <span class="koboSpan" id="kobo.8.1"><img src="test" /></span>
     <p><span class="koboSpan" id="kobo.9.1">&#160;</span></p>
     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>
 
-</i></b></div></div></body></html>`); a != b {
-		t.Error("not equal")
-		fmt.Println(a)
-		fmt.Println("---")
-		fmt.Println(b)
+</i></b></div></div></body></html>`)
+	if got := strings.TrimSpace(transformContent(t, in, opts...)); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
+}
+
+type partTest struct {
+	name     string
+	in       string // body fragment, or document if doc
+	doc      bool
+	opts     []ConverterOption
+	want     string // contents of book-inner, or substring of the output if contains
+	contains bool
+	not      string // must not be in the output
+}
+
+func (tc partTest) run(t *testing.T) {
+	t.Run(tc.name, func(t *testing.T) {
+		in := tc.in
+		if !tc.doc {
+			in = fragmentDoc(in)
+		}
+		out := transformContent(t, in, tc.opts...)
+		if tc.not != "" && strings.Contains(out, tc.not) {
+			t.Errorf("output contains %q:\n%s", tc.not, out)
+		}
+		if tc.contains {
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("output doesn't contain %q:\n%s", tc.want, out)
+			}
+			return
+		}
+		if got := bookInner(t, out); got != tc.want {
+			t.Errorf("got:\n%s\nwant:\n%s", got, tc.want)
+		}
+	})
 }
 
 func TestTransformContentParts(t *testing.T) {
 	t.Run("Charset", func(t *testing.T) {
-		transformContentCase{
-			Func:     transformContentCharsetUTF8,
-			What:     "charset meta element",
-			Fragment: false,
-			Contains: true,
-			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="iso-8859-1"/></head><body></body></html>`,
-			Out:      `meta charset="UTF-8"`,
-		}.Run(t)
-		transformContentCase{
-			Func:     transformContentCharsetUTF8,
-			What:     "charset meta element (case-insensitive, unchanged)",
-			Fragment: false,
-			Contains: true,
-			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="UTf-8"/></head><body></body></html>`,
-			Out:      `meta charset="UTf-8"`,
-		}.Run(t)
-		transformContentCase{
-			Func:     transformContentCharsetUTF8,
-			What:     "http-equiv content-type charset meta element",
-			Fragment: false,
-			Contains: true,
-			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta http-equiv="content-type" content="application/xhtml+xml; charset=iso-8859-1"/></head><body></body></html>`,
-			Out:      `meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8"`,
-		}.Run(t)
-		transformContentCase{
-			Func:     transformContentCharsetUTF8,
-			What:     "http-equiv content-type charset meta element (case-insensitive, unchanged)",
-			Fragment: false,
-			Contains: true,
-			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta http-equiv="content-type" content="application/xhtml+xml; charset=UTf-8"/></head><body></body></html>`,
-			Out:      `meta http-equiv="content-type" content="application/xhtml+xml; charset=UTf-8"`,
-		}.Run(t)
+		// charset declarations should all be replaced
+		for _, tc := range []partTest{
+			{name: "charset meta element", in: `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="iso-8859-1"/></head><body></body></html>`},
+			{name: "charset meta element (case-insensitive, unchanged)", in: `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="UTf-8"/></head><body></body></html>`},
+			{name: "http-equiv content-type charset meta element", in: `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta http-equiv="content-type" content="application/xhtml+xml; charset=iso-8859-1"/></head><body></body></html>`},
+			{name: "http-equiv content-type charset meta element (case-insensitive, unchanged)", in: `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta http-equiv="content-type" content="application/xhtml+xml; charset=UTf-8"/></head><body></body></html>`},
+		} {
+			tc.doc, tc.contains = true, true
+			tc.want = `<head><meta charset="UTF-8" /><title>Kepubify Test Case</title><style`
+			tc.run(t)
+		}
 	})
 
 	t.Run("KoboStyles", func(t *testing.T) {
-		transformContentCase{
-			Func:     transformContentKoboStyles,
-			What:     "add kobo style hacks",
-			Fragment: false,
-			Contains: true,
-			In:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="utf-8"/></head><body></body></html>`,
-			Out:      `kobostylehacks`,
-		}.Run(t)
+		partTest{
+			name:     "add kobo style hacks",
+			in:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="utf-8"/></head><body></body></html>`,
+			doc:      true,
+			contains: true,
+			want:     `<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style></head>`,
+		}.run(t)
 	})
 
 	t.Run("KoboDivs", func(t *testing.T) {
-		transformContentCase{
-			Func:     transformContentKoboDivs,
-			What:     "no content",
-			Fragment: true,
-			In:       ``,
-			Out:      `<div id="book-columns"><div id="book-inner"></div></div>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboDivs,
-			What:     "already has divs",
-			Fragment: true,
-			In:       `<div id="book-columns"><div id="book-inner"></div></div>`,
-			Out:      `<div id="book-columns"><div id="book-inner"></div></div>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboDivs,
-			What:     "single text node",
-			Fragment: true,
-			In:       `test`,
-			Out:      `<div id="book-columns"><div id="book-inner">test</div></div>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboDivs,
-			What:     "multiple elements and children",
-			Fragment: true,
-			In:       `<p>Test 1</p><p>Test <b>2</b></p><p>Test 3</p>`,
-			Out:      `<div id="book-columns"><div id="book-inner"><p>Test 1</p><p>Test <b>2</b></p><p>Test 3</p></div></div>`,
-		}.Run(t)
+		for _, tc := range []partTest{
+			{name: "no content", in: ``, want: ``},
+			{name: "already has divs", in: `<div id="book-columns"><div id="book-inner"></div></div>`, want: ``},
+			// with spans
+			{name: "single text node", in: `test`, want: `<span class="koboSpan" id="kobo.0.1">test</span>`},
+			{name: "multiple elements and children", in: `<p>Test 1</p><p>Test <b>2</b></p><p>Test 3</p>`, want: `<p><span class="koboSpan" id="kobo.1.1">Test 1</span></p><p><span class="koboSpan" id="kobo.2.1">Test </span><b><span class="koboSpan" id="kobo.2.2">2</span></b></p><p><span class="koboSpan" id="kobo.3.1">Test 3</span></p>`},
+		} {
+			tc.run(t)
+		}
 	})
 
 	t.Run("KoboSpans", func(t *testing.T) {
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "no content",
-			Fragment: true,
-			In:       ``,
-			Out:      ``,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "already has spans",
-			Fragment: true,
-			In:       `<p><span class="koboSpan" id="kobo.1.1">Test</span></p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Test</span></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "increment segment counter from 1 for every sentence",
-			Fragment: true,
-			In:       `<p>Sentence 1. Sentence 2. Sentence 3.</p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2. </span><span class="koboSpan" id="kobo.1.3">Sentence 3.</span></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "increment paragraph counter from 1 and reset segment counter for every p, ul, ol, or table",
-			Fragment: true,
-			In:       `<p>Sentence 1. Sentence 2.</p><p>Sentence 3.</p><ul><li>Sentence 4</li><li>Sentence 5</li></ul><ol><li>Sentence 6</li><li>Sentence 7</li></ol><table><tbody><tr><td>Test</td></tr><tr><td>Test</td></tr></tbody></table>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2.</span></p><p><span class="koboSpan" id="kobo.2.1">Sentence 3.</span></p><ul><li><span class="koboSpan" id="kobo.3.1">Sentence 4</span></li><li><span class="koboSpan" id="kobo.3.2">Sentence 5</span></li></ul><ol><li><span class="koboSpan" id="kobo.4.1">Sentence 6</span></li><li><span class="koboSpan" id="kobo.4.2">Sentence 7</span></li></ol><table><tbody><tr><td><span class="koboSpan" id="kobo.5.1">Test</span></td></tr><tr><td><span class="koboSpan" id="kobo.5.2">Test</span></td></tr></tbody></table>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "merge stray text at the end of lines into the next sentence (between regexp matches)",
-			Fragment: true,
-			In:       `<p>Sentence 1. Sentence 2. Stray text` + "\n" + `Another sentence.</p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2. </span><span class="koboSpan" id="kobo.1.3">Stray text` + "\n" + `Another sentence.</span></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "don't lose stray text not part of a sentence (after the last regexp match)",
-			Fragment: true,
-			In:       `<p>Sentence 1. Sentence 2. Stray text</p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2. </span><span class="koboSpan" id="kobo.1.3">Stray text</span></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "preserve but don't wrap extra whitespace outside of P elements", // TODO: are there any other cases where we need to still wrap whitespace to match Kobo's behaviour?
-			Fragment: true,
-			In:       `<p>This is a test.` + "\n" + `    This is another sentence on the next line.<span> </span>Another sentence.</p>` + "\n" + "    <p>Another paragraph.</p><p> </p><p></p>",
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">This is a test.` + "\n" + `    </span><span class="koboSpan" id="kobo.1.2">This is another sentence on the next line.</span><span> </span><span class="koboSpan" id="kobo.1.3">Another sentence.</span></p>` + "\n" + `    <p><span class="koboSpan" id="kobo.2.1">Another paragraph.</span></p><p><span class="koboSpan" id="kobo.3.1"> </span></p><p></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "preserve and split segments on formatting and links",
-			Fragment: true,
-			In:       `<p>Sentence<b> 1. </b>Sentence <span>2. Se</span>nten<a href="test.html">ce 3. Another word</a></p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Sentence</span><b><span class="koboSpan" id="kobo.1.2"> 1. </span></b><span class="koboSpan" id="kobo.1.3">Sentence </span><span><span class="koboSpan" id="kobo.1.4">2. </span><span class="koboSpan" id="kobo.1.5">Se</span></span><span class="koboSpan" id="kobo.1.6">nten</span><a href="test.html"><span class="koboSpan" id="kobo.1.7">ce 3. </span><span class="koboSpan" id="kobo.1.8">Another word</span></a></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "preserve and split segments on nested formatting and links",
-			Fragment: true,
-			In:       `<p>Sentence<b> 1. Sente<i>nce <span>2. Se</span>nt</i>en<a href="test.html">ce 3. Another word</a></b></p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Sentence</span><b><span class="koboSpan" id="kobo.1.2"> 1. </span><span class="koboSpan" id="kobo.1.3">Sente</span><i><span class="koboSpan" id="kobo.1.4">nce </span><span><span class="koboSpan" id="kobo.1.5">2. </span><span class="koboSpan" id="kobo.1.6">Se</span></span><span class="koboSpan" id="kobo.1.7">nt</span></i><span class="koboSpan" id="kobo.1.8">en</span><a href="test.html"><span class="koboSpan" id="kobo.1.9">ce 3. </span><span class="koboSpan" id="kobo.1.10">Another word</span></a></b></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "nested lists/paragraphs should not reset numbering once out of scope (i.e. <p [para1]>[span1.1]<ul [para2]><li>[span2.1]</li></ul>[span2.2]</p>)", // TODO: verify against an actual kepub (I'll have to find a free non-fiction one or one with a nested TOC)
-			Fragment: true,
-			In:       `<p>Sentence.<ul><li>Another sentence.</li><li>Another sentence.<ul><li>Another sentence.</li><li>Another sentence.</li></ul></li><li>Another sentence.</li></ul> Another sentence.</p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Sentence.</span></p><ul><li><span class="koboSpan" id="kobo.2.1">Another sentence.</span></li><li><span class="koboSpan" id="kobo.2.2">Another sentence.</span><ul><li><span class="koboSpan" id="kobo.3.1">Another sentence.</span></li><li><span class="koboSpan" id="kobo.3.2">Another sentence.</span></li></ul></li><li><span class="koboSpan" id="kobo.3.3">Another sentence.</span></li></ul><span class="koboSpan" id="kobo.3.4"> Another sentence.</span><p></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "don't touch the contents of script, style, pre, audio, video tags",
-			Fragment: true,
-			In:       `<p>Touch this.</p><script>not this</script><style>or this</style><pre>or this</pre><audio>or this</audio><video>or this</video><p>Touch this.</p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">Touch this.</span></p><script>not this</script><style>or this</style><pre>or this</pre><audio>or this</audio><video>or this</video><p><span class="koboSpan" id="kobo.2.1">Touch this.</span></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "treat an img as a new paragraph and add a span around it",
-			Fragment: true,
-			In:       `<p>One.</p><img src="test"><p>Three.</p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><span class="koboSpan" id="kobo.2.1"><img src="test"/></span><p><span class="koboSpan" id="kobo.3.1">Three.</span></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "don't increment paragraph counter if no spans were added",
-			Fragment: true,
-			In:       `<p>One.</p><p> </p><p><!-- comment --></p><p>Two.</p><p><b>Three.</b></p>`,
-			Out:      `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><p><span class="koboSpan" id="kobo.2.1"> </span></p><p><!-- comment --></p><p><span class="koboSpan" id="kobo.3.1">Two.</span></p><p><b><span class="koboSpan" id="kobo.4.1">Three.</span></b></p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "don't add spans to svg and math elements",
-			Fragment: true,
-			In:       `<svg xmlns="http://www.w3.org/2000/svg"><g><text font-size="24" y="20" x="0">kepubify</text></g></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mfrac><mrow><mo>-</mo><mi>b</mi><mo>±</mo><msqrt><msup><mi>b</mi><mn>2</mn></msup><mo>-</mo><mn>4</mn><mi>a</mi><mi>c</mi></msqrt></mrow><mrow><mn>2</mn><mi>a</mi></mrow></mfrac></math>`,
-			Out:      `<svg xmlns="http://www.w3.org/2000/svg"><g><text font-size="24" y="20" x="0">kepubify</text></g></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mfrac><mrow><mo>-</mo><mi>b</mi><mo>±</mo><msqrt><msup><mi>b</mi><mn>2</mn></msup><mo>-</mo><mn>4</mn><mi>a</mi><mi>c</mi></msqrt></mrow><mrow><mn>2</mn><mi>a</mi></mrow></mfrac></math>`,
-		}.Run(t)
-
-		// The following cases were found after using kobotest on a bunch of files (the previous cases are also based on kepubs, but I did them manually and didn't keep track):
-
-		transformContentCase{
-			Func:     transformContentKoboSpans,
-			What:     "also increment paragraph counter on heading tags and don't split sentences after colons or if there isn't any spaces after a period", // 69b8ba8c-1799-4e0d-ba3a-ce366410335e (Janurary 2020): Arthur Conan Doyle - The Complete Sherlock Holmes.kepub/OEBPS/bookwire/bookwire_advertisement1.xhtml
-			Fragment: true,
-			In:       `<div class="img_container"><p class="ad_image"><img src="bookwire_ad_cover1.jpg" alt="image"/></p></div>` + "\n" + `    <h2 class="subheadline">The Christmas Collection: All Of Your Favourite Classic Christmas Stories, Novels, Poems, Carols in One Ebook</h2>` + "\n" + `    <p class="subheadline2"></p>` + "\n" + `    <p class="metadata">Carr, Annie Roe</p>`,
-			Out:      `<div class="img_container"><p class="ad_image"><span class="koboSpan" id="kobo.1.1"><img src="bookwire_ad_cover1.jpg" alt="image"/></span></p></div>` + "\n" + `    <h2 class="subheadline"><span class="koboSpan" id="kobo.2.1">The Christmas Collection: All Of Your Favourite Classic Christmas Stories, Novels, Poems, Carols in One Ebook</span></h2>` + "\n" + `    <p class="subheadline2"></p>` + "\n" + `    <p class="metadata"><span class="koboSpan" id="kobo.3.1">Carr, Annie Roe</span></p>`,
-		}.Run(t)
+		for _, tc := range []partTest{
+			{
+				name: "no content",
+				in:   ``,
+				want: ``,
+			},
+			{
+				name: "already has spans",
+				in:   `<p><span class="koboSpan" id="kobo.1.1">Test</span></p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Test</span></p>`,
+			},
+			{
+				name: "increment segment counter from 1 for every sentence",
+				in:   `<p>Sentence 1. Sentence 2. Sentence 3.</p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2. </span><span class="koboSpan" id="kobo.1.3">Sentence 3.</span></p>`,
+			},
+			{
+				name: "increment paragraph counter from 1 and reset segment counter for every p, ul, ol, or table",
+				in:   `<p>Sentence 1. Sentence 2.</p><p>Sentence 3.</p><ul><li>Sentence 4</li><li>Sentence 5</li></ul><ol><li>Sentence 6</li><li>Sentence 7</li></ol><table><tbody><tr><td>Test</td></tr><tr><td>Test</td></tr></tbody></table>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2.</span></p><p><span class="koboSpan" id="kobo.2.1">Sentence 3.</span></p><ul><li><span class="koboSpan" id="kobo.3.1">Sentence 4</span></li><li><span class="koboSpan" id="kobo.3.2">Sentence 5</span></li></ul><ol><li><span class="koboSpan" id="kobo.4.1">Sentence 6</span></li><li><span class="koboSpan" id="kobo.4.2">Sentence 7</span></li></ol><table><tbody><tr><td><span class="koboSpan" id="kobo.5.1">Test</span></td></tr><tr><td><span class="koboSpan" id="kobo.5.2">Test</span></td></tr></tbody></table>`,
+			},
+			{
+				name: "merge stray text at the end of lines into the next sentence (between regexp matches)",
+				in:   `<p>Sentence 1. Sentence 2. Stray text` + "\n" + `Another sentence.</p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2. </span><span class="koboSpan" id="kobo.1.3">Stray text` + "\n" + `Another sentence.</span></p>`,
+			},
+			{
+				name: "don't lose stray text not part of a sentence (after the last regexp match)",
+				in:   `<p>Sentence 1. Sentence 2. Stray text</p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2. </span><span class="koboSpan" id="kobo.1.3">Stray text</span></p>`,
+			},
+			{
+				name: "preserve but don't wrap extra whitespace outside of P elements",
+				in:   `<p>This is a test.` + "\n" + `    This is another sentence on the next line.<span> </span>Another sentence.</p>` + "\n" + "    <p>Another paragraph.</p><p> </p><p></p>",
+				want: `<p><span class="koboSpan" id="kobo.1.1">This is a test.` + "\n" + `    </span><span class="koboSpan" id="kobo.1.2">This is another sentence on the next line.</span><span> </span><span class="koboSpan" id="kobo.1.3">Another sentence.</span></p>` + "\n" + `    <p><span class="koboSpan" id="kobo.2.1">Another paragraph.</span></p><p><span class="koboSpan" id="kobo.3.1"> </span></p><p></p>`,
+			},
+			{
+				name: "preserve and split segments on formatting and links",
+				in:   `<p>Sentence<b> 1. </b>Sentence <span>2. Se</span>nten<a href="test.html">ce 3. Another word</a></p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence</span><b><span class="koboSpan" id="kobo.1.2"> 1. </span></b><span class="koboSpan" id="kobo.1.3">Sentence </span><span><span class="koboSpan" id="kobo.1.4">2. </span><span class="koboSpan" id="kobo.1.5">Se</span></span><span class="koboSpan" id="kobo.1.6">nten</span><a href="test.html"><span class="koboSpan" id="kobo.1.7">ce 3. </span><span class="koboSpan" id="kobo.1.8">Another word</span></a></p>`,
+			},
+			{
+				name: "preserve and split segments on nested formatting and links",
+				in:   `<p>Sentence<b> 1. Sente<i>nce <span>2. Se</span>nt</i>en<a href="test.html">ce 3. Another word</a></b></p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence</span><b><span class="koboSpan" id="kobo.1.2"> 1. </span><span class="koboSpan" id="kobo.1.3">Sente</span><i><span class="koboSpan" id="kobo.1.4">nce </span><span><span class="koboSpan" id="kobo.1.5">2. </span><span class="koboSpan" id="kobo.1.6">Se</span></span><span class="koboSpan" id="kobo.1.7">nt</span></i><span class="koboSpan" id="kobo.1.8">en</span><a href="test.html"><span class="koboSpan" id="kobo.1.9">ce 3. </span><span class="koboSpan" id="kobo.1.10">Another word</span></a></b></p>`,
+			},
+			{
+				name: "nested lists/paragraphs should not reset numbering once out of scope",
+				in:   `<p>Sentence.<ul><li>Another sentence.</li><li>Another sentence.<ul><li>Another sentence.</li><li>Another sentence.</li></ul></li><li>Another sentence.</li></ul> Another sentence.</p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence.</span></p><ul><li><span class="koboSpan" id="kobo.2.1">Another sentence.</span></li><li><span class="koboSpan" id="kobo.2.2">Another sentence.</span><ul><li><span class="koboSpan" id="kobo.3.1">Another sentence.</span></li><li><span class="koboSpan" id="kobo.3.2">Another sentence.</span></li></ul></li><li><span class="koboSpan" id="kobo.3.3">Another sentence.</span></li></ul><span class="koboSpan" id="kobo.3.4"> Another sentence.</span><p></p>`,
+			},
+			{
+				name: "don't touch the contents of script, style, pre, audio, video tags",
+				in:   `<p>Touch this.</p><script>not this</script><style>or this</style><pre>or this</pre><audio>or this</audio><video>or this</video><p>Touch this.</p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Touch this.</span></p><script>not this</script><style>or this</style><pre>or this</pre><audio>or this</audio><video>or this</video><p><span class="koboSpan" id="kobo.2.1">Touch this.</span></p>`,
+			},
+			{
+				name: "treat an img as a new paragraph and add a span around it",
+				in:   `<p>One.</p><img src="test"><p>Three.</p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><span class="koboSpan" id="kobo.2.1"><img src="test" /></span><p><span class="koboSpan" id="kobo.3.1">Three.</span></p>`,
+			},
+			{
+				name: "don't increment paragraph counter if no spans were added",
+				in:   `<p>One.</p><p> </p><p><!-- comment --></p><p>Two.</p><p><b>Three.</b></p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">One.</span></p><p><span class="koboSpan" id="kobo.2.1"> </span></p><p><!-- comment --></p><p><span class="koboSpan" id="kobo.3.1">Two.</span></p><p><b><span class="koboSpan" id="kobo.4.1">Three.</span></b></p>`,
+			},
+			{
+				name: "don't add spans to svg and math elements",
+				in:   `<svg xmlns="http://www.w3.org/2000/svg"><g><text font-size="24" y="20" x="0">kepubify</text></g></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mfrac><mrow><mo>-</mo><mi>b</mi><mo>±</mo><msqrt><msup><mi>b</mi><mn>2</mn></msup><mo>-</mo><mn>4</mn><mi>a</mi><mi>c</mi></msqrt></mrow><mrow><mn>2</mn><mi>a</mi></mrow></mfrac></math>`,
+				want: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g><text font-size="24" y="20" x="0">kepubify</text></g></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mfrac><mrow><mo>-</mo><mi>b</mi><mo>±</mo><msqrt><msup><mi>b</mi><mn>2</mn></msup><mo>-</mo><mn>4</mn><mi>a</mi><mi>c</mi></msqrt></mrow><mrow><mn>2</mn><mi>a</mi></mrow></mfrac></math>`,
+			},
+			{
+				name: "also increment paragraph counter on heading tags and don't split sentences after colons or if there isn't any spaces after a period",
+				in:   `<div class="img_container"><p class="ad_image"><img src="bookwire_ad_cover1.jpg" alt="image"/></p></div>` + "\n" + `    <h2 class="subheadline">The Christmas Collection: All Of Your Favourite Classic Christmas Stories, Novels, Poems, Carols in One Ebook</h2>` + "\n" + `    <p class="subheadline2"></p>` + "\n" + `    <p class="metadata">Carr, Annie Roe</p>`,
+				want: `<div class="img_container"><p class="ad_image"><span class="koboSpan" id="kobo.1.1"><img src="bookwire_ad_cover1.jpg" alt="image" /></span></p></div>` + "\n" + `    <h2 class="subheadline"><span class="koboSpan" id="kobo.2.1">The Christmas Collection: All Of Your Favourite Classic Christmas Stories, Novels, Poems, Carols in One Ebook</span></h2>` + "\n" + `    <p class="subheadline2"></p>` + "\n" + `    <p class="metadata"><span class="koboSpan" id="kobo.3.1">Carr, Annie Roe</span></p>`,
+			},
+		} {
+			tc.run(t)
+		}
 	})
 
 	t.Run("AddStyle", func(t *testing.T) {
-		transformContentCase{
-			Func:     func(doc *html.Node) { transformContentAddStyle(doc, "kepubify-test", "div > div { color: black; }") },
-			What:     "add style to head",
-			Fragment: false,
-			In:       `<!DOCTYPE html><html><head><title>Kepubify Test</title></head><body></body></html>`,
-			Out:      `<!DOCTYPE html><html><head><title>Kepubify Test</title><style type="text/css" class="kepubify-test">div > div { color: black; }</style></head><body></body></html>`,
-		}.Run(t)
+		partTest{
+			name:     "add style to head",
+			in:       `<!DOCTYPE html><html><head><title>Kepubify Test</title></head><body></body></html>`,
+			doc:      true,
+			opts:     []ConverterOption{ConverterOptionAddCSS("div > div { color: black; }")},
+			contains: true,
+			want:     `<title>Kepubify Test</title><style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style><style type="text/css" class="kepubify-extracss">div > div { color: black; }</style></head>`,
+		}.run(t)
 	})
 
 	t.Run("SmartyPants", func(t *testing.T) {
-		transformContentCase{
-			Func:     transformContentPunctuation,
-			What:     "smart punctuation",
-			Fragment: true,
-			In:       `<p>This is a test sentence to test smartypants' conversion of "quotation marks", dashes like - / -- / ---, and symbols like (c).</p>`,
-			Out:      `<p>This is a test sentence to test smartypants’ conversion of “quotation marks”, dashes like - / – / —, and symbols like ©.</p>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentPunctuation,
-			What:     "skip pre, code, style, and script elements",
-			Fragment: true,
-			In:       `<p>This is a test sentence to test smartypants' conversion of <code>"quotation marks"</code>, dashes like <pre>- / -- / ---</pre>, and symbols like (c).</p><style>div{font-family:"Test"}</style><script>var a="test"</script>`,
-			Out:      `<p>This is a test sentence to test smartypants’ conversion of <code>&#34;quotation marks&#34;</code>, dashes like </p><pre>- / -- / ---</pre>, and symbols like ©.<p></p><style>div{font-family:"Test"}</style><script>var a="test"</script>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentPunctuation,
-			What:     "properly handle entity escaping",
-			Fragment: true,
-			In:       `<p>&amp;&quot;&lt;&gt;&quot;</p><pre>&quot;</pre>`,
-			Out:      `<p>&amp;“&lt;&gt;”</p><pre>&#34;</pre>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentPunctuation,
-			What:     "keep single backticks",
-			Fragment: true,
-			In:       "<p>``double'' and `single`</p>",
-			Out:      "<p>“double” and `single`</p>",
-		}.Run(t)
+		smarty := []ConverterOption{ConverterOptionSmartypants()}
+		for _, tc := range []partTest{
+			{
+				name: "smart punctuation",
+				in:   `<p>This is a test sentence to test smartypants' conversion of "quotation marks", dashes like - / -- / ---, and symbols like (c).</p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">This is a test sentence to test smartypants’ conversion of “quotation marks”, dashes like - / – / —, and symbols like ©.</span></p>`,
+			},
+			{
+				name: "skip pre, code, style, and script elements",
+				in:   `<p>This is a test sentence to test smartypants' conversion of <code>"quotation marks"</code>, dashes like <pre>- / -- / ---</pre>, and symbols like (c).</p><style>div{font-family:"Test"}</style><script>var a="test"</script>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">This is a test sentence to test smartypants’ conversion of </span><code><span class="koboSpan" id="kobo.1.2">"quotation marks"</span></code><span class="koboSpan" id="kobo.1.3">, dashes like </span></p><pre>- / -- / ---</pre><span class="koboSpan" id="kobo.1.4">, and symbols like ©.</span><p></p><style>div{font-family:"Test"}</style><script>var a="test"</script>`,
+			},
+			{
+				name: "properly handle entity escaping",
+				in:   `<p>&amp;&quot;&lt;&gt;&quot;</p><pre>&quot;</pre>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">&amp;“&lt;&gt;”</span></p><pre>"</pre>`,
+			},
+		} {
+			tc.opts = smarty
+			tc.run(t)
+		}
 	})
 
 	t.Run("CleanHTML", func(t *testing.T) {
-		transformContentCase{
-			Func:     transformContentClean,
-			What:     "remove adobe adept metadata",
-			Fragment: true,
-			In:       `<meta charset="utf-8"/><meta name="Adept.expected.resource"/>`,
-			Out:      `<meta charset="utf-8"/>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentClean,
-			What:     "remove useless MS Word tags",
-			Fragment: true,
-			In:       `<o:p></o:p><st1:test></st1:test><div><o:p> dfg </o:p><o:p></o:p></div>`,
-			Out:      `<div><o:p> dfg </o:p></div>`,
-		}.Run(t)
-
-		transformContentCase{
-			Func:     transformContentClean,
-			What:     "remove unicode replacement chars",
-			Fragment: true,
-			In:       `�<p>test�ing</p><p>asd<b>fgh</b></p>`,
-			Out:      `<p>testing</p><p>asd<b>fgh</b></p>`,
-		}.Run(t)
-	})
-
-	t.Run("Replacements", func(t *testing.T) {
-		const corpus = `<!DOCTYPE html><html><head><title></title></head><body><b>Lorem ipsum</b> dolor sit amet, <a href="https://example.com">consectetur adipiscing elit</a>, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</body></html>`
-		for _, tc := range []struct {
-			What         string
-			Replacements []string
-		}{
+		for _, tc := range []partTest{
 			{
-				What: "simple removal",
-				Replacements: []string{
-					" ipsum", "",
-				},
+				name: "remove adobe adept metadata",
+				in:   `<meta charset="utf-8"/><meta name="Adept.expected.resource"/>`,
+				// the charset declaration is replaced by polyglot.Writer
+				want: ``,
+				not:  `Adept`,
 			},
 			{
-				What: "simple replacement",
-				Replacements: []string{
-					". ", "_ ",
-				},
+				name: "remove useless MS Word tags",
+				in:   `<o:p></o:p><st1:test></st1:test><div><o:p> dfg </o:p><o:p></o:p></div>`,
+				want: `<div><span class="koboSpan" id="kobo.0.1"> dfg </span></div>`,
 			},
 			{
-				What: "complex removal", // to ensure the transformer behaves correctly when it requires multiple writes from the renderer
-				Replacements: []string{
-					"<b>Lorem ipsum</b>", "",
-				},
+				name: "remove useless MS Word tags (declared prefixes)",
+				in:   `<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:st1="urn:schemas-microsoft-com:office:smarttags"><body><o:p></o:p><st1:test> <!-- x --> </st1:test><div><o:p> dfg </o:p><o:p>&nbsp;</o:p></div></body></html>`,
+				doc:  true,
+				want: `<div><o:p><span class="koboSpan" id="kobo.0.1"> dfg </span></o:p></div>`,
 			},
 			{
-				What: "long replacement",
-				Replacements: []string{
-					"ipsum", strings.Repeat(".", 4096),
-				},
-			},
-			{
-				What: "simple chained",
-				Replacements: []string{
-					"ipsum", "test1",
-					"amet", "test2",
-					"commodo", "",
-				},
-			},
-			{
-				What: "ordered chained",
-				Replacements: []string{
-					"ipsum", "Lorem",
-					"Lorem", "test1",
-					"ipsum", "",
-				},
-			},
-			{
-				What: "overlapping chained",
-				Replacements: []string{
-					"Lorem", "test1",
-					"test1", "test2",
-					"ipsum", "test2 ipsum",
-					"test2", "test3",
-				},
-			},
-			{
-				What: "complex chained", // to ensure order matters
-				Replacements: []string{
-					"Lorem", "ipsum",
-					"or", "ar",
-					"dolar", "dolor",
-					"</", "__________",
-					"________", "__</",
-					"_", " ",
-					". ", "; ",
-				},
+				name: "remove unicode replacement chars",
+				in:   "\ufffd<p>test\ufffding</p><p>asd<b>fgh</b></p>",
+				// the character is removed after adding the spans, so the span
+				// around it is empty
+				want: `<span class="koboSpan" id="kobo.0.1"></span><p><span class="koboSpan" id="kobo.1.1">testing</span></p><p><span class="koboSpan" id="kobo.2.1">asd</span><b><span class="koboSpan" id="kobo.2.2">fgh</span></b></p>`,
 			},
 		} {
-			out := corpus
-			for i := 0; i < len(tc.Replacements)/2; i++ {
-				out = strings.ReplaceAll(out, tc.Replacements[i*2], tc.Replacements[i*2+1])
-			}
-			if out == corpus {
-				panic("strings don't differ")
-			}
-			transformContentCase{
-				Func: func(repl ...string) func(io.Writer) io.WriteCloser {
-					if len(repl)%2 != 0 {
-						panic("replacements not a multiple of 2")
-					}
-					f := make([][]byte, len(repl)/2)
-					r := make([][]byte, len(repl)/2)
-					for i := 0; i < len(repl)/2; i++ {
-						f[i], r[i] = []byte(repl[i*2]), []byte(repl[i*2+1])
-					}
-					return func(w io.Writer) io.WriteCloser {
-						return transformContentReplacements(w, f, r)
-					}
-				}(tc.Replacements...),
-				What: tc.What,
-				In:   corpus,
-				Out:  out,
-			}.Run(t)
+			tc.run(t)
 		}
 	})
+}
+
+func TestTransformContentReplacements(t *testing.T) {
+	const corpus = `<!DOCTYPE html><html><head><title></title></head><body><b>Lorem ipsum</b> dolor sit amet, <a href="https://example.com">consectetur adipiscing elit</a>, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</body></html>`
+	plain := transformContent(t, corpus)
+	for _, tc := range []struct {
+		name string
+		repl []string
+	}{
+		{"simple removal", []string{" ipsum", ""}},
+		{"simple replacement", []string{". ", "_ "}},
+		{"complex removal", []string{"<b>", ""}},
+		{"long replacement", []string{"ipsum", strings.Repeat(".", 4096)}},
+		{"simple chained", []string{"ipsum", "test1", "amet", "test2", "commodo", ""}},
+		{"ordered chained", []string{"ipsum", "Lorem", "Lorem", "test1", "ipsum", ""}},
+		{"overlapping chained", []string{"Lorem", "test1", "test1", "test2", "ipsum", "test2 ipsum", "test2", "test3"}},
+		{"complex chained", []string{"Lorem", "ipsum", "or", "ar", "dolar", "dolor", "</", "__________", "________", "__</", "_", " ", ". ", "; "}},
+		{"empty find", []string{"", "x", "ipsum", "y"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var opts []ConverterOption
+			want := plain
+			for i := 0; i < len(tc.repl); i += 2 {
+				opts = append(opts, ConverterOptionFindReplace(tc.repl[i], tc.repl[i+1]))
+				if tc.repl[i] != "" {
+					want = strings.ReplaceAll(want, tc.repl[i], tc.repl[i+1])
+				}
+			}
+			if want == plain {
+				t.Fatal("no replacements")
+			}
+			if got := transformContent(t, corpus, opts...); got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+func TestTransformContentEdgeCases(t *testing.T) {
+	for _, tc := range []partTest{
+		{
+			// #104
+			name: "self-closing tags of non-void elements are empty",
+			in:   `<p>One.<i/></p><p>Two.<b/> <span/><a id="x"/><td/></p><div/>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1">One.</span><i></i></p><p><span class="koboSpan" id="kobo.2.1">Two.</span><b></b><span class="koboSpan" id="kobo.2.2"> </span><span></span><a id="x"></a><td></td></p><div></div>`,
+		},
+		{
+			name: "self-closing tags in foreign content",
+			in:   `<p>x</p><svg><g/><rect/></svg><math><mi/></math>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1">x</span></p><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g></g><rect></rect></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi></mi></math>`,
+		},
+		{
+			// #98
+			name:     "hyphenation stylesheet",
+			opts:     []ConverterOption{ConverterOptionHyphenate(true)},
+			contains: true,
+			want:     "h1, h2, h3, h4, h5, h6, td,\nh1 *, h2 *, h3 *, h4 *, h5 *, h6 *, td * {",
+		},
+		{
+			name:     "no hyphenation stylesheet",
+			opts:     []ConverterOption{ConverterOptionHyphenate(false)},
+			contains: true,
+			want:     `<style type="text/css" class="kepubify-nohyphenate">* {`,
+		},
+		{
+			// #95
+			name:     "XML declaration after a comment",
+			in:       `<!-- generated --><?xml version="1.0" encoding="iso-8859-1"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd"><html><body>x</body></html>`,
+			doc:      true,
+			contains: true,
+			want:     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- generated -->\n" + `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">` + "\n<html",
+		},
+		{
+			// #95
+			name: "XML declaration in the body",
+			in:   `<p>x</p><?xml version="1.0"?><p>y</p>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1">x</span></p><!--?xml version="1.0"?--><p><span class="koboSpan" id="kobo.2.1">y</span></p>`,
+			not:  `<?xml`,
+		},
+		{
+			name:     "malformed doctype",
+			in:       `<!DOCTYPE"x><html><body>x</body></html>`,
+			doc:      true,
+			contains: true,
+			want:     `<html xmlns="http://www.w3.org/1999/xhtml"><head>`,
+			not:      `DOCTYPE`,
+		},
+		{
+			name:     "no doctype",
+			in:       "\ufeff<?xml version='1.0'?>\n<html><body>x</body></html>",
+			doc:      true,
+			contains: true,
+			want:     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + `<html xmlns="http://www.w3.org/1999/xhtml">`,
+		},
+		{
+			name: "noscript contents are markup",
+			in:   `<noscript><p>a. b</p></noscript>`,
+			want: `<noscript><p><span class="koboSpan" id="kobo.1.1">a. </span><span class="koboSpan" id="kobo.1.2">b</span></p></noscript>`,
+		},
+		{
+			name: "no spans in textarea, title and xmp",
+			in:   `<textarea>a. b</textarea><svg><title>c</title></svg><title>d. e</title><xmp>f</xmp>`,
+			want: `<textarea>a. b</textarea><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><title>c</title></svg><title>d. e</title><pre>f</pre>`,
+		},
+		{
+			name: "CDATA sections are text",
+			in:   `<p>a<![CDATA[ <b>. ]]>c</p>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1">a &lt;b&gt;. </span><span class="koboSpan" id="kobo.1.2">c</span></p>`,
+		},
+		{
+			name: "backticks are kept",
+			in:   "<p>a`b ``c''</p>",
+			opts: []ConverterOption{ConverterOptionSmartypants()},
+			want: "<p><span class=\"koboSpan\" id=\"kobo.1.1\">a`b “c”</span></p>",
+		},
+		{
+			name: "invalid UTF-8 is removed",
+			in:   "<p>a\xffb\x01c</p>",
+			want: `<p><span class="koboSpan" id="kobo.1.1">abc</span></p>`,
+		},
+		{
+			name: "bogus comment <!>",
+			in:   `<p>a<!>b</p>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1">a</span><!----><span class="koboSpan" id="kobo.1.2">b</span></p>`,
+		},
+		{
+			name: "svg with xmlns:xlink",
+			in:   `<svg xmlns:xlink="http://www.w3.org/1999/xlink"><rect/></svg>`,
+			want: `<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg"><rect></rect></svg>`,
+		},
+		{
+			name: "foreign elements named like HTML void elements",
+			in:   `<p>a</p><svg><wbr>x</wbr></svg>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1">a</span></p><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><wbr>x</wbr></svg>`,
+		},
+		{
+			name:     "stylesheets with < or &",
+			opts:     []ConverterOption{ConverterOptionAddCSS(`p::after { content: "<&]]>"; }`)},
+			contains: true,
+			want:     "<style type=\"text/css\" class=\"kepubify-extracss\">/*<![CDATA[*/\np::after { content: \"<&]]]]><![CDATA[>\"; }\n/*]]>*/</style>",
+		},
+	} {
+		tc.run(t)
+	}
+}
+
+func TestTransformContentStreaming(t *testing.T) {
+	// tests for lookahead
+	for _, tc := range []partTest{
+		{
+			name:     "wrapper divs after whitespace and comments",
+			in:       "\n<!-- a --> <div id=\"book-columns\"> <!-- b --><div id=\"book-inner\"><p>x</p></div></div>\n",
+			contains: true,
+			want:     "<body>\n<!-- a --> <div id=\"book-columns\"> <!-- b --><div id=\"book-inner\"><p><span class=\"koboSpan\" id=\"kobo.1.1\">x</span></p></div></div>\n</body>",
+		},
+		{
+			name: "wrapper divs after text",
+			in:   "x<div id=\"book-columns\"><div id=\"book-inner\"></div></div>",
+			want: "<span class=\"koboSpan\" id=\"kobo.0.1\">x</span><div id=\"book-columns\"><div id=\"book-inner\"></div></div>",
+		},
+		{
+			name: "book-columns without book-inner",
+			in:   " <div id=\"book-columns\"> <p>x</p></div>",
+			want: " <div id=\"book-columns\"> <p><span class=\"koboSpan\" id=\"kobo.1.1\">x</span></p></div>",
+		},
+		{
+			name: "existing spans after an image",
+			in:   `<p><img src="x"/><span class="koboSpan" id="kobo.1.1">x</span>y</p>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1"><img src="x" /></span><span class="koboSpan" id="kobo.1.1">x</span><span class="koboSpan" id="kobo.1.2">y</span></p>`,
+		},
+		{
+			name: "existing spans after whitespace",
+			in:   "<div> <p><span class=\"koboSpan\" id=\"kobo.1.1\">x</span>y</p></div>",
+			want: "<div> <p><span class=\"koboSpan\" id=\"kobo.1.1\">x</span>y</p></div>",
+		},
+		{
+			name: "whitespace sentence outside p",
+			in:   "<div>a. \u00a0\u2003</div><div>\u00a0 <b>b</b></div>",
+			want: "<div><span class=\"koboSpan\" id=\"kobo.0.1\">a. </span>&#160;\u2003</div><div>&#160; <b><span class=\"koboSpan\" id=\"kobo.0.2\">b</span></b></div>",
+		},
+	} {
+		tc.run(t)
+	}
+
+	t.Run("long text", func(t *testing.T) {
+		// longer than the chunk size of the Reader
+		var text strings.Builder
+		for i := range 20000 {
+			text.WriteString("Sentence number " + strings.Repeat("x", i%7) + `. "Quoted" -- `)
+		}
+		text.WriteString(strings.Repeat(" ", 100000) + "end")
+		var in, want strings.Builder
+		in.WriteString("<p>" + text.String() + "</p><div>" + strings.Repeat("\u00a0", 1000) + "</div>")
+		want.WriteString("<p>")
+		for i, s := range splitSentencesRegexp(text.String()) {
+			var sp smartypants
+			want.WriteString(`<span class="koboSpan" id="kobo.1.` + strconv.Itoa(i+1) + `">` + string(sp.Convert(nil, []byte(s), true)) + "</span>")
+		}
+		want.WriteString("</p><div>" + strings.Repeat("&#160;", 1000) + "</div>")
+		got := bookInner(t, transformContent(t, fragmentDoc(in.String()), ConverterOptionSmartypants()))
+		if got != want.String() {
+			i := 0
+			for i < len(got) && i < len(want.String()) && got[i] == want.String()[i] {
+				i++
+			}
+			t.Errorf("differs at %d: %q, want %q", i, got[i:min(len(got), i+100)], want.String()[i:min(len(want.String()), i+100)])
+		}
+	})
+
+	t.Run("long whitespace outside p", func(t *testing.T) {
+		// treated as text after holdMax bytes
+		in := "<div>" + strings.Repeat(" ", holdMax+1) + "</div>"
+		want := "<div><span class=\"koboSpan\" id=\"kobo.0.1\">" + strings.Repeat(" ", holdMax+1) + "</span></div>"
+		if got := bookInner(t, transformContent(t, fragmentDoc(in))); got != want {
+			t.Errorf("got %q", got[:min(len(got), 100)])
+		}
+	})
+}
+
+func TestTransformContentCharset(t *testing.T) {
+	latin1 := "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?><html><body><p>caf\xe9</p></body></html>"
+	meta := "<html><head><meta charset=\"windows-1252\"></head><body><p>\x93x\x94</p></body></html>"
+	for _, tc := range []struct {
+		name, in, charset, want string
+	}{
+		{"auto, XML declaration", latin1, "auto", "café"},
+		{"auto, meta", meta, "auto", "“x”"},
+		{"auto, UTF-8", "<p>café</p>", "auto", "café"},
+		{"label", "<p>caf\xe9</p>", "latin1", "café"},
+		{"default", "<p>café</p>", "", "café"},
+		{"UTF-8", "<p>café</p>", "UTF-8", "café"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := transformContent(t, tc.in, ConverterOptionCharset(tc.charset))
+			if !strings.Contains(out, `<span class="koboSpan" id="kobo.1.1">`+tc.want+`</span>`) {
+				t.Errorf("got %s", out)
+			}
+			if strings.Contains(out, "iso-8859-1") || strings.Contains(out, "windows-1252") {
+				t.Errorf("charset not replaced: %s", out)
+			}
+		})
+	}
+	if err := NewConverterWithOptions(ConverterOptionCharset("nonexistent")).TransformContent(io.Discard, strings.NewReader("")); err == nil {
+		t.Error("no error for an invalid charset")
+	}
+}
+
+func TestTransformContentErrors(t *testing.T) {
+	errRead := errors.New("read error")
+	doc := fragmentDoc(strings.Repeat("<p>Some text. More text.</p>", 10000))
+	for _, n := range []int{0, 10, 100, 10000, 100000} {
+		r := io.MultiReader(strings.NewReader(doc[:n]), iotest.ErrReader(errRead))
+		if err := NewConverter().TransformContent(io.Discard, r); !errors.Is(err, errRead) {
+			t.Errorf("read error after %d bytes: got %v", n, err)
+		}
+		w := &failWriter{n: n}
+		if err := NewConverterWithOptions(ConverterOptionFindReplace("text", "txet")).TransformContent(w, strings.NewReader(doc)); !errors.Is(err, errWrite) {
+			t.Errorf("write error after %d bytes: got %v", n, err)
+		}
+	}
+}
+
+var errWrite = errors.New("write error")
+
+// failWriter fails after n bytes.
+type failWriter struct{ n int }
+
+func (w *failWriter) Write(p []byte) (int, error) {
+	if len(p) > w.n {
+		n := w.n
+		w.n = 0
+		return n, errWrite
+	}
+	w.n -= len(p)
+	return len(p), nil
 }
 
 func TestTransformContentReplacementsWrites(t *testing.T) {
@@ -1107,75 +1244,6 @@ func TestTransformDummyTitlepageParts(t *testing.T) {
 	}
 }
 
-type transformContentCase struct {
-	Func     interface{}
-	What     string
-	Fragment bool
-	Contains bool
-
-	In  string
-	Out string
-}
-
-func (tc transformContentCase) Run(t *testing.T) {
-	// note: the HTML is parsed and rendered without my extensions to be to test
-	//       just the transformation function without depending on the behaviour
-	//       of the extensions.
-	t.Logf("case %#v", tc.What)
-
-	var inReader io.Reader
-	if tc.Fragment {
-		inReader = strings.NewReader(`<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="utf-8"/></head><body>` + tc.In + `</body></html>`)
-	} else {
-		inReader = strings.NewReader(tc.In)
-	}
-
-	doc, err := html.Parse(inReader)
-	if err != nil {
-		t.Errorf("case %#v: parse: %v", tc.What, err)
-		return
-	}
-
-	var w io.Writer
-	buf := bytes.NewBuffer(nil)
-	w = buf
-
-	switch fn := tc.Func.(type) {
-	case func(doc *html.Node):
-		fn(doc)
-	case func(w io.Writer) io.WriteCloser:
-		w = fn(w)
-	default:
-		panic(fmt.Sprintf("unknown type for func: %T", fn))
-	}
-
-	if err := html.Render(w, doc); err != nil {
-		t.Errorf("case %#v: render: %v", tc.What, err)
-		return
-	}
-
-	if wc, ok := w.(io.WriteCloser); ok {
-		if err := wc.Close(); err != nil {
-			t.Errorf("case %#v: render: %v", tc.What, err)
-		}
-	}
-
-	hstr := buf.String()
-	if tc.Fragment {
-		hstr = strings.Split(strings.Split(hstr, "<body>")[1], "</body>")[0] // hacky, but the easiest way to do it
-	}
-
-	if tc.Contains {
-		if !strings.Contains(hstr, tc.Out) {
-			t.Errorf("case %#v: \ngot:`%v` doesn't contain \nexp:`%v`", tc.What, strings.ReplaceAll(hstr, "\n", "`+\"\\n\"+`"), strings.ReplaceAll(tc.Out, "\n", "`+\"\\n\"+`"))
-		}
-	} else {
-		if hstr != tc.Out {
-			t.Errorf("case %#v: \ngot:`%v` != \nexp:`%v`", tc.What, strings.ReplaceAll(hstr, "\n", "`+\"\\n\"+`"), strings.ReplaceAll(tc.Out, "\n", "`+\"\\n\"+`"))
-		}
-	}
-}
-
 type titlepageTest struct {
 	name     string
 	force    *bool
@@ -1310,23 +1378,46 @@ var testSentences = []string{
 	" ?'  .   .'\xe2\x82\x28\xFF.",
 }
 
-func TestSplitSentences(t *testing.T) {
-	for _, v := range testSentences {
-		sss := slices.Collect(splitSentencesSeq(v))
-		ssr := splitSentencesRegexp(v)
-
-		if len(sss) == len(ssr) {
-			for i := range sss {
-				if sss[i] != ssr[i] {
-					t.Errorf("%q (new state-machine) != %q (old regexp)", sss, ssr)
-				}
+// splitSentences splits s with sentenceSplitter, passing it in parts of
+// ~chunkSize bytes, split between characters like Reader.
+func splitSentences(s string, chunkSize int) []string {
+	var sp sentenceSplitter
+	var r []string
+	var cur []byte
+	for len(s) != 0 {
+		part := []byte(s[:partEnd(s, chunkSize)])
+		s = s[len(part):]
+		for len(part) != 0 {
+			i := sp.next(part)
+			if i < 0 {
+				cur = append(cur, part...)
+				break
 			}
-		} else {
-			t.Errorf("%q (new state-machine) != %q (old regexp)", sss, ssr)
+			cur = append(cur, part[:i]...)
+			r = append(r, string(cur))
+			cur = cur[:0]
+			part = part[i:]
 		}
+	}
+	return append(r, string(cur))
+}
 
-		if j := strings.Join(sss, ""); j != v {
-			t.Errorf("%q (joined sentence) != %q (original sentence)", j, v)
+func partEnd(s string, n int) int {
+	i := min(n, len(s))
+	for i < len(s) && !utf8.RuneStart(s[i]) { // don't split utf8 sequences
+		i++
+	}
+	return i
+}
+
+func TestSplitSentences(t *testing.T) {
+	for _, s := range testSentences {
+		want := splitSentencesRegexp(s)
+		for _, n := range []int{1, 2, 3, 7, len(s) + 1} {
+			got := splitSentences(s, n)
+			if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+				t.Errorf("%q in parts of %d: got %q, want %q", s, n, got, want)
+			}
 		}
 	}
 }
@@ -1343,9 +1434,7 @@ func BenchmarkSplitSentences(b *testing.B) {
 	b.Run("StateMachine", func(b *testing.B) {
 		for b.Loop() {
 			for _, v := range testSentences {
-				for range splitSentencesSeq(v) {
-					// nop
-				}
+				splitSentences(v, len(v)+1)
 			}
 		}
 	})
