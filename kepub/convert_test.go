@@ -5,20 +5,24 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/png"
 	"io"
 	"io/fs"
-	"io/ioutil"
+	"maps"
 	"math/rand"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
+	"time"
 )
 
 // The intention of these tests are to provide quick checks for important
@@ -472,6 +476,74 @@ func TestConvertWarnProgress(t *testing.T) {
 	}
 }
 
+func TestConvertZipExtra(t *testing.T) {
+	// NTFS field followed by a stray byte (#97), a zip64 field, and an extended
+	// timestamp field
+	ntfs := append([]byte{0x0a, 0x00, 32, 0}, make([]byte, 32)...)
+	zip64 := append([]byte{0x01, 0x00, 16, 0}, make([]byte, 16)...)
+	ut := []byte{0x55, 0x54, 5, 0, 1, 0, 0, 0, 0}
+	extra := slices.Concat(ntfs, zip64, ut, []byte{0})
+
+	var in bytes.Buffer
+	zw := zip.NewWriter(&in)
+	for _, name := range slices.Sorted(maps.Keys(testEPUB)) {
+		data := testEPUB[name].Data
+		w, err := zw.CreateRaw(&zip.FileHeader{
+			Name:               name,
+			Method:             zip.Store,
+			Modified:           time.Date(2025, 1, 14, 9, 33, 0, 0, time.UTC),
+			CRC32:              crc32.ChecksumIEEE(data),
+			CompressedSize64:   uint64(len(data)),
+			UncompressedSize64: uint64(len(data)),
+			Extra:              extra,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(in.Bytes()), int64(in.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := Convert(context.Background(), &out, zr, Options{}); err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+	zr, err = zip.NewReader(bytes.NewReader(out.Bytes()), int64(out.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	for _, f := range zr.File {
+		if f.Name == "mimetype" || bytes.Equal(f.Extra, extra) {
+			continue // written by Convert, or copied
+		}
+		n++
+		var ids []uint16
+		for b := f.Extra; len(b) != 0; {
+			if len(b) < 4 || 4+int(binary.LittleEndian.Uint16(b[2:])) > len(b) {
+				t.Errorf("%s: malformed extra field %x", f.Name, f.Extra)
+				break
+			}
+			ids = append(ids, binary.LittleEndian.Uint16(b))
+			b = b[4+int(binary.LittleEndian.Uint16(b[2:])):]
+		}
+		if !slices.Equal(ids, []uint16{0x000a, 0x5455}) {
+			t.Errorf("%s: extra field ids %04x", f.Name, ids)
+		}
+	}
+	if n == 0 {
+		t.Error("no transformed files")
+	}
+}
+
 type ConvertTestCase struct {
 	What        string
 	EPUB        fs.FS
@@ -687,7 +759,7 @@ func FileShould(file string, fn func(contents string) error) ShouldFunc {
 		}
 		defer rc.Close()
 
-		buf, err := ioutil.ReadAll(rc)
+		buf, err := io.ReadAll(rc)
 		if err != nil {
 			return fmt.Errorf("failed to read file %q in kepub: %v", file, err)
 		}

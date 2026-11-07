@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -445,7 +446,7 @@ func zipReplace(z *zip.Writer, f *zip.FileHeader, r io.Reader) error {
 		Modified:      f.Modified,
 		ModifiedTime:  f.ModifiedTime,
 		ModifiedDate:  f.ModifiedDate,
-		Extra:         f.Extra,
+		Extra:         zipExtra(f),
 		ExternalAttrs: f.ExternalAttrs,
 	})
 	if err != nil {
@@ -453,6 +454,29 @@ func zipReplace(z *zip.Writer, f *zip.FileHeader, r io.Reader) error {
 	}
 	_, err = io.Copy(w, r)
 	return err
+}
+
+// zipExtra returns the extra fields of f for a new header written with
+// [zip.Writer.CreateHeader], leaving out malformed fields (#97), the zip64
+// field, and if f.Modified is set, the extended timestamp field (which will be
+// added by [zip.Writer.CreateHeader]).
+func zipExtra(f *zip.FileHeader) []byte {
+	const (
+		zip64ExtraID   = 0x0001
+		extTimeExtraID = 0x5455
+	)
+	var extra []byte
+	for b := f.Extra; len(b) >= 4; {
+		id, size := binary.LittleEndian.Uint16(b), int(binary.LittleEndian.Uint16(b[2:]))
+		if 4+size > len(b) {
+			break
+		}
+		if id != zip64ExtraID && (id != extTimeExtraID || f.Modified.IsZero()) {
+			extra = append(extra, b[:4+size]...)
+		}
+		b = b[4+size:]
+	}
+	return extra
 }
 
 // zipCopy copies a file from a FS to a zip using the information in the
@@ -471,7 +495,7 @@ func zipCopyFS(z *zip.Writer, f *zip.FileHeader, fs fs.FS) error {
 		Modified:      f.Modified,
 		ModifiedTime:  f.ModifiedTime,
 		ModifiedDate:  f.ModifiedDate,
-		Extra:         f.Extra,
+		Extra:         zipExtra(f),
 		ExternalAttrs: f.ExternalAttrs,
 	})
 	if err != nil {
