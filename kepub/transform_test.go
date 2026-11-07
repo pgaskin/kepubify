@@ -461,6 +461,39 @@ func TestTransformContentParts(t *testing.T) {
 	})
 }
 
+func TestTransformContentReplacementsWrites(t *testing.T) {
+	const in = "aab abab ba aaab b"
+	for _, repl := range [][][2]string{
+		{{"ab", "ba"}, {"ba", "x"}, {"", "y"}, {"aa", "a"}},
+		{{"", "y"}},
+		nil,
+	} {
+		var find, replace [][]byte
+		want := in
+		for _, r := range repl {
+			find, replace = append(find, []byte(r[0])), append(replace, []byte(r[1]))
+			if r[0] != "" {
+				want = strings.ReplaceAll(want, r[0], r[1])
+			}
+		}
+		for _, n := range []int{1, 2, 3, len(in)} {
+			var buf bytes.Buffer
+			wc := transformContentReplacements(&buf, find, replace)
+			for i := 0; i < len(in); i += n {
+				if _, err := wc.Write([]byte(in[i:min(i+n, len(in))])); err != nil {
+					t.Fatalf("write: %v", err)
+				}
+			}
+			if err := wc.Close(); err != nil {
+				t.Fatalf("close: %v", err)
+			}
+			if got := buf.String(); got != want {
+				t.Errorf("%q, writes of %d bytes: got %q, want %q", repl, n, got, want)
+			}
+		}
+	}
+}
+
 func TestTransformOPF(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

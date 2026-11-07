@@ -25,7 +25,6 @@ import (
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/htmlindex"
 	"golang.org/x/text/encoding/unicode/utf32"
-	"golang.org/x/text/transform"
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html/atom"
@@ -338,10 +337,10 @@ func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 
 	transformContentClean(doc)
 
+	var wc io.WriteCloser
 	if len(c.find) != 0 {
-		wc := transformContentReplacements(w, c.find, c.replace)
+		wc = transformContentReplacements(w, c.find, c.replace)
 		w = wc
-		defer wc.Close()
 	}
 
 	err = html.RenderWithOptions(w, doc,
@@ -349,6 +348,12 @@ func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 		html.RenderOptionPolyglot(true))
 	if err != nil {
 		return fmt.Errorf("render html: %w", err)
+	}
+
+	if wc != nil {
+		if err := wc.Close(); err != nil {
+			return fmt.Errorf("render html: %w", err)
+		}
 	}
 
 	return nil
@@ -764,21 +769,26 @@ func transformContentClean(doc *html.Node) {
 	}
 }
 
+// transformContentReplacements returns a writer which replaces each find with
+// the corresponding replace in the data written to w, in order (each
+// replacement applies to the output of the previous ones). Empty finds are
+// ignored.
 func transformContentReplacements(w io.Writer, find, replace [][]byte) io.WriteCloser {
-	var t []transform.Transformer
 	if len(find) != len(replace) {
 		panic("find and replace must be the same length")
 	}
-	for i := range find {
-		if len(find[i]) == 0 {
-			continue
+	var rw *replaceWriter
+	out := w
+	for i := len(find) - 1; i >= 0; i-- {
+		if len(find[i]) != 0 {
+			rw = &replaceWriter{w: out, next: rw, find: find[i], repl: replace[i]}
+			out = rw
 		}
-		t = append(t, &byteReplacer{
-			Find:    find[i],
-			Replace: replace[i],
-		})
 	}
-	return transform.NewWriter(w, transform.Chain(t...))
+	if rw == nil {
+		return nopWriteCloser{w}
+	}
+	return rw
 }
 
 const (
@@ -1269,80 +1279,65 @@ func includes(s, token string) bool {
 	return false
 }
 
-// byteReplacer is a Transformer which finds and replaces sequences of bytes.
-type byteReplacer struct {
-	transform.NopResetter
-	Find, Replace []byte
+// replaceWriter replaces a string in the data written to it, before writing it
+// to w.
+type replaceWriter struct {
+	w          io.Writer
+	next       *replaceWriter // w, to close
+	find, repl []byte
+	buf, out   []byte
 }
 
-func (b *byteReplacer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
-	if len(b.Find) == 0 {
-		panic("find length must not be zero")
+func (rw *replaceWriter) Write(p []byte) (int, error) {
+	rw.buf = append(rw.buf, p...)
+	if err := rw.flush(false); err != nil {
+		return 0, err
 	}
+	return len(p), nil
+}
 
+// flush writes the buffered data, except for a suffix which could be the
+// start of a match unless final.
+func (rw *replaceWriter) flush(final bool) error {
+	b := rw.buf
+	out := rw.out[:0]
 	for {
-		// find the next match
-		i := bytes.Index(src[nSrc:], b.Find)
-		if i == -1 {
+		i := bytes.Index(b, rw.find)
+		if i < 0 {
 			break
 		}
-
-		// copy the non-matching prefix
-		if n := copy(dst[nDst:], src[nSrc:nSrc+i]); n == len(src[nSrc:nSrc+i]) {
-			nSrc += n
-			nDst += n
-		} else {
-			// skip what we've already processed
-			nSrc += n
-			nDst += n
-			// have it call us again with a larger destination buffer
-			err = transform.ErrShortDst
-			return
-		}
-
-		// copy the new value
-		if n := copy(dst[nDst:], b.Replace); n == len(b.Replace) {
-			nSrc += len(b.Find)
-			nDst += n
-		} else {
-			// have it call us again with a larger destination buffer
-			err = transform.ErrShortDst
-			return
-		}
+		out = append(append(out, b[:i]...), rw.repl...)
+		b = b[i+len(rw.find):]
 	}
-
-	if !atEOF {
-		// skip everything, minus the last len(b.Replace)-1 in case there is another
-		// partial match at the end
-		if skip := len(src[nSrc:]) - (len(b.Find) - 1); skip > 0 {
-			if n := copy(dst[nDst:], src[nSrc:nSrc+skip]); n == len(src[nSrc:nSrc+skip]) {
-				nSrc += n
-				nDst += n
-			} else {
-				// skip what we've already processed
-				nSrc += n
-				nDst += n
-				// have it call us again with a larger destination buffer
-				err = transform.ErrShortDst
-				return
-			}
-		}
-
-		// have it call us again with more source bytes to find another match in
-		err = transform.ErrShortSrc
-		return
+	keep := 0
+	if !final {
+		keep = min(len(b), len(rw.find)-1)
 	}
-
-	// at EOF, and no more replacements, so copy the remaining bytes
-	if n := copy(dst[nDst:], src[nSrc:]); n == len(src[nSrc:]) {
-		nDst += n
-		nSrc += n
-	} else {
-		// skip what we've already copied
-		nDst += n
-		nSrc += n
-		// have it call us again with a larger destination buffer
-		err = transform.ErrShortDst
+	out = append(out, b[:len(b)-keep]...)
+	rw.buf = append(rw.buf[:0], b[len(b)-keep:]...)
+	rw.out = out
+	if len(out) == 0 {
+		return nil
 	}
-	return
+	_, err := rw.w.Write(out)
+	return err
+}
+
+// Close writes the rest of the data and closes the next writer in the chain.
+func (rw *replaceWriter) Close() error {
+	if err := rw.flush(true); err != nil {
+		return err
+	}
+	if rw.next != nil {
+		return rw.next.Close()
+	}
+	return nil
+}
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (nopWriteCloser) Close() error {
+	return nil
 }
