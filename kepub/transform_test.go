@@ -892,6 +892,18 @@ func TestTransformDummyTitlepage(t *testing.T) {
 	}.Run(t)
 
 	transformDummyTitlepageTestCase{
+		What:        "spine without whitespace",
+		Converter:   NewConverterWithOptions(ConverterOptionDummyTitlepage(true)),
+		OPFManifest: `<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>`,
+		OPFSpine:    `<itemref idref="item1"/>`,
+		Content: map[string]string{
+			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+		},
+		ShouldError:  false,
+		ShouldDetect: true,
+	}.Run(t)
+
+	transformDummyTitlepageTestCase{
 		What:         "empty opf package",
 		OPFManifest:  ``,
 		OPFSpine:     ``,

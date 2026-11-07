@@ -800,12 +800,12 @@ func transformDummyTitlepageAdd(opf *bytes.Buffer, opfF string) (string, io.Read
 		it.CreateAttr("media-type", mime)
 	}
 	if m := doc.FindElement("/package/spine"); m != nil {
-		it := m.CreateElement("itemref")
+		it := etree.NewElement("itemref")
 		it.Space = m.Space // shouldn't usually be needed, but just in case they used a namespace prefix
 		it.CreateAttr("idref", id)
-		m.InsertChildAt(1, it)
+		m.InsertChildAt(0, it)
 	}
-	doc.Indent(4) // same as TransformOPF
+	doc.Indent(4)
 
 	opf.Reset()
 	if _, err := doc.WriteTo(opf); err != nil {
