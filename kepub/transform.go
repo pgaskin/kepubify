@@ -38,16 +38,12 @@ func (c *Converter) TransformFileFilter(fn string) bool {
 		return true
 	case "iTunesMetadata.plist", "iTunesArtwork.plist": // iBooks
 		return true
-	case ".DS_STORE": // macOS
+	case ".DS_Store", ".DS_STORE": // macOS
 		return true
 	case "thumbs.db", "Thumbs.db": // Windows
 		return true
 	}
-	switch path.Dir(fn) {
-	case "__MACOSX":
-		return true
-	}
-	return false
+	return strings.HasPrefix(fn, "__MACOSX/") // macOS archivers
 }
 
 // TransformOPF transforms the OPF document for a KEPUB.

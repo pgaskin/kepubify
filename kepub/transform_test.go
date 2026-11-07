@@ -608,16 +608,25 @@ func TestTransformOPFParts(t *testing.T) {
 }
 
 func TestTransformFileFilter(t *testing.T) {
-	for _, fn := range []string{
-		"META-INF/calibre_bookmarks.txt",
-		"iTunesMetadata.plist",
-		"iTunesArtwork.plist",
-		".DS_STORE",
-		"__MACOSX/test.txt",
-		"thumbs.db",
+	for _, tc := range []struct {
+		fn   string
+		want bool
+	}{
+		{"META-INF/calibre_bookmarks.txt", true},
+		{"iTunesMetadata.plist", true},
+		{"iTunesArtwork.plist", true},
+		{".DS_STORE", true},
+		{"__MACOSX/test.txt", true},
+		{"thumbs.db", true},
+		{"OEBPS/Thumbs.db", true},
+		{"OEBPS/.DS_Store", true},
+		{"__MACOSX/OEBPS/._text.xhtml", true},
+		{"OEBPS/__MACOSX/x", false},
+		{"OEBPS/text.xhtml", false},
+		{"mimetype", false},
 	} {
-		if !(&Converter{}).TransformFileFilter(fn) {
-			t.Errorf("expected %q to be filtered", fn)
+		if got := (&Converter{}).TransformFileFilter(tc.fn); got != tc.want {
+			t.Errorf("%q: got %v, want %v", tc.fn, got, tc.want)
 		}
 	}
 }
