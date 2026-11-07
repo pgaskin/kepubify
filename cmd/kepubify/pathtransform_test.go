@@ -12,7 +12,7 @@ import (
 func TestTransformPaths(t *testing.T) {
 	mkTestTransformer := func(t transformer) transformer {
 		t.Suffixes = []string{".epub"}
-		t.ExcludeSuffixes = []string{".kepub.epub"}
+		t.ExplicitSuffixes = []string{".kepub.epub", ".kepub"}
 		t.TargetSuffix = ".kepub.epub"
 		return t
 	}
@@ -224,20 +224,209 @@ func TestTransformPaths(t *testing.T) {
 		},
 	}.Run(t)
 
-	for _, tp := range []string{"txt", "kepub.epub"} {
-		transformPathsCase{
-			What: "converting a file should error if not a supported or excluded type - " + tp,
-			Input: []string{
-				"./book.epub",
-				"./another.epub",
-				"./subdir/book1.epub",
-				"./dontconvert." + tp,
-			},
-			Transformer: mkTestTransformer(transformer{}),
-			Inputs:      []string{"book.epub", "dontconvert." + tp},
-			ShouldError: true,
-		}.Run(t)
-	}
+	transformPathsCase{
+		What: "converting a file should error if not a supported type",
+		Input: []string{
+			"./book.epub",
+			"./another.epub",
+			"./subdir/book1.epub",
+			"./dontconvert.txt",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"book.epub", "dontconvert.txt"},
+		ShouldError: true,
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a file with an explicit suffix should replace the whole suffix",
+		Input: []string{
+			"./book.kepub.epub",
+			"./subdir/book1.kepub.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"book.kepub.epub", "subdir/book1.kepub.epub"},
+		Outputs: []string{
+			"book_converted.kepub.epub",
+			"book1_converted.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a file with an explicit suffix in place should convert into the same path",
+		Input: []string{
+			"./book.kepub.epub",
+		},
+		Transformer: mkTestTransformer(transformer{
+			Inplace: true,
+		}),
+		Inputs: []string{"book.kepub.epub"},
+		Outputs: []string{
+			"book.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a dir should skip files with an explicit suffix",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/book1.kepub.epub",
+			"./dir1/subdir/book2.kepub.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"dir1"},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a dir should match the longest suffix regardless of order",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/subdir/book2.kepub.epub",
+		},
+		Transformer: transformer{
+			Suffixes:     []string{".epub", ".kepub.epub"},
+			TargetSuffix: ".kepub.epub",
+		},
+		Inputs: []string{"dir1"},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+			"dir1_converted/subdir/book2.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a dir with both suffixes should skip the converted sibling",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/book1.kepub.epub",
+			"./dir1/book2.kepub.epub",
+		},
+		Transformer: transformer{
+			Suffixes:     []string{".epub", ".kepub.epub"},
+			TargetSuffix: ".kepub.epub",
+		},
+		Inputs: []string{"dir1"},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+			"dir1_converted/book2.kepub.epub",
+		},
+		Skipped: []string{"dir1/book1.kepub.epub"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a dir with all kepub suffixes should keep the highest priority one",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/book1.kepub.epub",
+			"./dir1/book1.kepub",
+			"./dir1/book2.kepub.epub",
+			"./dir1/book2.kepub",
+			"./dir1/book3.kepub",
+		},
+		Transformer: transformer{
+			Suffixes:     []string{".epub", ".kepub.epub", ".kepub"},
+			TargetSuffix: ".kepub.epub",
+		},
+		Inputs: []string{"dir1"},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+			"dir1_converted/book2.kepub.epub",
+			"dir1_converted/book3.kepub.epub",
+		},
+		Skipped: []string{"dir1/book1.kepub.epub", "dir1/book1.kepub", "dir1/book2.kepub"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a kepub file in place with the kepub target suffix should convert into the same path",
+		Input: []string{
+			"./dir1/book1.kepub",
+		},
+		Transformer: transformer{
+			Inplace:      true,
+			Suffixes:     []string{".epub", ".kepub.epub", ".kepub"},
+			TargetSuffix: ".kepub",
+		},
+		Inputs: []string{"dir1"},
+		Outputs: []string{
+			"dir1/book1.kepub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a kepub file given directly should be renamed to the target suffix",
+		Input: []string{
+			"./book1.kepub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"book1.kepub"},
+		Outputs: []string{
+			"book1_converted.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a dir with both suffixes should skip the converted sibling with a different target suffix",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/book1.kepub.epub",
+		},
+		Transformer: transformer{
+			Suffixes:     []string{".epub", ".kepub.epub"},
+			TargetSuffix: ".kepub",
+		},
+		Inputs: []string{"dir1"},
+		Outputs: []string{
+			"dir1_converted/book1.kepub",
+		},
+		Skipped: []string{"dir1/book1.kepub.epub"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting files with both suffixes should skip the converted sibling regardless of order",
+		Input: []string{
+			"./book1.epub",
+			"./book1.kepub.epub",
+		},
+		Transformer: mkTestTransformer(transformer{
+			Inplace: true,
+		}),
+		Inputs: []string{"book1.kepub.epub", "book1.epub"},
+		Outputs: []string{
+			"book1.kepub.epub",
+		},
+		Skipped: []string{"book1.kepub.epub"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a dir with both suffixes should skip the converted file from another directory when flattening",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/subdir/book1.kepub.epub",
+		},
+		Transformer: transformer{
+			NoPreserveDirs: true,
+			Suffixes:       []string{".epub", ".kepub.epub"},
+			TargetSuffix:   ".kepub.epub",
+		},
+		Inputs: []string{"dir1"},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+		},
+		Skipped: []string{"dir1/subdir/book1.kepub.epub"},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "preserve should error when an ext is an explicit suffix",
+		Transformer: transformer{
+			Suffixes:         []string{".epub"},
+			ExplicitSuffixes: []string{".kepub.epub"},
+			PreserveSuffixes: []string{".pdf", ".KEPUB.epub"},
+			TargetSuffix:     ".kepub",
+		},
+		ShouldError: true,
+	}.Run(t)
 
 	transformPathsCase{
 		What: "converting a file should error if output files overlap",
@@ -858,6 +1047,7 @@ type transformPathsCase struct {
 
 	ShouldError bool
 	Outputs     []string
+	Skipped     []string // checked if not nil
 }
 
 func (tc transformPathsCase) Run(t *testing.T) {
@@ -902,7 +1092,7 @@ func (tc transformPathsCase) Run(t *testing.T) {
 		}
 	}
 
-	pathMap, _, err := tc.Transformer.TransformPaths(tc.Output, tc.Inputs...)
+	pathMap, skipList, err := tc.Transformer.TransformPaths(tc.Output, tc.Inputs...)
 	if err == nil && tc.ShouldError {
 		t.Errorf("expected error, got map %#v", pathMap)
 		return
@@ -926,6 +1116,18 @@ func (tc transformPathsCase) Run(t *testing.T) {
 
 	if !reflect.DeepEqual(outputs, tc.Outputs) {
 		t.Errorf("unexpected outputs\nexpected:%#v\ngot:%#v", tc.Outputs, outputs)
+	}
+
+	if tc.Skipped != nil {
+		var skipped []string
+		for _, in := range skipList {
+			skipped = append(skipped, filepath.ToSlash(in))
+		}
+		sort.Strings(skipped)
+		sort.Strings(tc.Skipped)
+		if !reflect.DeepEqual(skipped, tc.Skipped) {
+			t.Errorf("unexpected skipped\nexpected:%#v\ngot:%#v", tc.Skipped, skipped)
+		}
 	}
 
 	t.Log()

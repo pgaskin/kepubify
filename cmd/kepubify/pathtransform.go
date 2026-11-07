@@ -12,22 +12,42 @@ type transformer struct {
 	Inplace        bool
 	Update         bool // if not set, output files set may already exist
 
-	// compared case-insensitively
-	Suffixes        []string
-	ExcludeSuffixes []string
-	// suffix not unchanged, only included in output if different from original
-	// filename and not matched or excluded above
+	// Suffixes are the suffixes of files to convert, in order of priority.
+	// Suffixes are compared case-insensitively, and the longest matching one
+	// wins. When two files have the same output path, the one matched by the
+	// earlier suffix is kept and the other is skipped (e.g., book.kepub.epub
+	// beside book.epub is the already converted sibling).
+	Suffixes []string
+
+	// ExplicitSuffixes are converted like Suffixes, but only for files given
+	// directly as inputs. They are skipped in input directories, and ranked
+	// after Suffixes.
+	ExplicitSuffixes []string
+
+	// PreserveSuffixes are copied with the suffix unchanged, and only included
+	// in the output if the path differs from the original file.
 	PreserveSuffixes []string
 
-	// entire first matched suffix replaced
+	// TargetSuffix replaces the matched suffix of converted files.
 	TargetSuffix string
 }
+
+// suffixKind is how a file matching a suffix is handled.
+type suffixKind int
+
+const (
+	suffixConvert  suffixKind = iota // converted
+	suffixExplicit                   // converted if given directly, skipped in directories
+	suffixPreserve                   // copied unchanged
+)
 
 // matchedFile is a file found at or under an input.
 type matchedFile struct {
 	path      string // path of the file, under the input path as given
 	dir       string // directory of the file relative to the input, "." for a file input
 	stem      string // base name without the matched suffix
+	matched   string // matched suffix
+	rank      int    // priority of the matched suffix (lower is higher), for convert and explicit suffixes
 	suffix    string // output suffix
 	preserved bool   // copied unchanged rather than converted
 }
@@ -35,6 +55,10 @@ type matchedFile struct {
 // TransformPaths transforms the input paths into the output dir. See the test
 // cases for more details. All inputs must exist, but this may or may not be
 // checked. Output should be left blank if not specified by the user.
+//
+// It returns the output path for each input file, and the input files skipped
+// (existing outputs if Update is set, and files whose output is the same as a
+// file matched by a higher priority suffix, see [transformer.Suffixes]).
 func (t transformer) TransformPaths(output string, inputs ...string) (map[string]string, []string, error) {
 	for _, suffix := range t.PreserveSuffixes {
 		if strings.EqualFold(suffix, t.TargetSuffix) {
@@ -45,7 +69,11 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 				return nil, nil, fmt.Errorf("preserved suffix %#v overlaps with input suffix %#v", suffix, x)
 			}
 		}
-		// we don't check excluded suffixes for convenience
+		for _, x := range t.ExplicitSuffixes {
+			if strings.EqualFold(suffix, x) {
+				return nil, nil, fmt.Errorf("preserved suffix %#v overlaps with input suffix %#v", suffix, x)
+			}
+		}
 	}
 
 	// clean and dedupe the inputs so different spellings of the same path
@@ -74,21 +102,20 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 
 		if !inputInfo.IsDir() {
 			name := filepath.Base(input)
-			suffix, excluded, preserved, ok := t.matchSuffix(name)
+			suffix, kind, rank, ok := t.matchSuffix(name)
 			if !ok {
 				return nil, nil, fmt.Errorf("invalid extension %#v for input file %#v", filepath.Ext(input), input)
-			}
-			if excluded {
-				return nil, nil, fmt.Errorf("invalid extension %#v for input file %#v", suffix, input)
 			}
 			f := matchedFile{
 				path:      input,
 				dir:       ".",
 				stem:      name[:len(name)-len(suffix)],
+				matched:   suffix,
+				rank:      rank,
 				suffix:    t.TargetSuffix,
-				preserved: preserved,
+				preserved: kind == suffixPreserve,
 			}
-			if preserved {
+			if f.preserved {
 				f.suffix = suffix
 			}
 			matchingInputFiles[input] = append(matchingInputFiles[input], f)
@@ -109,8 +136,8 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 				return nil // skip non-files
 			}
 
-			suffix, excluded, preserved, ok := t.matchSuffix(info.Name())
-			if !ok || excluded {
+			suffix, kind, rank, ok := t.matchSuffix(info.Name())
+			if !ok || kind == suffixExplicit {
 				return nil // skip
 			}
 
@@ -123,10 +150,12 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 				path:      filepath.Join(input, rel),
 				dir:       filepath.Dir(rel),
 				stem:      info.Name()[:len(info.Name())-len(suffix)],
+				matched:   suffix,
+				rank:      rank,
 				suffix:    t.TargetSuffix,
-				preserved: preserved,
+				preserved: kind == suffixPreserve,
 			}
-			if preserved {
+			if f.preserved {
 				f.suffix = suffix
 			}
 			matchingInputFiles[input] = append(matchingInputFiles[input], f)
@@ -148,7 +177,11 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 		}
 	}
 
-	pathMap := map[string]string{}
+	var (
+		skipList []string
+		pathMap  = map[string]string{}
+		byTarget = map[string]matchedFile{}
+	)
 	for _, input := range inputs {
 		files := matchingInputFiles[input]
 		if len(files) == 0 {
@@ -218,49 +251,50 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 			if _, ok := pathMap[f.path]; ok {
 				return nil, nil, fmt.Errorf("%#v from input %#v included in more than one input (did you have one input as the parent directory of another?)", f.path, input)
 			}
+
+			if other, ok := byTarget[target]; ok {
+				switch {
+				case f.preserved || other.preserved || f.rank == other.rank:
+					return nil, nil, fmt.Errorf("overlapping output file %#v for %#v and %#v", target, other.path, f.path)
+				case f.rank > other.rank:
+					skipList = append(skipList, f.path) // lower priority suffix
+					continue
+				default:
+					skipList = append(skipList, other.path) // lower priority suffix
+					delete(pathMap, other.path)
+				}
+			}
+			byTarget[target] = f
 			pathMap[f.path] = target
 		}
 	}
 
-	var skipList []string
-	seen := map[string]string{}
-	for in, out := range pathMap {
-		if t.Update {
+	if t.Update {
+		for in, out := range pathMap {
 			if _, err := os.Stat(out); !os.IsNotExist(err) {
 				skipList = append(skipList, in)
+				delete(pathMap, in)
 			}
 		}
-		if _, ok := seen[out]; ok {
-			return nil, nil, fmt.Errorf("overlapping output file %#v for %#v and %#v", out, seen[out], in)
-		}
-		seen[out] = in
-	}
-	for _, f := range skipList {
-		delete(pathMap, f)
 	}
 
 	return pathMap, skipList, nil
 }
 
-// matchSuffix returns the first transformer suffix matching name, and whether
-// it is an excluded or preserved one.
-func (t transformer) matchSuffix(name string) (suffix string, excluded, preserved, ok bool) {
-	for _, suffix := range t.ExcludeSuffixes {
-		if hasSuffixFold(name, suffix) {
-			return suffix, true, false, true
+// matchSuffix returns the longest transformer suffix matching name, how files
+// with it are handled, and its priority (the position in Suffixes followed by
+// ExplicitSuffixes).
+func (t transformer) matchSuffix(name string) (suffix string, kind suffixKind, rank int, ok bool) {
+	var n int
+	for i, suffixes := range [][]string{t.Suffixes, t.ExplicitSuffixes, t.PreserveSuffixes} {
+		for j, x := range suffixes {
+			if len(x) > len(suffix) && hasSuffixFold(name, x) {
+				suffix, kind, rank, ok = x, suffixKind(i), n+j, true
+			}
 		}
+		n += len(suffixes)
 	}
-	for _, suffix := range t.Suffixes {
-		if hasSuffixFold(name, suffix) {
-			return suffix, false, false, true
-		}
-	}
-	for _, suffix := range t.PreserveSuffixes {
-		if hasSuffixFold(name, suffix) {
-			return suffix, false, true, true
-		}
-	}
-	return "", false, false, false
+	return suffix, kind, rank, ok
 }
 
 // inputName returns the base name of a cleaned input directory for use in the

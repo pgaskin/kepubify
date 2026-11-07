@@ -33,15 +33,16 @@ func main() {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"1.General Options"})
 	}
 
-	update := pflag.BoolP("update", "u", false, "Don't reconvert files which have already been converted (i.e. don't overwrite output files)")
+	update := pflag.BoolP("update", "u", false, "Skip inputs whose output file already exists")
 	inplace := pflag.BoolP("inplace", "i", false, "Don't add the _converted suffix to converted files and directories")
 	preserveattrs := pflag.BoolP("preserve-attrs", "p", false, "Preserve the modification times and permissions of the input files on the output files (failing if chmod/chtimes fails)")
 	nopreservedirs := pflag.Bool("no-preserve-dirs", false, "Flatten the directory structure of the input (an error will be shown if there are conflicts)")
 	output := pflag.StringP("output", "o", "", "[>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)")
 	calibre := pflag.Bool("calibre", false, "Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
 	copy := pflag.StringSliceP("copy", "x", nil, "Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the same)")
+	includekepub := pflag.Bool("include-kepub", false, "Include .kepub.epub and .kepub files found in input directories (copied unchanged with the output extension unless --reprocess-kepub is specified, and skipped if the .epub they were converted from is present)")
 
-	for _, flag := range []string{"update", "inplace", "preserve-attrs", "no-preserve-dirs", "output", "calibre", "copy"} {
+	for _, flag := range []string{"update", "inplace", "preserve-attrs", "no-preserve-dirs", "output", "calibre", "copy", "include-kepub"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"2.Output Options"})
 	}
 
@@ -55,8 +56,10 @@ func main() {
 	detectcover := pflag.Bool("detect-cover", false, "Show the book's cover image on the dummy titlepage, if one is found (from the package document, or an image named like cover.jpg)")
 	replace := pflag.StringArrayP("replace", "r", nil, "Find and replace on all html files (repeat any number of times) (format: find|replace)")
 	charset := pflag.String("charset", "auto", "Override the HTML charset (\"auto\" detects it from the content, falling back to UTF-8 if valid)")
+	reprocesskepub := pflag.Bool("reprocess-kepub", false, "Process input files which are already KEPUBs (based on the content, not the extension) again with the current options instead of copying them unchanged (existing Kobo spans are kept as-is rather than re-split, and existing output files are overwritten either way unless --update is specified)")
+	// TODO: option to resplit spans too? not sure how useful it would actually be in practice though
 
-	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "detect-cover", "replace", "charset"} {
+	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "detect-cover", "replace", "charset", "reprocess-kepub"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
 	}
 
@@ -97,6 +100,7 @@ func main() {
 		FullScreenFixes: *fullscreenfixes,
 		DetectCover:     *detectcover,
 		Smartypants:     *smartenpunct,
+		ReprocessKepub:  *reprocesskepub,
 	}
 	if *hyphenate {
 		opt.Hyphenate = new(true)
@@ -125,12 +129,17 @@ func main() {
 		ext = ".kepub"
 	}
 
+	suffixes, explicitSuffixes := []string{".epub"}, []string{".kepub.epub", ".kepub"}
+	if *includekepub {
+		suffixes, explicitSuffixes = append(suffixes, explicitSuffixes...), nil
+	}
+
 	pathMap, skipList, err := transformer{
 		NoPreserveDirs:   *nopreservedirs,
 		Update:           *update,
 		Inplace:          *inplace,
-		Suffixes:         []string{".epub"},
-		ExcludeSuffixes:  []string{".kepub.epub"},
+		Suffixes:         suffixes,
+		ExplicitSuffixes: explicitSuffixes,
 		PreserveSuffixes: *copy,
 		TargetSuffix:     ext,
 	}.TransformPaths(*output, pflag.Args()...)
@@ -272,6 +281,7 @@ func main() {
 							continue
 						}
 						var warns warnings
+						var alreadyKepub, unchanged bool
 						if err := func() error {
 							opt := opt
 							if *verbose {
@@ -290,7 +300,22 @@ func main() {
 							}
 							defer os.Remove(fo.Name())
 
-							if err := kepub.Convert(context.Background(), fo, fi, opt); err != nil {
+							if err := kepub.Convert(context.Background(), fo, fi, opt); errors.Is(err, kepub.ErrAlreadyKepub) {
+								alreadyKepub = true
+								if sameFile(input, output) {
+									unchanged = true
+									return nil
+								}
+								in, err := os.Open(input)
+								if err != nil {
+									return err
+								}
+								_, err = io.Copy(fo, in)
+								in.Close()
+								if err != nil {
+									return err
+								}
+							} else if err != nil {
 								return err
 							}
 
@@ -327,7 +352,16 @@ func main() {
 						if w := warns.Format(i); w != "" {
 							log(true, "%s", w)
 						}
-						atomic.AddInt64(&converted, 1)
+						switch {
+						case unchanged:
+							log(false, "          Unchanged (%d): already a KEPUB\n", i)
+							atomic.AddInt64(&skipped, 1)
+						case alreadyKepub:
+							log(false, "          Copied (%d): already a KEPUB\n", i)
+							atomic.AddInt64(&copied, 1)
+						default:
+							atomic.AddInt64(&converted, 1)
+						}
 					}
 				}
 			}()
@@ -433,6 +467,19 @@ func exit(status int) {
 		time.Sleep(time.Second * 2)
 	}
 	os.Exit(status)
+}
+
+// sameFile reports whether a and b are existing paths to the same file.
+func sameFile(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(fa, fb)
 }
 
 // copyAttrs sets the permissions and modification time of dst to those of src.
