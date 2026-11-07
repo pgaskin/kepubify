@@ -4,6 +4,7 @@ package main
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -51,7 +52,7 @@ func main() {
 	adddummytitlepage := pflag.Bool("add-dummy-titlepage", false, "Force-enables the dummy titlepage to fix layout issues with the first content file on certain books (this is enabled when needed using a heuristic if not specified)")
 	noadddummytitlepage := pflag.Bool("no-add-dummy-titlepage", false, "Force-disables the dummy titlepage")
 	replace := pflag.StringArrayP("replace", "r", nil, "Find and replace on all html files (repeat any number of times) (format: find|replace)")
-	charset := pflag.String("charset", "utf-8", "Override the HTML charset (use \"auto\" to detect it from the content)")
+	charset := pflag.String("charset", "auto", "Override the HTML charset (\"auto\" detects it from the content, falling back to UTF-8 if valid)")
 
 	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "replace", "charset"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
@@ -86,27 +87,23 @@ func main() {
 		}
 	}
 
-	// --- Make converter --- //
+	// --- Make options --- //
 
-	var opts []kepub.ConverterOption
-	for _, v := range *css {
-		opts = append(opts, kepub.ConverterOptionAddCSS(v))
+	opt := kepub.Options{
+		Charset:         *charset,
+		CSS:             *css,
+		FullScreenFixes: *fullscreenfixes,
+		Smartypants:     *smartenpunct,
 	}
 	if *hyphenate {
-		opts = append(opts, kepub.ConverterOptionHyphenate(true))
+		opt.Hyphenate = new(true)
 	} else if *nohyphenate {
-		opts = append(opts, kepub.ConverterOptionHyphenate(false))
-	}
-	if *smartenpunct {
-		opts = append(opts, kepub.ConverterOptionSmartypants())
-	}
-	if *fullscreenfixes {
-		opts = append(opts, kepub.ConverterOptionFullScreenFixes())
+		opt.Hyphenate = new(false)
 	}
 	if *adddummytitlepage {
-		opts = append(opts, kepub.ConverterOptionDummyTitlepage(true))
+		opt.DummyTitlepage = new(true)
 	} else if *noadddummytitlepage {
-		opts = append(opts, kepub.ConverterOptionDummyTitlepage(false))
+		opt.DummyTitlepage = new(false)
 	}
 	for _, r := range *replace {
 		spl := strings.SplitN(r, "|", 2)
@@ -115,10 +112,8 @@ func main() {
 			exit(1)
 			return
 		}
-		opts = append(opts, kepub.ConverterOptionFindReplace(spl[0], spl[1]))
+		opt.Replace = append(opt.Replace, kepub.Replacement{Find: spl[0], Replace: spl[1]})
 	}
-	opts = append(opts, kepub.ConverterOptionCharset(*charset))
-	converter := kepub.NewConverterWithOptions(opts...)
 
 	// --- Transform paths --- //
 
@@ -265,9 +260,15 @@ func main() {
 							log(true, "          Error (%d): %v\n", i, err)
 							continue
 						}
+						var warns warnings
 						if err := func() error {
+							opt := opt
+							if *verbose {
+								opt.Warn = warns.add
+							}
+
 							fi, err := zip.OpenReader(input)
-							if err != nil {
+							if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
 								return err
 							}
 							defer fi.Close()
@@ -278,7 +279,7 @@ func main() {
 							}
 							defer os.Remove(fo.Name())
 
-							if err := converter.Convert(context.Background(), fo, fi); err != nil {
+							if err := kepub.Convert(context.Background(), fo, fi, opt); err != nil {
 								return err
 							}
 
@@ -296,10 +297,16 @@ func main() {
 
 							return nil
 						}(); err != nil {
+							if w := warns.Format(i); w != "" {
+								log(true, "%s", w)
+							}
 							errs.Store(input, err)
 							atomic.AddInt64(&errored, 1)
 							log(true, "          Error (%d): %v\n", i, err)
 							continue
+						}
+						if w := warns.Format(i); w != "" {
+							log(true, "%s", w)
 						}
 						atomic.AddInt64(&converted, 1)
 					}
@@ -326,6 +333,43 @@ func main() {
 		return
 	}
 	exit(0)
+}
+
+type warnings struct {
+	mu    sync.Mutex
+	order [][2]string // name and message, in the order first seen
+	count map[[2]string]int
+}
+
+func (w *warnings) add(name, msg string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.count == nil {
+		w.count = map[[2]string]int{}
+	}
+	k := [2]string{name, msg}
+	if w.count[k] == 0 {
+		w.order = append(w.order, k)
+	}
+	w.count[k]++
+}
+
+func (w *warnings) Format(i int64) string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	ks := append([][2]string(nil), w.order...)
+	sort.SliceStable(ks, func(i, j int) bool {
+		return ks[i][0] < ks[j][0]
+	})
+	var b strings.Builder
+	for _, k := range ks {
+		fmt.Fprintf(&b, "          Warning (%d): %s: %s", i, k[0], k[1])
+		if n := w.count[k]; n > 1 {
+			fmt.Fprintf(&b, " (%d times)", n)
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 func helpExit() {

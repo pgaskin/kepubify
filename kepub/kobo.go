@@ -103,13 +103,23 @@ const holdMax = 64 << 10 // KiB
 const cssKobo = `div#book-inner { margin-top: 0; margin-bottom: 0;}`
 
 // newKobo returns the state for a document, with the style elements to add
-// for c.
-func newKobo(c *Converter) *kobo {
-	k := &kobo{smartypants: c.smartypants}
+// for opt.
+func newKobo(opt Options) *kobo {
+	k := &kobo{smartypants: opt.Smartypants}
 	k.buf = k.bufArr[:0]
 	k.styles = appendStyle(k.styles, "kobostylehacks", cssKobo)
-	for i := range c.extraCSS {
-		k.styles = appendStyle(k.styles, c.extraCSSClass[i], c.extraCSS[i])
+	for _, css := range opt.CSS {
+		k.styles = appendStyle(k.styles, "kepubify-extracss", css)
+	}
+	switch {
+	case opt.Hyphenate == nil:
+	case *opt.Hyphenate:
+		k.styles = appendStyle(k.styles, "kepubify-hyphenate", cssHyphenate)
+	default:
+		k.styles = appendStyle(k.styles, "kepubify-nohyphenate", cssNoHyphenate)
+	}
+	if opt.FullScreenFixes {
+		k.styles = appendStyle(k.styles, "kepubify-fullscreenfixes", cssFullScreenFixes)
 	}
 	return k
 }

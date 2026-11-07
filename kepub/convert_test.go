@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 )
@@ -84,7 +85,6 @@ func TestConvert(t *testing.T) {
 		EPUB:        testEPUB,
 		ShouldError: false,
 
-		Options: []ConverterOption{},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
 			AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
@@ -99,7 +99,6 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
 			AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
@@ -115,7 +114,6 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
 			ShouldHaveFile("OEBPS/xhtml/Ch01.XHTML").Because("should be lenient during conversion, but still keep the output file as close as possible to the original when invalid"),
@@ -151,8 +149,8 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionDummyTitlepage(false),
+		Options: Options{
+			DummyTitlepage: new(false),
 		},
 		Checks: []ShouldFunc{
 			FileShould("OEBPS/content.xhtml", func(contents string) error {
@@ -184,8 +182,8 @@ func TestConvert(t *testing.T) {
 		EPUB:        testEPUB,
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionDummyTitlepage(true),
+		Options: Options{
+			DummyTitlepage: new(true),
 		},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(1).Because("should have all source documents, and the new dummy titlepage"),
@@ -205,7 +203,6 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(1).Because("should have all source documents, and the new dummy titlepage"),
 			FileShould("OEBPS/content.opf", func(contents string) error {
@@ -228,8 +225,8 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionDummyTitlepage(false),
+		Options: Options{
+			DummyTitlepage: new(false),
 		},
 		Checks: []ShouldFunc{
 			FileShould("OEBPS/content.opf", func(contents string) error {
@@ -252,13 +249,15 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionFindReplace("Lorem", "*****"),
-			ConverterOptionFindReplace("*****", "***"),
-			ConverterOptionFindReplace("ipsum", "dolor"),
-			ConverterOptionFindReplace("dolor", "ipsum"),
-			ConverterOptionFindReplace("<i>", "<em>"),
-			ConverterOptionFindReplace("</i>", "</em>"),
+		Options: Options{
+			Replace: []Replacement{
+				{"Lorem", "*****"},
+				{"*****", "***"},
+				{"ipsum", "dolor"},
+				{"dolor", "ipsum"},
+				{"<i>", "<em>"},
+				{"</i>", "</em>"},
+			},
 		},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
@@ -303,7 +302,6 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
 			AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
@@ -329,8 +327,8 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionSmartypants(),
+		Options: Options{
+			Smartypants: true,
 		},
 		Checks: []ShouldFunc{
 			FileShould("OEBPS/xhtml/ch01.xhtml", DocumentProbablyHasSpans),
@@ -353,8 +351,8 @@ func TestConvert(t *testing.T) {
 		EPUB:        testEPUB,
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionHyphenate(true),
+		Options: Options{
+			Hyphenate: new(true),
 		},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
@@ -373,8 +371,8 @@ func TestConvert(t *testing.T) {
 		EPUB:        testEPUB,
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionHyphenate(false),
+		Options: Options{
+			Hyphenate: new(false),
 		},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
@@ -393,8 +391,8 @@ func TestConvert(t *testing.T) {
 		EPUB:        testEPUB,
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionFullScreenFixes(),
+		Options: Options{
+			FullScreenFixes: true,
 		},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
@@ -413,9 +411,8 @@ func TestConvert(t *testing.T) {
 		EPUB:        testEPUB,
 		ShouldError: false,
 
-		Options: []ConverterOption{
-			ConverterOptionAddCSS(".css1 {}"),
-			ConverterOptionAddCSS(".css2 {}"),
+		Options: Options{
+			CSS: []string{".css1 {}", ".css2 {}"},
 		},
 		Checks: []ShouldFunc{
 			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
@@ -430,12 +427,57 @@ func TestConvert(t *testing.T) {
 	}.Run(t)
 }
 
+func TestConvertWarnProgress(t *testing.T) {
+	epub := overlayMapFS(testEPUB, fstest.MapFS{
+		"OEBPS/xhtml/ch01.xhtml": &fstest.MapFile{
+			Data: []byte(`<!DOCTYPE html><html><head><title>Chapter</title></head><body><p>Lorem <o:p>ipsum</o:p>.</p></body></html>`),
+			Mode: 0644,
+		},
+	})
+	var (
+		mu    sync.Mutex
+		warns []string
+		pcts  []float64
+	)
+	opt := Options{
+		Warn: func(name, msg string) {
+			mu.Lock()
+			defer mu.Unlock()
+			warns = append(warns, name+": "+msg)
+		},
+		Progress: func(pct float64) {
+			pcts = append(pcts, pct)
+		},
+	}
+	if err := Convert(context.Background(), io.Discard, epub, opt); err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+	var ch01 bool
+	for _, w := range warns {
+		if strings.HasPrefix(w, ": ") {
+			t.Errorf("warning without a name: %q", w)
+		}
+		ch01 = ch01 || strings.HasPrefix(w, "OEBPS/xhtml/ch01.xhtml: ")
+	}
+	if !ch01 {
+		t.Errorf("no warnings for ch01.xhtml: %q", warns)
+	}
+	if len(pcts) < 3 || pcts[0] != 0 || pcts[len(pcts)-1] != 1 {
+		t.Fatalf("progress %v", pcts)
+	}
+	for i := 1; i < len(pcts)-1; i++ {
+		if d := pcts[i] - pcts[i-1]; d < .01 {
+			t.Errorf("progress %v: step %d is %v", pcts, i, d)
+		}
+	}
+}
+
 type ConvertTestCase struct {
 	What        string
 	EPUB        fs.FS
 	ShouldError bool
 
-	Options []ConverterOption
+	Options Options
 	Checks  []ShouldFunc
 }
 
@@ -444,7 +486,7 @@ func (tc ConvertTestCase) Run(t *testing.T) {
 
 	kepub := bytes.NewBuffer(nil)
 
-	if err := NewConverterWithOptions(tc.Options...).Convert(context.Background(), kepub, tc.EPUB); err != nil {
+	if err := Convert(context.Background(), kepub, tc.EPUB, tc.Options); err != nil {
 		if !tc.ShouldError {
 			t.Errorf("case %q: convert: unexpected error: %v", tc.What, err)
 		}
@@ -483,7 +525,7 @@ func (tc ConvertTestCase) Run(t *testing.T) {
 
 		kepub1 := bytes.NewBuffer(nil)
 
-		if err := NewConverterWithOptions(tc.Options...).Convert(context.Background(), kepub1, epub1); err != nil {
+		if err := Convert(context.Background(), kepub1, epub1, tc.Options); err != nil {
 			return fmt.Errorf("failed to convert: %w", err)
 		}
 

@@ -19,15 +19,14 @@ import (
 	"golang.org/x/text/encoding/unicode/utf32"
 )
 
-func transformContent(t *testing.T, in string, opts ...ConverterOption) string {
+func testTransformContent(t *testing.T, in string, opt Options) string {
 	t.Helper()
-	c := NewConverterWithOptions(opts...)
 	var a, b bytes.Buffer
-	if err := c.TransformContent(&a, strings.NewReader(in)); err != nil {
+	if err := TransformContent(&a, strings.NewReader(in), opt); err != nil {
 		t.Fatalf("transform: %v", err)
 	}
 	// one-byte reader to ensure streaming works correctly
-	if err := c.TransformContent(&b, iotest.OneByteReader(strings.NewReader(in))); err != nil {
+	if err := TransformContent(&b, iotest.OneByteReader(strings.NewReader(in)), opt); err != nil {
 		t.Fatalf("transform (one byte reader): %v", err)
 	}
 	if a.String() != b.String() {
@@ -51,13 +50,15 @@ func bookInner(t *testing.T, out string) string {
 }
 
 func TestTransformContent(t *testing.T) {
-	opts := []ConverterOption{
-		ConverterOptionAddCSS("body { color: black; }"),
-		ConverterOptionFindReplace("Test sentence 2.", "Replaced sentence 2."),
-		ConverterOptionFindReplace(`<a id="test">`, `<a id="test1">`),
-		ConverterOptionFindReplace("sdfsdfsdf", "dfgdfgdfg"),
-		ConverterOptionFindReplace(" sentence 2", ""),
-		ConverterOptionSmartypants(),
+	opt := Options{
+		CSS: []string{"body { color: black; }"},
+		Replace: []Replacement{
+			{"Test sentence 2.", "Replaced sentence 2."},
+			{`<a id="test">`, `<a id="test1">`},
+			{"sdfsdfsdf", "dfgdfgdfg"},
+			{" sentence 2", ""},
+		},
+		Smartypants: true,
 	}
 	in := strings.TrimSpace(`
 <?xml version="1.0" charset="utf-8"?>
@@ -108,7 +109,7 @@ func TestTransformContent(t *testing.T) {
     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>
 
 </i></b></div></div></body></html>`)
-	if got := strings.TrimSpace(transformContent(t, in, opts...)); got != want {
+	if got := strings.TrimSpace(testTransformContent(t, in, opt)); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -117,7 +118,7 @@ type partTest struct {
 	name     string
 	in       string // body fragment, or document if doc
 	doc      bool
-	opts     []ConverterOption
+	opt      Options
 	want     string // contents of book-inner, or substring of the output if contains
 	contains bool
 	not      string // must not be in the output
@@ -129,7 +130,7 @@ func (tc partTest) run(t *testing.T) {
 		if !tc.doc {
 			in = fragmentDoc(in)
 		}
-		out := transformContent(t, in, tc.opts...)
+		out := testTransformContent(t, in, tc.opt)
 		if tc.not != "" && strings.Contains(out, tc.not) {
 			t.Errorf("output contains %q:\n%s", tc.not, out)
 		}
@@ -269,14 +270,14 @@ func TestTransformContentParts(t *testing.T) {
 			name:     "add style to head",
 			in:       `<!DOCTYPE html><html><head><title>Kepubify Test</title></head><body></body></html>`,
 			doc:      true,
-			opts:     []ConverterOption{ConverterOptionAddCSS("div > div { color: black; }")},
+			opt:      Options{CSS: []string{"div > div { color: black; }"}},
 			contains: true,
 			want:     `<title>Kepubify Test</title><style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style><style type="text/css" class="kepubify-extracss">div > div { color: black; }</style></head>`,
 		}.run(t)
 	})
 
 	t.Run("SmartyPants", func(t *testing.T) {
-		smarty := []ConverterOption{ConverterOptionSmartypants()}
+		smarty := Options{Smartypants: true}
 		for _, tc := range []partTest{
 			{
 				name: "smart punctuation",
@@ -294,7 +295,7 @@ func TestTransformContentParts(t *testing.T) {
 				want: `<p><span class="koboSpan" id="kobo.1.1">&amp;“&lt;&gt;”</span></p><pre>"</pre>`,
 			},
 		} {
-			tc.opts = smarty
+			tc.opt = smarty
 			tc.run(t)
 		}
 	})
@@ -334,7 +335,7 @@ func TestTransformContentParts(t *testing.T) {
 
 func TestTransformContentReplacements(t *testing.T) {
 	const corpus = `<!DOCTYPE html><html><head><title></title></head><body><b>Lorem ipsum</b> dolor sit amet, <a href="https://example.com">consectetur adipiscing elit</a>, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</body></html>`
-	plain := transformContent(t, corpus)
+	plain := testTransformContent(t, corpus, Options{})
 	for _, tc := range []struct {
 		name string
 		repl []string
@@ -350,10 +351,10 @@ func TestTransformContentReplacements(t *testing.T) {
 		{"empty find", []string{"", "x", "ipsum", "y"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var opts []ConverterOption
+			var opt Options
 			want := plain
 			for i := 0; i < len(tc.repl); i += 2 {
-				opts = append(opts, ConverterOptionFindReplace(tc.repl[i], tc.repl[i+1]))
+				opt.Replace = append(opt.Replace, Replacement{tc.repl[i], tc.repl[i+1]})
 				if tc.repl[i] != "" {
 					want = strings.ReplaceAll(want, tc.repl[i], tc.repl[i+1])
 				}
@@ -361,7 +362,7 @@ func TestTransformContentReplacements(t *testing.T) {
 			if want == plain {
 				t.Fatal("no replacements")
 			}
-			if got := transformContent(t, corpus, opts...); got != want {
+			if got := testTransformContent(t, corpus, opt); got != want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, want)
 			}
 		})
@@ -383,13 +384,13 @@ func TestTransformContentEdgeCases(t *testing.T) {
 		{
 			// #98
 			name:     "hyphenation stylesheet",
-			opts:     []ConverterOption{ConverterOptionHyphenate(true)},
+			opt:      Options{Hyphenate: new(true)},
 			contains: true,
 			want:     "h1, h2, h3, h4, h5, h6, td,\nh1 *, h2 *, h3 *, h4 *, h5 *, h6 *, td * {",
 		},
 		{
 			name:     "no hyphenation stylesheet",
-			opts:     []ConverterOption{ConverterOptionHyphenate(false)},
+			opt:      Options{Hyphenate: new(false)},
 			contains: true,
 			want:     `<style type="text/css" class="kepubify-nohyphenate">* {`,
 		},
@@ -441,7 +442,7 @@ func TestTransformContentEdgeCases(t *testing.T) {
 		{
 			name: "backticks are kept",
 			in:   "<p>a`b ``c''</p>",
-			opts: []ConverterOption{ConverterOptionSmartypants()},
+			opt:  Options{Smartypants: true},
 			want: "<p><span class=\"koboSpan\" id=\"kobo.1.1\">a`b “c”</span></p>",
 		},
 		{
@@ -466,7 +467,7 @@ func TestTransformContentEdgeCases(t *testing.T) {
 		},
 		{
 			name:     "stylesheets with < or &",
-			opts:     []ConverterOption{ConverterOptionAddCSS(`p::after { content: "<&]]>"; }`)},
+			opt:      Options{CSS: []string{`p::after { content: "<&]]>"; }`}},
 			contains: true,
 			want:     "<style type=\"text/css\" class=\"kepubify-extracss\">/*<![CDATA[*/\np::after { content: \"<&]]]]><![CDATA[>\"; }\n/*]]>*/</style>",
 		},
@@ -528,7 +529,7 @@ func TestTransformContentStreaming(t *testing.T) {
 			want.WriteString(`<span class="koboSpan" id="kobo.1.` + strconv.Itoa(i+1) + `">` + string(sp.Convert(nil, []byte(s), true)) + "</span>")
 		}
 		want.WriteString("</p><div>" + strings.Repeat("&#160;", 1000) + "</div>")
-		got := bookInner(t, transformContent(t, fragmentDoc(in.String()), ConverterOptionSmartypants()))
+		got := bookInner(t, testTransformContent(t, fragmentDoc(in.String()), Options{Smartypants: true}))
 		if got != want.String() {
 			i := 0
 			for i < len(got) && i < len(want.String()) && got[i] == want.String()[i] {
@@ -542,7 +543,7 @@ func TestTransformContentStreaming(t *testing.T) {
 		// treated as text after holdMax bytes
 		in := "<div>" + strings.Repeat(" ", holdMax+1) + "</div>"
 		want := "<div><span class=\"koboSpan\" id=\"kobo.0.1\">" + strings.Repeat(" ", holdMax+1) + "</span></div>"
-		if got := bookInner(t, transformContent(t, fragmentDoc(in))); got != want {
+		if got := bookInner(t, testTransformContent(t, fragmentDoc(in), Options{})); got != want {
 			t.Errorf("got %q", got[:min(len(got), 100)])
 		}
 	})
@@ -557,12 +558,15 @@ func TestTransformContentCharset(t *testing.T) {
 		{"auto, XML declaration", latin1, "auto", "café"},
 		{"auto, meta", meta, "auto", "“x”"},
 		{"auto, UTF-8", "<p>café</p>", "auto", "café"},
+		{"auto, undeclared latin1", "<p>caf\xe9</p>", "auto", "café"},
 		{"label", "<p>caf\xe9</p>", "latin1", "café"},
-		{"default", "<p>café</p>", "", "café"},
+		{"default, XML declaration", latin1, "", "café"},
+		{"default, UTF-8", "<p>café</p>", "", "café"},
 		{"UTF-8", "<p>café</p>", "UTF-8", "café"},
+		{"UTF-8, wrong declaration", "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?><p>café</p>", "UTF-8", "café"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := transformContent(t, tc.in, ConverterOptionCharset(tc.charset))
+			out := testTransformContent(t, tc.in, Options{Charset: tc.charset})
 			if !strings.Contains(out, `<span class="koboSpan" id="kobo.1.1">`+tc.want+`</span>`) {
 				t.Errorf("got %s", out)
 			}
@@ -571,7 +575,7 @@ func TestTransformContentCharset(t *testing.T) {
 			}
 		})
 	}
-	if err := NewConverterWithOptions(ConverterOptionCharset("nonexistent")).TransformContent(io.Discard, strings.NewReader("")); err == nil {
+	if err := TransformContent(io.Discard, strings.NewReader(""), Options{Charset: "nonexistent"}); err == nil {
 		t.Error("no error for an invalid charset")
 	}
 }
@@ -581,11 +585,11 @@ func TestTransformContentErrors(t *testing.T) {
 	doc := fragmentDoc(strings.Repeat("<p>Some text. More text.</p>", 10000))
 	for _, n := range []int{0, 10, 100, 10000, 100000} {
 		r := io.MultiReader(strings.NewReader(doc[:n]), iotest.ErrReader(errRead))
-		if err := NewConverter().TransformContent(io.Discard, r); !errors.Is(err, errRead) {
+		if err := TransformContent(io.Discard, r, Options{}); !errors.Is(err, errRead) {
 			t.Errorf("read error after %d bytes: got %v", n, err)
 		}
 		w := &failWriter{n: n}
-		if err := NewConverterWithOptions(ConverterOptionFindReplace("text", "txet")).TransformContent(w, strings.NewReader(doc)); !errors.Is(err, errWrite) {
+		if err := TransformContent(w, strings.NewReader(doc), Options{Replace: []Replacement{{"text", "txet"}}}); !errors.Is(err, errWrite) {
 			t.Errorf("write error after %d bytes: got %v", n, err)
 		}
 	}
@@ -606,6 +610,26 @@ func (w *failWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+func TestTransformContentWarn(t *testing.T) {
+	var warns []string
+	opt := Options{
+		Warn: func(name, msg string) {
+			warns = append(warns, name+": "+msg)
+		},
+	}
+	if err := TransformContent(io.Discard, strings.NewReader(fragmentDoc(`<p><o:p>x</o:p></p>`)), opt); err != nil {
+		t.Fatalf("transform: %v", err)
+	}
+	if len(warns) == 0 {
+		t.Error("no warnings")
+	}
+	for _, w := range warns {
+		if !strings.HasPrefix(w, ": ") {
+			t.Errorf("unexpected warning %q", w)
+		}
+	}
+}
+
 func TestTransformContentReplacementsWrites(t *testing.T) {
 	const in = "aab abab ba aaab b"
 	for _, repl := range [][][2]string{
@@ -613,17 +637,17 @@ func TestTransformContentReplacementsWrites(t *testing.T) {
 		{{"", "y"}},
 		nil,
 	} {
-		var find, replace [][]byte
+		var rs []Replacement
 		want := in
 		for _, r := range repl {
-			find, replace = append(find, []byte(r[0])), append(replace, []byte(r[1]))
+			rs = append(rs, Replacement{r[0], r[1]})
 			if r[0] != "" {
 				want = strings.ReplaceAll(want, r[0], r[1])
 			}
 		}
 		for _, n := range []int{1, 2, 3, len(in)} {
 			var buf bytes.Buffer
-			wc := transformContentReplacements(&buf, find, replace)
+			wc := transformContentReplacements(&buf, rs)
 			for i := 0; i < len(in); i += n {
 				if _, err := wc.Write([]byte(in[i:min(i+n, len(in))])); err != nil {
 					t.Fatalf("write: %v", err)
@@ -876,7 +900,7 @@ func TestTransformOPF(t *testing.T) {
 			if want == "" {
 				want = tc.in
 			}
-			if got := transformOPF(t, tc.in); got != want {
+			if got := testTransformOPF(t, tc.in); got != want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, want)
 			}
 		})
@@ -890,14 +914,14 @@ func must[T any](v T, err error) T {
 	return v
 }
 
-func transformOPF(t *testing.T, in string) string {
+func testTransformOPF(t *testing.T, in string) string {
 	t.Helper()
 	var a, b bytes.Buffer
-	if err := (&Converter{}).TransformOPF(&a, strings.NewReader(in)); err != nil {
+	if err := transformOPF(&a, strings.NewReader(in)); err != nil {
 		t.Fatalf("transform: %v", err)
 	}
 	// one-byte reader to ensure streaming works correctly
-	if err := (&Converter{}).TransformOPF(&b, iotest.OneByteReader(strings.NewReader(in))); err != nil {
+	if err := transformOPF(&b, iotest.OneByteReader(strings.NewReader(in))); err != nil {
 		t.Fatalf("transform (one byte reader): %v", err)
 	}
 	if a.String() != b.String() {
@@ -924,7 +948,7 @@ func TestTransformFileFilter(t *testing.T) {
 		{"OEBPS/text.xhtml", false},
 		{"mimetype", false},
 	} {
-		if got := (&Converter{}).TransformFileFilter(tc.fn); got != tc.want {
+		if got := transformFileFilter(tc.fn); got != tc.want {
 			t.Errorf("%q: got %v, want %v", tc.fn, got, tc.want)
 		}
 	}
@@ -1277,12 +1301,8 @@ func (tc titlepageTest) run(t *testing.T) {
 		for name, s := range tc.content {
 			epub[path.Join(path.Dir(titlepageOPF), name)] = &fstest.MapFile{Data: []byte(s)}
 		}
-		c := NewConverter()
-		if tc.force != nil {
-			c = NewConverterWithOptions(ConverterOptionDummyTitlepage(*tc.force))
-		}
 		buf := bytes.NewBufferString(opf)
-		name, r, added, err := c.TransformDummyTitlepage(epub, titlepageOPF, buf)
+		name, r, added, err := transformDummyTitlepage(epub, titlepageOPF, buf, tc.force)
 		if tc.err != (err != nil) {
 			t.Errorf("error %v, want error %v", err, tc.err)
 		}

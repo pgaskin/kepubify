@@ -1,108 +1,65 @@
 // Package kepub converts EPUBs to KEPUBs.
 package kepub
 
-import (
-	"context"
-	"math"
-)
+// Options configures the conversion of EPUB2/EPUB3 books to Kobo's KEPUB
+// format. The zero value applies only the mandatory changes.
+type Options struct {
+	// Charset overrides the charset for all content documents (not including
+	// the OPF). If empty or "auto", it is detected from the content (byte order
+	// mark, meta element, or XML declaration), falling back to UTF-8 if valid,
+	// or windows-1252 otherwise. Otherwise, it is an encoding label (e.g.,
+	// "utf-8") which overrides the charset.
+	Charset string
 
-// Converter converts EPUB2/EPUB3 books to Kobo's KEPUB format.
-type Converter struct {
-	// extra css
-	extraCSS      []string
-	extraCSSClass []string
+	// CSS adds the specified code to new style elements in content documents.
+	CSS []string
 
-	// smart punctuation
-	smartypants bool
+	// Hyphenate force-enables (except in headings and table cells) or
+	// force-disables hyphenation. If nil, it is left to the book/reader
+	// styling.
+	Hyphenate *bool
 
-	// find/replace in raw html output
-	find    [][]byte
-	replace [][]byte
+	// FullScreenFixes applies fullscreen fixes. This is only needed for
+	// firmware versions older than 4.19.11911, and is generally harmless on
+	// newer versions.
+	FullScreenFixes bool
 
-	// titlepage fix
-	dummyTitlepageForce      bool
-	dummyTitlepageForceValue bool
+	// Smartypants enables automatic smart punctuation conversion.
+	Smartypants bool
 
-	// charset override
-	charset string // "auto" for auto-detection
+	// Replace replaces raw strings in the transformed HTML, in order (each
+	// replacement applies to the output of the previous ones). Replacements
+	// with an empty Find are ignored.
+	Replace []Replacement
+
+	// DummyTitlepage force-enables or force-disables the fix which adds a
+	// dummy titlepage to the start of the book to fix layout issues on
+	// certain books. If nil, a heuristic is used to determine whether it
+	// should be added.
+	DummyTitlepage *bool
+
+	// Warn, if not nil, is called for content which can't be converted exactly
+	// (e.g., due to malformed on ambiguous HTML), with the path of the file in
+	// the EPUB (empty if TransformContent is called directly, or if not
+	// applicable to any specific file). It may be called concurrently.
+	//
+	// It is usually okay to ignore this (e.g., if you're doing bulk
+	// conversions, don't have a good way to show warnings, or your thing is
+	// being used by non-technical users), as it only really affects either
+	// extremely malformed documents, or mostly-inconsequential minor things in
+	// weirder documents.
+	Warn func(name, msg string)
+
+	// Progress, if not nil, is called synchronously by Convert as the
+	// conversion progresses. The percentage is from 0 to 1. It is always called
+	// at the start, and at the end on success, with 0/1 respectively.
+	Progress func(percent float64)
 }
 
-// ConverterOption configures a Converter.
-type ConverterOption func(*Converter)
-
-// NewConverter creates a new Converter. By default, no options are applied.
-func NewConverter() *Converter {
-	return NewConverterWithOptions()
-}
-
-// NewConverterWithOptions is like NewConverter, with options.
-func NewConverterWithOptions(opts ...ConverterOption) *Converter {
-	c := new(Converter)
-	for _, f := range opts {
-		f(c)
-	}
-	return c
-}
-
-// ConverterOptionSmartypants enables smart punctuation.
-func ConverterOptionSmartypants() ConverterOption {
-	return func(c *Converter) {
-		c.smartypants = true
-	}
-}
-
-// ConverterOptionFindReplace replaces a raw string in the transformed HTML.
-func ConverterOptionFindReplace(find, replace string) ConverterOption {
-	return func(c *Converter) {
-		c.find = append(c.find, []byte(find))
-		c.replace = append(c.replace, []byte(replace))
-	}
-}
-
-// ConverterOptionDummyTitlepage force-enables or force-disables the fix which
-// adds a dummy titlepage to the start of the book to fix layout issues on
-// certain books. If not set, a heuristic is used to determine whether it should
-// be added.
-func ConverterOptionDummyTitlepage(add bool) ConverterOption {
-	return func(c *Converter) {
-		c.dummyTitlepageForce = true
-		c.dummyTitlepageForceValue = add
-	}
-}
-
-// ConverterOptionAddCSS adds CSS code to a book.
-func ConverterOptionAddCSS(css string) ConverterOption {
-	return converterOptionAddCSS("kepubify-extracss", css)
-}
-
-// ConverterOptionHyphenate force-enables or force-disables hyphenation. If not
-// set, no specific state is enforced by kepubify.
-func ConverterOptionHyphenate(hyphenate bool) ConverterOption {
-	if hyphenate {
-		return converterOptionAddCSS("kepubify-hyphenate", cssHyphenate)
-	}
-	return converterOptionAddCSS("kepubify-nohyphenate", cssNoHyphenate)
-}
-
-// ConverterOptionFullScreenFixes applies fullscreen fixes for firmware versions
-// older than 4.19.11911.
-func ConverterOptionFullScreenFixes() ConverterOption {
-	return converterOptionAddCSS("kepubify-fullscreenfixes", cssFullScreenFixes)
-}
-
-// ConverterOptionCharset overrides the charset for all content documents. Use
-// "auto" to automatically detect the charset.
-func ConverterOptionCharset(charset string) ConverterOption {
-	return func(c *Converter) {
-		c.charset = charset
-	}
-}
-
-func converterOptionAddCSS(class, css string) ConverterOption {
-	return func(c *Converter) {
-		c.extraCSS = append(c.extraCSS, css)
-		c.extraCSSClass = append(c.extraCSSClass, class)
-	}
+// Replacement is a raw string to replace in the transformed HTML.
+type Replacement struct {
+	Find    string
+	Replace string
 }
 
 const cssHyphenate = `* {
@@ -138,49 +95,15 @@ body>div {
     padding-right: 0.2em !important;
 }`
 
-// These are for use by certain kepubify frontends for progress information
-// during conversions. It is not exported for general use, must be imported via
-// an unsafe go:linkname directive, and is subject to change.
-type (
-	progressKey      struct{}
-	progressDeltaKey struct{}
-)
-
-// withProgress adds a function to be called synchronously as the conversion
-// progresses. If delta is in the range [0, 1], the callback will be
-// rate-limited to when there is an important change or when the percentage
-// changes by more than delta.
-func withProgress(ctx context.Context, delta float64, fn func(n, total int)) context.Context {
-	ctx = context.WithValue(ctx, progressDeltaKey{}, delta)
-	ctx = context.WithValue(ctx, progressKey{}, fn)
-	return ctx
-}
-
-// ctxProgress creates a rate-limited progress callback for the provided
-// context. It returns nil if a callback has not been set.
-func ctxProgress(ctx context.Context) func(force bool, n, total int) {
-	if v := ctx.Value(progressKey{}); v != nil {
-		fn := v.(func(n, total int))
-		dt := ctx.Value(progressDeltaKey{}).(float64)
-
-		var pct, lastPct float64
-		return func(force bool, n, total int) {
-			if dt < 0 || dt > 1 {
-				fn(n, total)
-				return
-			}
-			if n == 0 && total == 0 {
-				pct = 1
-			} else if n == 0 || total == 0 {
-				pct = 0
-			} else {
-				pct = float64(n) / float64(total)
-			}
-			if force || math.Abs(pct-lastPct) >= dt {
-				lastPct = pct
-				fn(n, total)
-			}
+func (opt Options) progress() func(pct float64, force bool) {
+	if opt.Progress == nil {
+		return func(float64, bool) {}
+	}
+	last := -1.0
+	return func(pct float64, force bool) {
+		if pct != last && (force || pct-last >= .01) {
+			last = pct
+			opt.Progress(pct)
 		}
 	}
-	return nil
 }

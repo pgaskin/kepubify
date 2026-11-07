@@ -18,14 +18,32 @@ import (
 )
 
 // Convert converts the EPUB root r into a new EPUB written to w. If r is a
-// (*zip.Reader) (from archive/zip by default, or from
-// github.com/pgaskin/kepubify/_/go116-zip.go117/archive/zip if the zip117 build
-// tag is used (even on Go 1.17)), the original zip metadata is preserved where
-// possible, and additional optimizations are applied to prevent re-compressing
-// unchanged data where possible. If processing untrusted EPUBs, r should not
-// point to an unrestricted on-disk filesystem since paths are not sanitized; it
-// should point to a (*zip.Reader) or other in-memory or synthetic filesystem.
-func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
+// [zip.Reader], the original zip metadata and unmodified compressed data are
+// preserved where possible.
+//
+// Some files are filtered from the EPUB:
+//
+//   - [extra] remove calibre_bookmarks.txt
+//   - [extra] remove iBooks metadata
+//   - [extra] remove macOS metadata
+//   - [extra] remove Windows metadata
+//
+// For the OPF:
+//
+//   - [mandatory] add the cover-image property to the cover.
+//     Kobo only supports the standardized EPUB3-style method of specifying the
+//     cover (`manifest>item[properties="cover-image"]`), but most older EPUBs
+//     will reference the manifest item with a meta element like
+//     `meta[name="cover"][content="{manifest-item-id}"]`. or just set the
+//     manifest item ID to `cover` instead of using `properties`.
+//
+//   - [extra] remove unnecessary Calibre metadata.
+//     Removes extraneous metadata elements commonly added by Calibre.
+//
+// If processing untrusted EPUBs, r should be a [zip.Reader] or other
+// in-memory/sandboxed filesystem, rather than an on-disk filesystem since paths
+// are not sanitized.
+func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 	type FileAction int
 	const (
 		FileActionCopy             = 0
@@ -34,15 +52,13 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 		FileActionTransformOPF     = 3
 	)
 
-	p := ctxProgress(ctx)
+	p := opt.progress()
 
 	if tmp, ok := r.(*zip.ReadCloser); ok {
 		r = &tmp.Reader
 	}
 
-	if p != nil {
-		p(true, 0, 0)
-	}
+	p(0, true)
 
 	var files []*zip.FileHeader
 	if zr, ok := r.(*zip.Reader); ok {
@@ -132,7 +148,7 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 
 	// mark the files to be removed
 	for i, f := range files {
-		if c.TransformFileFilter(f.Name) {
+		if transformFileFilter(f.Name) {
 			fileAct[i] = FileActionIgnore
 		}
 	}
@@ -216,9 +232,9 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 
 				switch a := fileAct[i]; a {
 				case FileActionTransformOPF:
-					err = c.TransformOPF(buf, rc)
+					err = transformOPF(buf, rc)
 					if err == nil {
-						if fn, r, a, err1 := c.TransformDummyTitlepage(r, opf, buf); err1 != nil {
+						if fn, r, a, err1 := transformDummyTitlepage(r, opf, buf, opt.DummyTitlepage); err1 != nil {
 							err = err1
 						} else if a {
 							buf1 := pool.Get().(*bytes.Buffer)
@@ -239,7 +255,7 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 						}
 					}
 				case FileActionTransformContent:
-					err = c.TransformContent(buf, rc)
+					err = transformContent(buf, rc, opt, f.Name)
 				default:
 					panic(fmt.Sprintf("unexpected action %d in transformation goroutine", a))
 				}
@@ -305,10 +321,8 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 			b.Reset()
 			pool.Put(b)
 		}
-		if p != nil {
-			n++
-			p(false, n, len(files))
-		}
+		n++
+		p(float64(n)/float64(len(files)), false)
 	}
 	if err := g.Wait(); err != nil {
 		return err
@@ -319,9 +333,7 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 		return fmt.Errorf("finalize output EPUB: %w", err)
 	}
 
-	if p != nil {
-		p(true, n, n)
-	}
+	p(1, true)
 	return nil
 }
 

@@ -27,16 +27,8 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// TransformFileFilter returns true if a file should be filtered from the EPUB.
-//
-//   - [extra] remove calibre_bookmarks.txt
-//
-//   - [extra] remove iBooks metadata
-//
-//   - [extra] remove macOS metadata
-//
-//   - [extra] remove Windows metadata
-func (c *Converter) TransformFileFilter(fn string) bool {
+// transformFileFilter returns true if a file should be filtered from the EPUB.
+func transformFileFilter(fn string) bool {
 	switch path.Base(fn) {
 	case "calibre_bookmarks.txt": // Calibre
 		return true
@@ -64,22 +56,14 @@ var (
 	))
 )
 
-// TransformOPF transforms the OPF document for a KEPUB.
+// transformOPF transforms the OPF document for a KEPUB.
 //
-//   - [mandatory] add the cover-image property to the cover.
-//     Kobo only supports the standardized EPUB3-style method of specifying the
-//     cover (`manifest>item[properties="cover-image"]`), but most older EPUBs
-//     will reference the manifest item with a meta element like
-//     `meta[name="cover"][content="{manifest-item-id}"]`. or just set the
-//     manifest item ID to `cover` instead of using `properties`.
-//
-//   - [extra] remove unnecessary Calibre metadata.
-//     Removes extraneous metadata elements commonly added by Calibre.
+// See [Convert] for the list of changes.
 //
 // Formatting is preserved where possible, and malformed documents are
 // transformed on a best-effort basis. Element matching is namespace-aware. The
 // output document is in UTF-8 if possible.
-func (c *Converter) TransformOPF(w io.Writer, r io.Reader) error {
+func transformOPF(w io.Writer, r io.Reader) error {
 	opf, err := io.ReadAll(r)
 	if err != nil {
 		return err
@@ -286,25 +270,37 @@ func isBlankText(tok *htmlstream.Token) bool {
 //
 // The document is streamed, so existing Kobo divs and spans are only detected
 // if they are close to the start of the body (which they should be).
-func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
-	r, err := transformContentCharset(r, c.charset)
+func TransformContent(w io.Writer, r io.Reader, opt Options) error {
+	return transformContent(w, r, opt, "")
+}
+
+// transformContent is TransformContent for the content document at the path
+// name in the EPUB, for Warn.
+func transformContent(w io.Writer, r io.Reader, opt Options, name string) error {
+	r, err := transformContentCharset(r, opt.Charset)
 	if err != nil {
 		return fmt.Errorf("parse html: %w", err)
 	}
 
 	var wc io.WriteCloser
-	if len(c.find) != 0 {
-		wc = transformContentReplacements(w, c.find, c.replace)
+	if len(opt.Replace) != 0 {
+		wc = transformContentReplacements(w, opt.Replace)
 		w = wc
 	}
 
-	k := newKobo(c)
-	if err := convert(w, r, polyglot.Options{
+	k := newKobo(opt)
+	popt := polyglot.Options{
 		DoctypeMode: polyglot.KeepDoctype,
 		XMLDecl:     polyglot.KeepXMLDecl, // only at the start (see #95)
 		OnTag:       k.OnTag,
 		OnText:      k.OnText,
-	}); err != nil {
+	}
+	if opt.Warn != nil {
+		popt.Warn = func(w polyglot.Warning) {
+			opt.Warn(name, w.Msg)
+		}
+	}
+	if err := convert(w, r, popt); err != nil {
 		return fmt.Errorf("transform html: %w", err)
 	}
 
@@ -318,13 +314,14 @@ func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 }
 
 // transformContentCharset returns a reader decoding r to UTF-8 from the
-// specified encoding, or the detected encoding if "auto" (same prescan rules as
-// browsers), or otherwise guessed (UTF-8 if valid, or latin1/windows-1252).
+// specified encoding, or the detected encoding if "auto" or empty (same prescan
+// rules as browsers), or otherwise guessed (UTF-8 if valid, or
+// latin1/windows-1252).
 func transformContentCharset(r io.Reader, label string) (io.Reader, error) {
 	switch strings.ToLower(label) {
-	case "utf-8", "":
+	case "utf-8":
 		return r, nil
-	case "auto":
+	case "auto", "":
 		br := bufio.NewReaderSize(r, 1024)
 		head, err := br.Peek(1024)
 		if err != nil && err != io.EOF {
@@ -365,15 +362,12 @@ func transformContentCharset(r io.Reader, label string) (io.Reader, error) {
 // the corresponding replace in the data written to w, in order (each
 // replacement applies to the output of the previous ones). Empty finds are
 // ignored.
-func transformContentReplacements(w io.Writer, find, replace [][]byte) io.WriteCloser {
-	if len(find) != len(replace) {
-		panic("find and replace must be the same length")
-	}
+func transformContentReplacements(w io.Writer, repl []Replacement) io.WriteCloser {
 	var rw *replaceWriter
 	out := w
-	for i := len(find) - 1; i >= 0; i-- {
-		if len(find[i]) != 0 {
-			rw = &replaceWriter{w: out, next: rw, find: find[i], repl: replace[i]}
+	for i := len(repl) - 1; i >= 0; i-- {
+		if repl[i].Find != "" {
+			rw = &replaceWriter{w: out, next: rw, find: []byte(repl[i].Find), repl: []byte(repl[i].Replace)}
 			out = rw
 		}
 	}
@@ -389,7 +383,7 @@ const (
 	dummyTitlepage     = `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title></title></head><body><p style="text-align: center; margin: 4em 0; font-size: .7em; font-style: italic;">Page intentionally left blank by kepubify.</p></body></html>`
 )
 
-// TransformDummyTitlepage adds a dummy titlepage if forced or the heuristic
+// transformDummyTitlepage adds a dummy titlepage if forced or the heuristic
 // determines that is is necessary. If there was an error determining if the
 // titlepage is required, false and an error is returned. If it is not required,
 // false is returned. If it is required, but there was an error when adding it,
@@ -408,17 +402,16 @@ const (
 // first linear spine item, as transformed by TransformContent. Formatting is
 // preserved where possible, and malformed documents are transformed on a
 // best-effort basis. Element matching is namespace-aware.
-func (c *Converter) TransformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer) (string, io.Reader, bool, error) {
-	if c.dummyTitlepageForce {
-		if !c.dummyTitlepageForceValue {
-			return "", nil, false, nil
-		}
-	} else {
+func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, force *bool) (string, io.Reader, bool, error) {
+	switch {
+	case force == nil:
 		if req, err := transformDummyTitlepageRequired(epub, opfF, opf.Bytes()); err != nil {
 			return "", nil, false, fmt.Errorf("check if dummy titlepage is required: %w", err)
 		} else if !req {
 			return "", nil, false, nil
 		}
+	case !*force:
+		return "", nil, false, nil
 	}
 	var b bytes.Buffer
 	if err := transformDummyTitlepageAdd(&b, opf.Bytes()); err != nil {
