@@ -1,6 +1,7 @@
 package kepub
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/xml"
@@ -13,7 +14,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pgaskin/kepubify/v5/internal/zip"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -291,7 +291,7 @@ func (c *Converter) Convert(ctx context.Context, w io.Writer, r fs.FS) error {
 		case nil:
 			var err error
 			if zr, ok := r.(*zip.Reader); ok {
-				err = zipCopy(zw, zr.File[of.Index])
+				err = zw.Copy(zr.File[of.Index])
 			} else {
 				err = zipCopyFS(zw, f, r)
 			}
@@ -441,13 +441,6 @@ func zipReplace(z *zip.Writer, f *zip.FileHeader, r io.Reader) error {
 	}
 	_, err = io.Copy(w, r)
 	return err
-}
-
-// zipCopy copies a file from one zip archive to another. On Go 1.17+, this uses
-// (*zip.Writer).Copy, which is much faster than reading and re-compressing the
-// data.
-func zipCopy(z *zip.Writer, f *zip.File) error {
-	return zipCopyImpl(z, f)
 }
 
 // zipCopy copies a file from a FS to a zip using the information in the

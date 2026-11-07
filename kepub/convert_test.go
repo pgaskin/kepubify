@@ -1,6 +1,7 @@
 package kepub
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha1"
@@ -17,8 +18,6 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
-
-	"github.com/pgaskin/kepubify/v5/internal/zip"
 )
 
 // The intention of these tests are to provide quick checks for important

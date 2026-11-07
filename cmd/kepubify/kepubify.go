@@ -2,6 +2,7 @@
 package main
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pgaskin/kepubify/v5/internal/zip"
 	"github.com/pgaskin/kepubify/v5/kepub"
 	"github.com/spf13/pflag"
 )
