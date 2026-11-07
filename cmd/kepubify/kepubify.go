@@ -302,6 +302,8 @@ func main() {
 								return err
 							}
 
+							_ = os.Chmod(fo.Name(), 0644) // CreateTemp uses 0600
+
 							if *preserveattrs {
 								if err := copyAttrs(input, fo.Name()); err != nil {
 									return err
