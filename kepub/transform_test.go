@@ -1115,6 +1115,96 @@ func TestTransformDummyTitlepage(t *testing.T) {
 	}
 }
 
+func TestTransformDummyTitlepageCover(t *testing.T) {
+	const img = "image"
+	for _, tc := range []titlepageTest{
+		{
+			name:     "declared in the opf",
+			manifest: `<item id="c" href="images/front.jpg" media-type="image/jpeg" properties="cover-image"/>`,
+			content:  map[string]string{"images/front.jpg": img, "cover.jpg": img},
+			cover:    "images/front.jpg",
+		},
+		{
+			name:     "declared in the opf, but not an image",
+			manifest: `<item id="cover" href="cover.xhtml" media-type="application/xhtml+xml" properties="cover-image"/>`,
+			content:  map[string]string{"cover.xhtml": "", "cover.png": img},
+			cover:    "cover.png",
+		},
+		{
+			name:     "declared in the opf, but missing",
+			manifest: `<item id="c" href="front.jpg" media-type="image/jpeg" properties="cover-image"/>`,
+			content:  map[string]string{"cover.jpg": img},
+			cover:    "cover.jpg",
+		},
+		{
+			name:    "package directory first",
+			content: map[string]string{"cover.jpg": img, "images/cover.jpg": img, "../cover.jpg": img},
+			cover:   "cover.jpg",
+		},
+		{
+			name:    "anywhere before the next pattern",
+			content: map[string]string{"cover_front.png": img, "../cover.jpg": img},
+			cover:   "../cover.jpg",
+		},
+		{
+			name:    "cover_ before _cover",
+			content: map[string]string{"img/x_cover.jpg": img, "img/cover_x.jpg": img},
+			cover:   "img/cover_x.jpg",
+		},
+		{
+			name:    "_cover before cover suffix",
+			content: map[string]string{"bookcover.jpg": img, "book_cover.jpg": img},
+			cover:   "book_cover.jpg",
+		},
+		{
+			name:    "cover suffix before containing cover",
+			content: map[string]string{"covers.png": img, "bookcover.gif": img},
+			cover:   "bookcover.gif",
+		},
+		{
+			name:    "case-insensitive",
+			content: map[string]string{"Images/COVER.JPEG": img},
+			cover:   "Images/COVER.JPEG",
+		},
+		{
+			name:    "escaped",
+			content: map[string]string{"my cover.jpg": img},
+			cover:   "my%20cover.jpg",
+		},
+		{
+			name:    "filtered files and other types",
+			content: map[string]string{"../__MACOSX/OEBPS/._cover.jpg": img, "cover.xhtml": "", "cover.svg": img},
+		},
+	} {
+		tc.force, tc.added, tc.detectCover = new(true), true, true
+		tc.run(t)
+	}
+	titlepageTest{
+		name:    "disabled",
+		force:   new(true),
+		added:   true,
+		content: map[string]string{"cover.jpg": img},
+	}.run(t)
+}
+
+func TestRelativeHref(t *testing.T) {
+	for _, tc := range [][3]string{
+		{"OEBPS", "OEBPS/cover.jpg", "cover.jpg"},
+		{"OEBPS", "OEBPS/images/cover.jpg", "images/cover.jpg"},
+		{"OEBPS/text", "OEBPS/images/cover.jpg", "../images/cover.jpg"},
+		{"OEBPS", "cover.jpg", "../cover.jpg"},
+		{".", "OEBPS/cover.jpg", "OEBPS/cover.jpg"},
+		{"", "cover.jpg", "cover.jpg"},
+		{"OEBPS", "OEBPS/a:b.jpg", "./a:b.jpg"},
+		{"OEBPS", "OEBPS/my cover#1?.jpg", "my%20cover%231%3F.jpg"},
+		{"a/b", "a/b", "../b"},
+	} {
+		if got := relativeHref(tc[0], tc[1]); got != tc[2] {
+			t.Errorf("relativeHref(%q, %q) = %q, want %q", tc[0], tc[1], got, tc[2])
+		}
+	}
+}
+
 func TestTransformDummyTitlepageParts(t *testing.T) {
 	const lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
 	words := map[string]string{"text.xhtml": `<html><body><div>` + lorem + ` ` + lorem + `</div></body></html>`}
@@ -1278,6 +1368,9 @@ type titlepageTest struct {
 	err      bool
 	added    bool
 	want     string // new opf to check (if not empty)
+
+	detectCover bool
+	cover       string // expected cover image src (if not empty)
 }
 
 const titlepageOPF = "OEBPS/content.opf"
@@ -1302,7 +1395,7 @@ func (tc titlepageTest) run(t *testing.T) {
 			epub[path.Join(path.Dir(titlepageOPF), name)] = &fstest.MapFile{Data: []byte(s)}
 		}
 		buf := bytes.NewBufferString(opf)
-		name, r, added, err := transformDummyTitlepage(epub, titlepageOPF, buf, tc.force)
+		name, r, added, err := transformDummyTitlepage(epub, titlepageOPF, buf, tc.force, tc.detectCover)
 		if tc.err != (err != nil) {
 			t.Errorf("error %v, want error %v", err, tc.err)
 		}
@@ -1321,8 +1414,12 @@ func (tc titlepageTest) run(t *testing.T) {
 		if name != "OEBPS/kepubify-titlepage-dummy.xhtml" {
 			t.Errorf("name %q", name)
 		}
-		if b, err := io.ReadAll(r); err != nil || string(b) != dummyTitlepage {
-			t.Errorf("content document %q, %v", b, err)
+		if b, err := io.ReadAll(r); err != nil {
+			t.Errorf("content document: %v", err)
+		} else if tc.cover == "" && string(b) != dummyTitlepage {
+			t.Errorf("content document %q", b)
+		} else if tc.cover != "" && string(b) != dummyTitlepageWithCover(tc.cover) {
+			t.Errorf("content document %q, want cover %q", b, tc.cover)
 		}
 		if err := checkTitlepageOPF(buf.Bytes()); err != nil {
 			t.Errorf("%v:\n%s", err, buf.String())

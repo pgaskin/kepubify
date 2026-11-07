@@ -51,10 +51,11 @@ func main() {
 	fullscreenfixes := pflag.Bool("fullscreen-reading-fixes", false, "Enable fullscreen reading bugfixes based on https://www.mobileread.com/forums/showpost.php?p=3113460&postcount=16")
 	adddummytitlepage := pflag.Bool("add-dummy-titlepage", false, "Force-enables the dummy titlepage to fix layout issues with the first content file on certain books (this is enabled when needed using a heuristic if not specified)")
 	noadddummytitlepage := pflag.Bool("no-add-dummy-titlepage", false, "Force-disables the dummy titlepage")
+	detectcover := pflag.Bool("detect-cover", false, "Show the book's cover image on the dummy titlepage, if one is found (from the package document, or an image named like cover.jpg)")
 	replace := pflag.StringArrayP("replace", "r", nil, "Find and replace on all html files (repeat any number of times) (format: find|replace)")
 	charset := pflag.String("charset", "auto", "Override the HTML charset (\"auto\" detects it from the content, falling back to UTF-8 if valid)")
 
-	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "replace", "charset"} {
+	for _, flag := range []string{"smarten-punctuation", "css", "hyphenate", "no-hyphenate", "fullscreen-reading-fixes", "add-dummy-titlepage", "no-add-dummy-titlepage", "detect-cover", "replace", "charset"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"3.Conversion Options"})
 	}
 
@@ -93,6 +94,7 @@ func main() {
 		Charset:         *charset,
 		CSS:             *css,
 		FullScreenFixes: *fullscreenfixes,
+		DetectCover:     *detectcover,
 		Smartypants:     *smartenpunct,
 	}
 	if *hyphenate {

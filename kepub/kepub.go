@@ -38,6 +38,12 @@ type Options struct {
 	// should be added.
 	DummyTitlepage *bool
 
+	// DetectCover makes the dummy titlepage show the book's cover image, if
+	// one is found, instead of being blank. The cover image is the one
+	// declared in the OPF, or an image file named like a cover (e.g.,
+	// cover.jpg).
+	DetectCover bool
+
 	// Warn, if not nil, is called for content which can't be converted exactly
 	// (e.g., due to malformed on ambiguous HTML), with the path of the file in
 	// the EPUB (empty if TransformContent is called directly, or if not

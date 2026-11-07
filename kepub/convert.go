@@ -235,7 +235,7 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 				case FileActionTransformOPF:
 					err = transformOPF(buf, rc)
 					if err == nil {
-						if fn, r, a, err1 := transformDummyTitlepage(r, opf, buf, opt.DummyTitlepage); err1 != nil {
+						if fn, r, a, err1 := transformDummyTitlepage(r, opf, buf, opt.DummyTitlepage, opt.DetectCover); err1 != nil {
 							err = err1
 						} else if a {
 							buf1 := pool.Get().(*bytes.Buffer)

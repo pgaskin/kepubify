@@ -402,7 +402,10 @@ const (
 // first linear spine item, as transformed by TransformContent. Formatting is
 // preserved where possible, and malformed documents are transformed on a
 // best-effort basis. Element matching is namespace-aware.
-func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, force *bool) (string, io.Reader, bool, error) {
+//
+// If detectCover is true, the dummy titlepage shows the cover image if one is
+// found (see transformDummyTitlepageCover) instead of being blank.
+func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, force *bool, detectCover bool) (string, io.Reader, bool, error) {
 	switch {
 	case force == nil:
 		if req, err := transformDummyTitlepageRequired(epub, opfF, opf.Bytes()); err != nil {
@@ -417,9 +420,123 @@ func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, force *
 	if err := transformDummyTitlepageAdd(&b, opf.Bytes()); err != nil {
 		return "", nil, true, fmt.Errorf("apply title page fix: %w", err)
 	}
+	page := dummyTitlepage
+	if detectCover {
+		if cover := transformDummyTitlepageCover(epub, opfF, opf.Bytes()); cover != "" {
+			page = dummyTitlepageWithCover(relativeHref(path.Dir(opfF), cover))
+		}
+	}
 	opf.Reset()
 	opf.Write(b.Bytes())
-	return path.Join(path.Dir(opfF), dummyTitlepageHref), strings.NewReader(dummyTitlepage), true, nil
+	return path.Join(path.Dir(opfF), dummyTitlepageHref), strings.NewReader(page), true, nil
+}
+
+// dummyTitlepageWithCover returns a dummy titlepage showing the image at href.
+func dummyTitlepageWithCover(href string) string {
+	b := []byte(`<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title></title><style type="text/css">html, body { height: 100%; margin: 0; padding: 0; } body { text-align: center; } img { max-width: 100%; max-height: 100%; }</style></head><body>`)
+	b = htmlstream.AppendStartTag(b, "img", true, "src", href, "alt", "")
+	b = append(b, `</body></html>`...)
+	return string(b)
+}
+
+// transformDummyTitlepageCover returns the path in epub of the cover image of
+// the package document opf at opfF, or "" if none is found.
+//
+// The cover image is the manifest item with the cover-image property, if it is
+// an image which exists. Otherwise, it is the first image file (by
+// extension) whose name (without the extension, case-insensitive) is cover,
+// starts with cover_, ends with _cover, ends with cover, or contains cover, in
+// that order of preference, preferring the ones in the directory of the
+// package document over the others for each.
+func transformDummyTitlepageCover(epub fs.FS, opfF string, opf []byte) string {
+	// TODO: add the detected cover to the manifest if not already listed? it
+	// should work fine as-is, though it is technically supposed to be listed
+	// there
+
+	isImage := func(name string) bool {
+		switch strings.ToLower(path.Ext(name)) {
+		case ".jpg", ".jpeg", ".png", ".gif":
+			return true
+		}
+		return false
+	}
+
+	// note: transformOPF sets the cover-image property on the cover
+	rd := htmlstream.NewReader(bytes.NewReader(opf))
+	rd.SetMode(htmlstream.XML)
+	var manifest bool
+	for tok := range rd.All() {
+		switch {
+		case tok.Kind() == htmlstream.EndTag && rd.Depth() == 2:
+			manifest = false
+		case tok.Kind() != htmlstream.StartTag || tok.NS() != nsOPF:
+		case rd.Depth() == 2:
+			manifest = tok.Opens() && string(tok.Local()) == "manifest"
+		case rd.Depth() == 3 && manifest && string(tok.Local()) == "item":
+			if !slices.Contains(strings.Fields(attrValue(tok, "properties")), "cover-image") {
+				continue
+			}
+			href := attrValue(tok, "href")
+			if p, err := url.PathUnescape(href); err == nil {
+				href = p
+			}
+			name := path.Join(path.Dir(opfF), href)
+			if isImage(name) {
+				if _, err := fs.Stat(epub, name); err == nil {
+					return name
+				}
+			}
+		}
+	}
+
+	var images []string
+	fs.WalkDir(epub, ".", func(name string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && isImage(name) && !transformFileFilter(name) {
+			images = append(images, name)
+		}
+		return nil
+	})
+	slices.Sort(images)
+	for _, match := range []func(base string) bool{
+		func(base string) bool { return base == "cover" },
+		func(base string) bool { return strings.HasPrefix(base, "cover_") },
+		func(base string) bool { return strings.HasSuffix(base, "_cover") },
+		func(base string) bool { return strings.HasSuffix(base, "cover") },
+		func(base string) bool { return strings.Contains(base, "cover") },
+	} {
+		for _, inPackage := range []bool{true, false} {
+			for _, name := range images {
+				if inPackage && path.Dir(name) != path.Dir(opfF) {
+					continue
+				}
+				base := strings.ToLower(path.Base(name))
+				if match(strings.TrimSuffix(base, path.Ext(base))) {
+					return name
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// relativeHref returns a relative URL referencing the slash-separated path
+// name from a document in the directory dir.
+func relativeHref(dir, name string) string {
+	// TODO: refactor?
+	var from []string
+	if dir = path.Clean(dir); dir != "." {
+		from = strings.Split(dir, "/")
+	}
+	to := strings.Split(name, "/")
+	i := 0
+	for i < len(from) && i < len(to)-1 && from[i] == to[i] {
+		i++
+	}
+	rel := strings.Repeat("../", len(from)-i) + strings.Join(to[i:], "/")
+	if first, _, _ := strings.Cut(rel, "/"); strings.Contains(first, ":") {
+		rel = "./" + rel // not a scheme
+	}
+	return (&url.URL{Path: rel}).EscapedPath()
 }
 
 func transformDummyTitlepageRequired(epub fs.FS, opfF string, opf []byte) (bool, error) {
