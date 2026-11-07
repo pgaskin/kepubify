@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"testing/iotest"
 
 	"github.com/beevik/etree"
 
@@ -460,12 +461,13 @@ func TestTransformContentParts(t *testing.T) {
 }
 
 func TestTransformOPF(t *testing.T) {
-	// note: the individual parts below aren't tested again here
-	c := &Converter{}
-
-	buf := bytes.NewBuffer(nil)
-	if err := c.TransformOPF(buf, strings.NewReader(strings.TrimSpace(`
-<?xml version="1.0" encoding="UTF-8"?>
+	for _, tc := range []struct {
+		name    string
+		in, out string
+	}{
+		{
+			name: "unchanged",
+			in: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <!-- other stuff left out for brevity -->
@@ -478,39 +480,11 @@ func TestTransformOPF(t *testing.T) {
     <spine toc="ncx">
         <itemref idref="xhtml_text1"/>
     </spine>
-</package>`))); err != nil {
-		t.Fatalf("transform: unexpected error: %v", err)
-	}
-
-	if a, b := strings.TrimSpace(buf.String()), strings.TrimSpace(`
-<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <!-- other stuff left out for brevity -->
-    </metadata>
-    <manifest>
-        <item id="cover-image" href="book_cover.jpg" media-type="image/jpeg"/>
-        <item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
-        <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-        <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
-    </manifest>
-    <spine toc="ncx">
-        <itemref idref="xhtml_text1"/>
-    </spine>
-</package>`); a != b {
-		t.Error("not equal")
-		fmt.Println(a)
-		fmt.Println("---")
-		fmt.Println(b)
-	}
-}
-
-func TestTransformOPFParts(t *testing.T) {
-	t.Run("CoverImage", func(t *testing.T) {
-		transformXMLTestCase{
-			Func: transformOPFCoverImage,
-			What: "set cover-image property on ID from meta[name=cover]",
-			In: `<?xml version="1.0" encoding="UTF-8"?>
+</package>`,
+		},
+		{
+			name: "set cover-image property on ID from meta[name=cover]",
+			in: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <!-- other stuff left out for brevity -->
@@ -526,7 +500,7 @@ func TestTransformOPFParts(t *testing.T) {
         <itemref idref="xhtml_text1"/>
     </spine>
 </package>`,
-			Out: `<?xml version="1.0" encoding="UTF-8"?>
+			out: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <!-- other stuff left out for brevity -->
@@ -542,12 +516,10 @@ func TestTransformOPFParts(t *testing.T) {
         <itemref idref="xhtml_text1"/>
     </spine>
 </package>`,
-		}.Run(t)
-
-		transformXMLTestCase{
-			Func: transformOPFCoverImage,
-			What: "set cover-image property on #cover if meta[name=cover] not present",
-			In: `<?xml version="1.0" encoding="UTF-8"?>
+		},
+		{
+			name: "set cover-image property on #cover if meta[name=cover] not present",
+			in: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <!-- other stuff left out for brevity -->
@@ -555,14 +527,9 @@ func TestTransformOPFParts(t *testing.T) {
     <manifest>
         <item id="cover" href="book_cover.jpg" media-type="image/jpeg"/>
         <item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
-        <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-        <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     </manifest>
-    <spine toc="ncx">
-        <itemref idref="xhtml_text1"/>
-    </spine>
 </package>`,
-			Out: `<?xml version="1.0" encoding="UTF-8"?>
+			out: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <!-- other stuff left out for brevity -->
@@ -570,22 +537,12 @@ func TestTransformOPFParts(t *testing.T) {
     <manifest>
         <item id="cover" href="book_cover.jpg" media-type="image/jpeg" properties="cover-image"/>
         <item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
-        <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-        <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     </manifest>
-    <spine toc="ncx">
-        <itemref idref="xhtml_text1"/>
-    </spine>
 </package>`,
-		}.Run(t)
-	})
-
-	t.Run("CalibreMeta", func(t *testing.T) {
-		// note: the <!-- --> is to preven editors from trimming the whitespace
-		transformXMLTestCase{
-			Func: transformOPFCalibreMeta,
-			What: "remove calibre:timestamp and calibre contributor",
-			In: `<?xml version="1.0" encoding="UTF-8"?>
+		},
+		{
+			name: "remove calibre:timestamp and calibre contributor",
+			in: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <!-- --><meta content="whatever" name="calibre:timestamp"/>
@@ -594,7 +551,7 @@ func TestTransformOPFParts(t *testing.T) {
     </metadata>
     <!-- other stuff left out for brevity -->
 </package>`,
-			Out: `<?xml version="1.0" encoding="UTF-8"?>
+			out: `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <!-- -->
@@ -603,8 +560,121 @@ func TestTransformOPFParts(t *testing.T) {
     </metadata>
     <!-- other stuff left out for brevity -->
 </package>`,
-		}.Run(t)
-	})
+		},
+		{
+			name: "more calibre metadata, epub2 prefixes",
+			in: `<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:title>Title</dc:title>
+    <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (5.0.0) [https://calibre-ebook.com]</dc:contributor>
+    <dc:contributor opf:role="edt">Editor</dc:contributor>
+    <opf:meta name="calibre:timestamp" content="2020-01-01T00:00:00+00:00"/>
+  </metadata>
+</package>`,
+			out: `<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:title>Title</dc:title>
+    <dc:contributor opf:role="edt">Editor</dc:contributor>
+  </metadata>
+</package>`,
+		},
+		{
+			name: "prefixed package document",
+			in: `<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:x="http://purl.org/dc/elements/1.1/" version="2.0">
+<opf:metadata><x:contributor opf:role="bkp">calibre</x:contributor><opf:meta name="cover" content="img"/></opf:metadata>
+<opf:manifest><opf:item id="img" href="c.jpg" media-type="image/jpeg"/></opf:manifest>
+</opf:package>`,
+			out: `<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:x="http://purl.org/dc/elements/1.1/" version="2.0">
+<opf:metadata><opf:meta name="cover" content="img"/></opf:metadata>
+<opf:manifest><opf:item id="img" href="c.jpg" media-type="image/jpeg" properties="cover-image"/></opf:manifest>
+</opf:package>`,
+		},
+		{
+			name: "cover meta element after the manifest",
+			in: `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" href="c.xhtml"/><item id="img" href="c.jpg"/></manifest>` +
+				`<metadata><meta name="cover" content="img"/></metadata></package>`,
+			out: `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" href="c.xhtml"/><item id="img" href="c.jpg" properties="cover-image"/></manifest>` +
+				`<metadata><meta name="cover" content="img"/></metadata></package>`,
+		},
+		{
+			name: "first match by id",
+			in: `<package xmlns="http://www.idpf.org/2007/opf"><metadata><meta name="cover" content="a"/><meta name="cover" content="b"/></metadata>` +
+				`<manifest><item id="b" href="b.jpg"/><item id="a" href="a.jpg"/><item id="a" href="a2.jpg"/></manifest></package>`,
+			out: `<package xmlns="http://www.idpf.org/2007/opf"><metadata><meta name="cover" content="a"/><meta name="cover" content="b"/></metadata>` +
+				`<manifest><item id="b" href="b.jpg"/><item id="a" href="a.jpg" properties="cover-image"/><item id="a" href="a2.jpg"/></manifest></package>`,
+		},
+		{
+			name: "breadth-first id match",
+			in: `<package xmlns="http://www.idpf.org/2007/opf"><metadata><x-metadata><meta name="cover" content="a"/></x-metadata><meta name="cover" content="b"/></metadata>` +
+				`<manifest><x><item id="b" href="b1.jpg"/></x><item id="b" href="b2.jpg"/></manifest></package>`,
+			out: `<package xmlns="http://www.idpf.org/2007/opf"><metadata><x-metadata><meta name="cover" content="a"/></x-metadata><meta name="cover" content="b"/></metadata>` +
+				`<manifest><x><item id="b" href="b1.jpg"/></x><item id="b" href="b2.jpg" properties="cover-image"/></manifest></package>`,
+		},
+		{
+			name: "existing properties",
+			in:   `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="svg  scripted" href="c.xhtml"/></manifest></package>`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="cover-image" href="c.xhtml"/></manifest></package>`,
+		},
+		{
+			name: "existing cover-image property",
+			in:   `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties=' cover-image' href="c.jpg"/></manifest></package>`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="cover-image" href="c.jpg"/></manifest></package>`,
+		},
+		{
+			name: "id with quotes",
+			in:   `<package xmlns="http://www.idpf.org/2007/opf"><metadata><meta name="cover" content="a'&quot;b"/></metadata><manifest><item id='a&apos;"b'/></manifest></package>`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><metadata><meta name="cover" content="a'&quot;b"/></metadata><manifest><item id='a&apos;"b' properties="cover-image"/></manifest></package>`,
+		},
+		{
+			name: "elements in other namespaces and prefixed attributes",
+			in: `<package xmlns="http://www.idpf.org/2007/opf" xmlns:x="urn:x"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/">` +
+				`<x:meta name="cover" content="a"/><meta x:name="cover" content="b"/><meta xmlns="" name="calibre:timestamp"/><x:contributor role="bkp"/><dc:contributor x:role="bkp"/>` +
+				`</metadata><manifest><item x:id="cover"/><item xml:id="cover"/></manifest></package>`,
+		},
+		{
+			name: "unbound prefixes",
+			in:   `<package xmlns="http://www.idpf.org/2007/opf"><metadata><dc:contributor opf:role="bkp"/><opf:meta name="cover" content="a"/></metadata><manifest><item id="cover"/></manifest></package>`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><metadata><dc:contributor opf:role="bkp"/><opf:meta name="cover" content="a"/></metadata><manifest><item id="cover" properties="cover-image"/></manifest></package>`,
+		},
+		{
+			name: "malformed",
+			in:   `<package xmlns="http://www.idpf.org/2007/opf"><metadata><meta name="calibre:timestamp"><manifest><item id="cover">`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><metadata>`,
+		},
+		{
+			name: "malformed token",
+			in:   `<package xmlns="http://www.idpf.org/2007/opf"><metadata><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">A & B</dc:title><meta name="calibre:timestamp"/></metadata><manifest><item id="cover"/></manifest></package>`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><metadata><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">A & B</dc:title></metadata><manifest><item id="cover" properties="cover-image"/></manifest></package>`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want := tc.out
+			if want == "" {
+				want = tc.in
+			}
+			if got := transformOPF(t, tc.in); got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+
+func transformOPF(t *testing.T, in string) string {
+	t.Helper()
+	var a, b bytes.Buffer
+	if err := (&Converter{}).TransformOPF(&a, strings.NewReader(in)); err != nil {
+		t.Fatalf("transform: %v", err)
+	}
+	// one-byte reader to ensure streaming works correctly
+	if err := (&Converter{}).TransformOPF(&b, iotest.OneByteReader(strings.NewReader(in))); err != nil {
+		t.Fatalf("transform (one byte reader): %v", err)
+	}
+	if a.String() != b.String() {
+		t.Fatalf("output differs with a one byte reader:\n%s\n%s", a.String(), b.String())
+	}
+	return a.String()
 }
 
 func TestTransformFileFilter(t *testing.T) {
@@ -1010,38 +1080,6 @@ func (tc transformContentCase) Run(t *testing.T) {
 		if hstr != tc.Out {
 			t.Errorf("case %#v: \ngot:`%v` != \nexp:`%v`", tc.What, strings.ReplaceAll(hstr, "\n", "`+\"\\n\"+`"), strings.ReplaceAll(tc.Out, "\n", "`+\"\\n\"+`"))
 		}
-	}
-}
-
-type transformXMLTestCase struct {
-	Func func(*etree.Document)
-	What string
-	In   string
-	Out  string
-}
-
-func (tc transformXMLTestCase) Run(t *testing.T) {
-	t.Logf("case %#v", tc.What)
-
-	doc := etree.NewDocument()
-	if _, err := doc.ReadFrom(strings.NewReader(tc.In)); err != nil {
-		t.Errorf("case %#v: parse: %v", tc.What, err)
-		return
-	}
-
-	tc.Func(doc)
-
-	buf := bytes.NewBuffer(nil)
-	if _, err := doc.WriteTo(buf); err != nil {
-		t.Errorf("case %#v: write: %v", tc.What, err)
-		return
-	}
-
-	if a, b := strings.TrimSpace(buf.String()), strings.TrimSpace(tc.Out); a != b {
-		t.Error("not equal")
-		fmt.Println(a)
-		fmt.Println("---")
-		fmt.Println(b)
 	}
 }
 

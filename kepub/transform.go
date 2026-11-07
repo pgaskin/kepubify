@@ -16,6 +16,8 @@ import (
 
 	"github.com/beevik/etree"
 	"github.com/kr/smartypants"
+	"github.com/pgaskin/htmlstream"
+	"github.com/pgaskin/htmlstream/ascii"
 	"golang.org/x/text/transform"
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
@@ -46,6 +48,20 @@ func (c *Converter) TransformFileFilter(fn string) bool {
 	return strings.HasPrefix(fn, "__MACOSX/") // macOS archivers
 }
 
+const (
+	nsOPF = "http://www.idpf.org/2007/opf"
+	nsDC  = "http://purl.org/dc/elements/1.1/"
+)
+
+var (
+	isCoverMeta          = htmlstream.TagNS(nsOPF, "meta", htmlstream.AttrEquals("name", "cover"))
+	isCalibreMeta        = htmlstream.TagNS(nsOPF, "meta", htmlstream.AttrEquals("name", "calibre:timestamp"))
+	isCalibreContributor = htmlstream.TagNS(nsDC, "contributor", htmlstream.Or(
+		htmlstream.AttrEquals("role", "bkp"),
+		htmlstream.AttrNSEquals(nsOPF, "role", "bkp"),
+	))
+)
+
 // TransformOPF transforms the OPF document for a KEPUB.
 //
 //   - [mandatory] add the cover-image property to the cover.
@@ -57,41 +73,97 @@ func (c *Converter) TransformFileFilter(fn string) bool {
 //
 //   - [extra] remove unnecessary Calibre metadata.
 //     Removes extraneous metadata elements commonly added by Calibre.
+//
+// Formatting is preserved where possible, and malformed documents are
+// transformed on a best-effort basis. Element matching is namespace-aware.
 func (c *Converter) TransformOPF(w io.Writer, r io.Reader) error {
-	doc := etree.NewDocument()
-	if _, err := doc.ReadFrom(r); err != nil {
-		return fmt.Errorf("parse: %w", err)
+	opf, err := io.ReadAll(r)
+	if err != nil {
+		return err
 	}
 
-	transformOPFCoverImage(doc) // mandatory
-	transformOPFCalibreMeta(doc)
-	doc.Indent(4)
-
-	if _, err := doc.WriteTo(w); err != nil {
-		return fmt.Errorf("render: %w", err)
+	// note: we need two passes since the ID references may be out-of-rder
+	type element struct {
+		depth int
+		pos   htmlstream.Pos
+	}
+	var (
+		coverID   = "cover"
+		coverMeta = -1 // cover meta depth
+		ids       = map[string]element{}
+	)
+	rd := htmlstream.NewReader(bytes.NewReader(opf))
+	rd.SetMode(htmlstream.XML)
+	for tok := range rd.All() {
+		if tok.Kind() != htmlstream.StartTag {
+			continue
+		}
+		depth := rd.Depth()
+		if isCoverMeta(tok) && (coverMeta < 0 || depth < coverMeta) {
+			coverMeta, coverID = depth, "cover"
+			if a, ok := tok.Attr("content"); ok {
+				coverID = a.Value()
+			}
+		}
+		if a, ok := tok.Attr("id"); ok {
+			if e, ok := ids[a.Value()]; !ok || depth < e.depth {
+				ids[a.Value()] = element{depth, tok.Pos()}
+			}
+		}
+	}
+	if err := rd.Err(); err != nil {
+		return err
+	}
+	cover, ok := ids[coverID]
+	if !ok {
+		cover.pos = -1
 	}
 
-	return nil
+	t := htmlstream.NewTransformer(w, bytes.NewReader(opf))
+	t.SetMode(htmlstream.XML)
+	var space indentHolder
+	for tok := range t.All() {
+		if tok.Kind() == htmlstream.StartTag {
+			if isCalibreMeta(tok) || isCalibreContributor(tok) {
+				space.Drop(t)
+				t.Remove()
+			} else if tok.Pos() == cover.pos {
+				t.SetAttr("properties", "cover-image")
+			}
+		}
+		space.Next(t)
+	}
+	return t.Close()
 }
 
-func transformOPFCoverImage(doc *etree.Document) {
-	// property based on Kobo (checked with 3 books) as of 2020-01-12
-	coverID := "cover"
-	if el := doc.FindElement("//meta[@name='cover']"); el != nil {
-		coverID = el.SelectAttrValue("content", coverID)
+type indentHolder struct {
+	hold htmlstream.Hold
+}
+
+// Next stops holding the whitespace before the current token, then holds the
+// current token if it is a whitespace-only text token.
+func (s *indentHolder) Next(t *htmlstream.Transformer) {
+	if s.hold != (htmlstream.Hold{}) {
+		t.HoldRelease(s.hold)
+		s.hold = htmlstream.Hold{}
 	}
-	if el := doc.FindElement("//[@id='" + coverID + "']"); el != nil {
-		el.CreateAttr("properties", "cover-image")
+	if tok := t.Token(); tok != nil && isBlankText(tok) {
+		s.hold = t.Hold()
 	}
 }
 
-func transformOPFCalibreMeta(doc *etree.Document) {
-	for _, el := range doc.FindElements("//meta[@name='calibre:timestamp']") {
-		el.Parent().RemoveChild(el)
+// Drop removes the whitespace before the current token.
+func (s *indentHolder) Drop(t *htmlstream.Transformer) {
+	if s.hold != (htmlstream.Hold{}) {
+		t.HoldDiscard(s.hold, nil)
+		s.hold = htmlstream.Hold{}
 	}
-	for _, el := range doc.FindElements("//contributor[@role='bkp']") {
-		el.Parent().RemoveChild(el)
-	}
+}
+
+// isBlankText returns true if tok is a text token with only whitespace. If tok
+// is split (i.e., it's too long), it always returns false.
+func isBlankText(tok *htmlstream.Token) bool {
+	return tok.Kind() == htmlstream.Text && !tok.Partial() && !tok.Continued() && ascii.IsBlank(tok.Raw())
 }
 
 // TransformContent transforms an HTML4/HTML5/XHTML1.1 document for a KEPUB.
