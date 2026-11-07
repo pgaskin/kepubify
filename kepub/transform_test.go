@@ -13,6 +13,9 @@ import (
 	"testing/fstest"
 	"testing/iotest"
 
+	xunicode "golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/encoding/unicode/utf32"
+
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 )
 
@@ -646,6 +649,49 @@ func TestTransformOPF(t *testing.T) {
 			in:   `<package xmlns="http://www.idpf.org/2007/opf"><metadata><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">A & B</dc:title><meta name="calibre:timestamp"/></metadata><manifest><item id="cover"/></manifest></package>`,
 			out:  `<package xmlns="http://www.idpf.org/2007/opf"><metadata><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">A & B</dc:title></metadata><manifest><item id="cover" properties="cover-image"/></manifest></package>`,
 		},
+		{
+			name: "utf-16le with bom",
+			in:   "\xff\xfe" + must(xunicode.UTF16(xunicode.LittleEndian, xunicode.IgnoreBOM).NewEncoder().String(`<?xml version="1.0" encoding="UTF-16"?><package xmlns="http://www.idpf.org/2007/opf"><metadata><meta name="cover" content="é"/></metadata><manifest><item id="é"/></manifest></package>`)),
+			out:  `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf"><metadata><meta name="cover" content="é"/></metadata><manifest><item id="é" properties="cover-image"/></manifest></package>`,
+		},
+		{
+			name: "utf-16be without bom or encoding",
+			in:   must(xunicode.UTF16(xunicode.BigEndian, xunicode.IgnoreBOM).NewEncoder().String(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover"/></manifest></package>`)),
+			out:  `<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="cover-image"/></manifest></package>`,
+		},
+		{
+			name: "utf-32le with bom",
+			in:   "\xff\xfe\x00\x00" + must(utf32.UTF32(utf32.LittleEndian, utf32.IgnoreBOM).NewEncoder().String(`<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover"/></manifest></package>`)),
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="cover-image"/></manifest></package>`,
+		},
+		{
+			name: "iso-8859-1",
+			in:   "<?xml version='1.0' encoding='ISO-8859-1' standalone='yes'?>\n<package xmlns=\"http://www.idpf.org/2007/opf\"><metadata><dc:title xmlns:dc=\"http://purl.org/dc/elements/1.1/\">Caf\xe9</dc:title></metadata></package>",
+			out:  "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<package xmlns=\"http://www.idpf.org/2007/opf\"><metadata><dc:title xmlns:dc=\"http://purl.org/dc/elements/1.1/\">Café</dc:title></metadata></package>",
+		},
+		{
+			name: "xml decl without version or quotes",
+			in:   "<?xml encoding=latin1?><package xmlns=\"http://www.idpf.org/2007/opf\">\xe9</package>",
+			out:  `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf">é</package>`,
+		},
+		{
+			name: "keep utf-8 bom and declaration",
+			in:   "\xef\xbb\xbf<?xml version='1.0' encoding='utf-8'?><package xmlns=\"http://www.idpf.org/2007/opf\">é</package>",
+		},
+		{
+			// note: browsers do this too
+			name: "utf-16 declared without utf-16 bytes",
+			in:   `<?xml version="1.0" encoding="UTF-16"?><package xmlns="http://www.idpf.org/2007/opf">é</package>`,
+			out:  `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf">é</package>`,
+		},
+		{
+			name: "unknown encoding",
+			in:   "<?xml version=\"1.0\" encoding=\"x-unknown\"?><package xmlns=\"http://www.idpf.org/2007/opf\">\xe9</package>",
+		},
+		{
+			name: "replacement encoding",
+			in:   "<?xml version=\"1.0\" encoding=\"ISO-2022-KR\"?><package xmlns=\"http://www.idpf.org/2007/opf\">x</package>",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			want := tc.out
@@ -657,6 +703,13 @@ func TestTransformOPF(t *testing.T) {
 			}
 		})
 	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 func transformOPF(t *testing.T, in string) string {

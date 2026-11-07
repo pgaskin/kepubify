@@ -2,6 +2,7 @@ package kepub
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"mime"
 	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -19,6 +21,10 @@ import (
 	"github.com/pgaskin/htmlstream"
 	"github.com/pgaskin/htmlstream/ascii"
 	"github.com/pgaskin/htmlstream/polyglot"
+	"github.com/pgaskin/htmlstream/xmlutil"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/htmlindex"
+	"golang.org/x/text/encoding/unicode/utf32"
 	"golang.org/x/text/transform"
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
@@ -76,10 +82,14 @@ var (
 //     Removes extraneous metadata elements commonly added by Calibre.
 //
 // Formatting is preserved where possible, and malformed documents are
-// transformed on a best-effort basis. Element matching is namespace-aware.
+// transformed on a best-effort basis. Element matching is namespace-aware. The
+// output document is in UTF-8 if possible.
 func (c *Converter) TransformOPF(w io.Writer, r io.Reader) error {
 	opf, err := io.ReadAll(r)
 	if err != nil {
+		return err
+	}
+	if opf, err = transformOPFUTF8(opf); err != nil {
 		return err
 	}
 
@@ -135,6 +145,53 @@ func (c *Converter) TransformOPF(w io.Writer, r io.Reader) error {
 		space.Next(t, nil)
 	}
 	return t.Close()
+}
+
+// transformOPFUTF8 converts opf to UTF-8, detecting the encoding, and updating
+// the declaration. Documents in unknown or unsupported encodings are returned
+// unchanged (if they're ascii-compatible, they should transform fine in most
+// cases).
+func transformOPFUTF8(opf []byte) ([]byte, error) {
+	e := xmlutil.DetectEncoding(opf)
+	var enc encoding.Encoding
+	switch e.Name {
+	case "":
+		return opf, nil // unknown
+	case "UTF-8":
+		// no conversion needed (and keep BOM)
+		// TODO: should we remove the BOM?
+	case "UTF-32BE":
+		enc = utf32.UTF32(utf32.BigEndian, utf32.IgnoreBOM)
+	case "UTF-32LE":
+		enc = utf32.UTF32(utf32.LittleEndian, utf32.IgnoreBOM)
+	default:
+		var err error
+		if enc, err = htmlindex.Get(e.Name); err != nil || enc == encoding.Replacement {
+			return opf, nil // unsupported
+		}
+	}
+	start := e.BOM
+	if enc != nil {
+		b, err := enc.NewDecoder().Bytes(opf[e.BOM:])
+		if err != nil {
+			return nil, fmt.Errorf("decode %s: %w", e.Name, err)
+		}
+		opf, start = b, 0
+	}
+	if e.Declared != "" {
+		var name string
+		if denc, err := htmlindex.Get(e.Declared); err == nil {
+			name, _ = htmlindex.Name(denc)
+		}
+		if name != "utf-8" {
+			if d, n, err := xmlutil.ParseDecl(opf[start:]); err != xmlutil.ErrNoDecl && n != 0 {
+				d.Version = cmp.Or(d.Version, "1.0")
+				d.Encoding = "UTF-8"
+				opf = slices.Concat(opf[:start], xmlutil.AppendDecl(nil, d), opf[start+n:])
+			}
+		}
+	}
+	return opf, nil
 }
 
 type indentHolder struct {
