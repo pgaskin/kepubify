@@ -1,7 +1,5 @@
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
-github.com/kr/smartypants v0.1.0 h1:Sn8hn5XrY+uXrxSWUdcr621Gfpk11mOGGVs4XX06kEw=
-github.com/kr/smartypants v0.1.0/go.mod h1:EcTX9ge+SWNaGwbQvHwNICsMGavh98FLUqyOWFr+j9c=
 github.com/pgaskin/htmlstream v0.0.4-0.20261102213320-2dcec3a2a421 h1:5OFJhkm9YbXZh07KI1uF3feNW9n/BG2BA7M/xPOzbKU=
 github.com/pgaskin/htmlstream v0.0.4-0.20261102213320-2dcec3a2a421/go.mod h1:jmLge4/tS3KmlKDp90/QHuGdRbfC5O1K8mGYz0FNauU=
 github.com/pgaskin/kepubify/_/html v0.0.0-20211223234002-6ee2cc632cdc h1:mJk4TIXTO+JmxgHJ5iyil42PLQJWkyaKB/qNcjJU6h4=

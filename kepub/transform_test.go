@@ -336,6 +336,14 @@ func TestTransformContentParts(t *testing.T) {
 			In:       `<p>&amp;&quot;&lt;&gt;&quot;</p><pre>&quot;</pre>`,
 			Out:      `<p>&amp;“&lt;&gt;”</p><pre>&#34;</pre>`,
 		}.Run(t)
+
+		transformContentCase{
+			Func:     transformContentPunctuation,
+			What:     "keep single backticks",
+			Fragment: true,
+			In:       "<p>``double'' and `single`</p>",
+			Out:      "<p>“double” and `single`</p>",
+		}.Run(t)
 	})
 
 	t.Run("CleanHTML", func(t *testing.T) {

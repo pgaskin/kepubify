@@ -17,7 +17,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/kr/smartypants"
 	"github.com/pgaskin/htmlstream"
 	"github.com/pgaskin/htmlstream/ascii"
 	"github.com/pgaskin/htmlstream/polyglot"
@@ -720,15 +719,8 @@ func transformContentPunctuation(doc *html.Node) {
 			}
 		case html.TextNode:
 			if !isSpace(cur.Data) {
-				buf := bytes.NewBuffer(nil)
-				if _, err := smartypants.New(buf, smartypants.LatexDashes).Write([]byte(cur.Data)); err != nil {
-					panic(err) // smartypants should never error on its own
-				}
-				// (*smartypants.writer).write calls smartypants.attrEscape on
-				// the passed data (which has been unescaped by the parser),
-				// which escapes the HTML entities, so we need to unescape it
-				// after it has been processed.
-				cur.Data = html.UnescapeString(buf.String())
+				var sp smartypants
+				cur.Data = string(sp.Convert(nil, []byte(cur.Data), true))
 			}
 		}
 	}
