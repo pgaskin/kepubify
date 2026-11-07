@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"iter"
 	"mime"
 	"path"
 	"strconv"
@@ -24,14 +25,13 @@ import (
 
 // TransformFileFilter returns true if a file should be filtered from the EPUB.
 //
-//  * [extra] remove calibre_bookmarks.txt
+//   - [extra] remove calibre_bookmarks.txt
 //
-//  * [extra] remove iBooks metadata
+//   - [extra] remove iBooks metadata
 //
-//  * [extra] remove macOS metadata
+//   - [extra] remove macOS metadata
 //
-//  * [extra] remove Windows metadata
-//
+//   - [extra] remove Windows metadata
 func (c *Converter) TransformFileFilter(fn string) bool {
 	switch path.Base(fn) {
 	case "calibre_bookmarks.txt": // Calibre
@@ -52,16 +52,15 @@ func (c *Converter) TransformFileFilter(fn string) bool {
 
 // TransformOPF transforms the OPF document for a KEPUB.
 //
-//  * [mandatory] add the cover-image property to the cover.
-//    Kobo only supports the standardized EPUB3-style method of specifying the
-//    cover (`manifest>item[properties="cover-image"]`), but most older EPUBs
-//    will reference the manifest item with a meta element like
-//    `meta[name="cover"][content="{manifest-item-id}"]`. or just set the
-//    manifest item ID to `cover` instead of using `properties`.
+//   - [mandatory] add the cover-image property to the cover.
+//     Kobo only supports the standardized EPUB3-style method of specifying the
+//     cover (`manifest>item[properties="cover-image"]`), but most older EPUBs
+//     will reference the manifest item with a meta element like
+//     `meta[name="cover"][content="{manifest-item-id}"]`. or just set the
+//     manifest item ID to `cover` instead of using `properties`.
 //
-//  * [extra] remove unnecessary Calibre metadata.
-//    Removes extraneous metadata elements commonly added by Calibre.
-//
+//   - [extra] remove unnecessary Calibre metadata.
+//     Removes extraneous metadata elements commonly added by Calibre.
 func (c *Converter) TransformOPF(w io.Writer, r io.Reader) error {
 	doc := etree.NewDocument()
 	if _, err := doc.ReadFrom(r); err != nil {
@@ -309,19 +308,15 @@ func transformContentKoboSpans(doc *html.Node) {
 	var cur *html.Node
 	stack = append(stack, findAtom(doc, atom.Body))
 
-	sentences := make([]string, 0, 8)
-
 	for len(stack) != 0 {
 		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
 		switch cur.Type {
 		case html.TextNode:
-			sentences = splitSentences(cur.Data, sentences[:0])
-
 			// wrap each sentence in a span (don't wrap whitespace unless it is
 			// directly under a P tag [TODO: are there any other cases we wrap
 			// whitespace? ... I need to find a kepub like this]) and add it
 			// back to the parent.
-			for _, sentence := range sentences {
+			for sentence := range splitSentencesSeq(cur.Data) {
 				if isSpace(sentence) && cur.Parent.DataAtom != atom.P {
 					cur.Parent.InsertBefore(&html.Node{
 						Type: html.TextNode,
@@ -384,7 +379,7 @@ func transformContentKoboSpans(doc *html.Node) {
 	}
 }
 
-// splitSentences splits the string into sentences using the rules for creating
+// splitSentencesSeq iterates over sentences in str using the rules for creating
 // koboSpans. To make this zero-allocation, pass a zero-length slice for
 // splitSentences to take ownership of. To re-use the slice, pass the returned
 // slice, sliced to zero. If the slice is too small, it will be grown, causing
@@ -394,7 +389,7 @@ func transformContentKoboSpans(doc *html.Node) {
 // regexp-based one on average, and even faster when pre-allocating and re-using
 // the sentences slice. It should have the same output. For the original
 // implementation, see splitSentencesRegexp in the tests.
-func splitSentences(str string, sentences []string) []string {
+func splitSentencesSeq(str string) iter.Seq[string] {
 	const (
 		InputPunct   = iota // sentence-terminating punctuation
 		InputExtra          // additional punctuation (one is optionionally consumed after punct if present)
@@ -414,126 +409,126 @@ func splitSentences(str string, sentences []string) []string {
 		StateAfterPunctExtra        // after the optional additional punctuation rune
 		StateAfterSpace             // the trailing whitespace after the sentence
 	)
+	return func(yield func(string) bool) {
+		var emitted bool
+		for i, state := 0, 0; state != -1; {
+			x, z := utf8.DecodeRuneInString(str[i:])
 
-	if sentences == nil {
-		sentences = make([]string, 0, 4) // pre-allocate some room
+			var input int
+			switch x {
+			case utf8.RuneError:
+				switch z {
+				case 0:
+					input = InputEOS
+				default:
+					input = InputInvalid
+				}
+			case '.', '!', '?':
+				input = InputPunct
+			case '\'', '"', '”', '’', '“', '…':
+				input = InputExtra
+			case '\t', '\n', '\f', '\r', ' ': // \s only matches only ASCII whitespace
+				input = InputSpace
+			default:
+				input = InputAny
+			}
+
+			var output int
+			switch state {
+			case StateDefault:
+				switch input {
+				case InputPunct:
+					output, state = OutputNone, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNone, StateDefault
+				case InputSpace:
+					output, state = OutputNone, StateDefault
+				case InputAny:
+					output, state = OutputNone, StateDefault
+				case InputInvalid:
+					output, state = OutputNone, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			case StateAfterPunct:
+				switch input {
+				case InputPunct:
+					output, state = OutputNone, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNone, StateAfterPunctExtra
+				case InputSpace:
+					output, state = OutputNone, StateAfterSpace
+				case InputAny:
+					output, state = OutputNone, StateDefault
+				case InputInvalid:
+					output, state = OutputNone, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			case StateAfterPunctExtra:
+				switch input {
+				case InputPunct:
+					output, state = OutputNone, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNone, StateDefault
+				case InputSpace:
+					output, state = OutputNone, StateAfterSpace
+				case InputAny:
+					output, state = OutputNone, StateDefault
+				case InputInvalid:
+					output, state = OutputNone, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			case StateAfterSpace:
+				switch input {
+				case InputPunct:
+					output, state = OutputNext, StateAfterPunct
+				case InputExtra:
+					output, state = OutputNext, StateDefault
+				case InputSpace:
+					output, state = OutputNone, StateAfterSpace
+				case InputAny:
+					output, state = OutputNext, StateDefault
+				case InputInvalid:
+					output, state = OutputNext, StateDefault
+				case InputEOS:
+					output, state = OutputRest, -1
+				default:
+					panic("unhandled input")
+				}
+			default:
+				panic("unhandled state")
+			}
+
+			switch output {
+			case OutputNone:
+				i += z
+			case OutputNext:
+				if emitted = true; !yield(str[:i]) {
+					return
+				}
+				str, i = str[i:], z
+			case OutputRest:
+				if len(str) != 0 || !emitted {
+					if !yield(str) {
+						return
+					}
+				}
+				if state != -1 {
+					panic("invalid state")
+				}
+			default:
+				panic("unhandled output")
+			}
+		}
 	}
-
-	for i, state := 0, 0; state != -1; {
-		x, z := utf8.DecodeRuneInString(str[i:])
-
-		var input int
-		switch x {
-		case utf8.RuneError:
-			switch z {
-			case 0:
-				input = InputEOS
-			default:
-				input = InputInvalid
-			}
-		case '.', '!', '?':
-			input = InputPunct
-		case '\'', '"', '”', '’', '“', '…':
-			input = InputExtra
-		case '\t', '\n', '\f', '\r', ' ': // \s only matches only ASCII whitespace
-			input = InputSpace
-		default:
-			input = InputAny
-		}
-
-		var output int
-		switch state {
-		case StateDefault:
-			switch input {
-			case InputPunct:
-				output, state = OutputNone, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNone, StateDefault
-			case InputSpace:
-				output, state = OutputNone, StateDefault
-			case InputAny:
-				output, state = OutputNone, StateDefault
-			case InputInvalid:
-				output, state = OutputNone, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		case StateAfterPunct:
-			switch input {
-			case InputPunct:
-				output, state = OutputNone, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNone, StateAfterPunctExtra
-			case InputSpace:
-				output, state = OutputNone, StateAfterSpace
-			case InputAny:
-				output, state = OutputNone, StateDefault
-			case InputInvalid:
-				output, state = OutputNone, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		case StateAfterPunctExtra:
-			switch input {
-			case InputPunct:
-				output, state = OutputNone, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNone, StateDefault
-			case InputSpace:
-				output, state = OutputNone, StateAfterSpace
-			case InputAny:
-				output, state = OutputNone, StateDefault
-			case InputInvalid:
-				output, state = OutputNone, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		case StateAfterSpace:
-			switch input {
-			case InputPunct:
-				output, state = OutputNext, StateAfterPunct
-			case InputExtra:
-				output, state = OutputNext, StateDefault
-			case InputSpace:
-				output, state = OutputNone, StateAfterSpace
-			case InputAny:
-				output, state = OutputNext, StateDefault
-			case InputInvalid:
-				output, state = OutputNext, StateDefault
-			case InputEOS:
-				output, state = OutputRest, -1
-			default:
-				panic("unhandled input")
-			}
-		default:
-			panic("unhandled state")
-		}
-
-		switch output {
-		case OutputNone:
-			i += z
-		case OutputNext:
-			sentences = append(sentences, str[:i])
-			str, i = str[i:], z
-		case OutputRest:
-			if len(str) != 0 || len(sentences) == 0 {
-				sentences = append(sentences, str)
-			}
-			if state != -1 {
-				panic("invalid state")
-			}
-		default:
-			panic("unhandled output")
-		}
-	}
-
-	return sentences
 }
 
 func koboSpan(para, seg int) *html.Node {
