@@ -403,12 +403,14 @@ const (
 // preserved where possible, and malformed documents are transformed on a
 // best-effort basis. Element matching is namespace-aware.
 //
-// If detectCover is true, the dummy titlepage shows the cover image if one is
-// found (see transformDummyTitlepageCover) instead of being blank.
-func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, force *bool, detectCover bool) (string, io.Reader, bool, error) {
-	switch {
+// The options used are DummyTitlepage, DetectCover (if true, the dummy
+// titlepage shows the cover image if one is found, see
+// transformDummyTitlepageCover, instead of being blank), and Charset (for
+// reading the first content document).
+func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, opt Options) (string, io.Reader, bool, error) {
+	switch force := opt.DummyTitlepage; {
 	case force == nil:
-		if req, err := transformDummyTitlepageRequired(epub, opfF, opf.Bytes()); err != nil {
+		if req, err := transformDummyTitlepageRequired(epub, opfF, opf.Bytes(), opt.Charset); err != nil {
 			return "", nil, false, fmt.Errorf("check if dummy titlepage is required: %w", err)
 		} else if !req {
 			return "", nil, false, nil
@@ -421,7 +423,7 @@ func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, force *
 		return "", nil, true, fmt.Errorf("apply title page fix: %w", err)
 	}
 	page := dummyTitlepage
-	if detectCover {
+	if opt.DetectCover {
 		if cover := transformDummyTitlepageCover(epub, opfF, opf.Bytes()); cover != "" {
 			page = dummyTitlepageWithCover(relativeHref(path.Dir(opfF), cover))
 		}
@@ -539,7 +541,7 @@ func relativeHref(dir, name string) string {
 	return (&url.URL{Path: rel}).EscapedPath()
 }
 
-func transformDummyTitlepageRequired(epub fs.FS, opfF string, opf []byte) (bool, error) {
+func transformDummyTitlepageRequired(epub fs.FS, opfF string, opf []byte, charset string) (bool, error) {
 	type item struct {
 		id   string
 		href string
@@ -627,7 +629,11 @@ func transformDummyTitlepageRequired(epub fs.FS, opfF string, opf []byte) (bool,
 		return false, nil // a missing file
 	}
 	defer f.Close()
-	x, err := isTitlepage(f)
+	r, err := transformContentCharset(f, charset)
+	if err != nil {
+		return false, err
+	}
+	x, err := isTitlepage(r)
 	if err != nil {
 		return false, nil // if unparseable, assume it's a titlepage
 	}

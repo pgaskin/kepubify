@@ -1375,9 +1375,31 @@ func TestTransformDummyTitlepageParts(t *testing.T) {
 			added:   true,
 		},
 		{
-			name:    "UTF-16 content document",
+			name:    "UTF-16 content document read as UTF-8",
 			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
 			content: map[string]string{"text.xhtml": "\xff\xfe<\x00h\x00t\x00m\x00l\x00>\x00"},
+			charset: "utf-8",
+		},
+		{
+			name:    "UTF-16 content document with charset detection",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": "\xff\xfe" + must(xunicode.UTF16(xunicode.LittleEndian, xunicode.IgnoreBOM).NewEncoder().String(words["text.xhtml"]))},
+			charset: "auto",
+			added:   true,
+		},
+		{
+			name:    "UTF-16 content document with a charset",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": must(xunicode.UTF16(xunicode.BigEndian, xunicode.IgnoreBOM).NewEncoder().String(words["text.xhtml"]))},
+			charset: "utf-16be",
+			added:   true,
+		},
+		{
+			name:    "invalid charset",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: words,
+			charset: "nonexistent",
+			err:     true,
 		},
 	} {
 		tc.run(t)
@@ -1397,6 +1419,8 @@ type titlepageTest struct {
 
 	detectCover bool
 	cover       string // expected cover image src (if not empty)
+
+	charset string
 }
 
 const titlepageOPF = "OEBPS/content.opf"
@@ -1421,7 +1445,7 @@ func (tc titlepageTest) run(t *testing.T) {
 			epub[path.Join(path.Dir(titlepageOPF), name)] = &fstest.MapFile{Data: []byte(s)}
 		}
 		buf := bytes.NewBufferString(opf)
-		name, r, added, err := transformDummyTitlepage(epub, titlepageOPF, buf, tc.force, tc.detectCover)
+		name, r, added, err := transformDummyTitlepage(epub, titlepageOPF, buf, Options{DummyTitlepage: tc.force, DetectCover: tc.detectCover, Charset: tc.charset})
 		if tc.err != (err != nil) {
 			t.Errorf("error %v, want error %v", err, tc.err)
 		}
