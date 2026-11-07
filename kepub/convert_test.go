@@ -1223,3 +1223,27 @@ func stringFor(s string, start int, end int, fn func(s string, i int) string) st
 	}
 	return b.String()
 }
+
+func TestTransformFileFilter(t *testing.T) {
+	for _, tc := range []struct {
+		fn   string
+		want bool
+	}{
+		{"META-INF/calibre_bookmarks.txt", true},
+		{"iTunesMetadata.plist", true},
+		{"iTunesArtwork.plist", true},
+		{".DS_STORE", true},
+		{"__MACOSX/test.txt", true},
+		{"thumbs.db", true},
+		{"OEBPS/Thumbs.db", true},
+		{"OEBPS/.DS_Store", true},
+		{"__MACOSX/OEBPS/._text.xhtml", true},
+		{"OEBPS/__MACOSX/x", false},
+		{"OEBPS/text.xhtml", false},
+		{"mimetype", false},
+	} {
+		if got := transformFileFilter(tc.fn); got != tc.want {
+			t.Errorf("%q: got %v, want %v", tc.fn, got, tc.want)
+		}
+	}
+}

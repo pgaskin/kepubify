@@ -616,3 +616,18 @@ func zipCopyFS(z *zip.Writer, f *zip.FileHeader, fs fs.FS) error {
 	_, err = io.Copy(w, rc)
 	return err
 }
+
+// transformFileFilter returns true if a file should be filtered from the EPUB.
+func transformFileFilter(fn string) bool {
+	switch path.Base(fn) {
+	case "calibre_bookmarks.txt": // Calibre
+		return true
+	case "iTunesMetadata.plist", "iTunesArtwork.plist": // iBooks
+		return true
+	case ".DS_Store", ".DS_STORE": // macOS
+		return true
+	case "thumbs.db", "Thumbs.db": // Windows
+		return true
+	}
+	return strings.HasPrefix(fn, "__MACOSX/") // macOS archivers
+}

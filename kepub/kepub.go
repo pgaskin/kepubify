@@ -1,7 +1,9 @@
 // Package kepub converts EPUBs to KEPUBs.
 package kepub
 
-import "errors"
+import (
+	"errors"
+)
 
 // ErrAlreadyKepub is returned by [Convert] when the input is already a KEPUB
 // and [Options.ReprocessKepub] is not set. It is returned before anything is
@@ -81,39 +83,6 @@ type Replacement struct {
 	Find    string
 	Replace string
 }
-
-const cssHyphenate = `* {
-    -webkit-hyphens: auto;
-    -moz-hyphens: auto;
-    hyphens: auto;
-
-    -webkit-hyphenate-limit-after: 3;
-    -webkit-hyphenate-limit-before: 3;
-    -webkit-hyphenate-limit-lines: 2;
-}
-
-h1, h2, h3, h4, h5, h6, td,
-h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, td * {
-    -moz-hyphens: none !important;
-    -webkit-hyphens: none !important;
-    hyphens: none !important;
-}`
-
-const cssNoHyphenate = `* {
-    -moz-hyphens: none !important;
-    -webkit-hyphens: none !important;
-    hyphens: none !important;
-}`
-
-const cssFullScreenFixes = `body {
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-body>div {
-    padding-left: 0.2em !important;
-    padding-right: 0.2em !important;
-}`
 
 func (opt Options) progress() func(pct float64, force bool) {
 	if opt.Progress == nil {
