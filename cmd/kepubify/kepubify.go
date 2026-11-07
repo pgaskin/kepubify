@@ -35,12 +35,13 @@ func main() {
 
 	update := pflag.BoolP("update", "u", false, "Don't reconvert files which have already been converted (i.e. don't overwrite output files)")
 	inplace := pflag.BoolP("inplace", "i", false, "Don't add the _converted suffix to converted files and directories")
+	preserveattrs := pflag.BoolP("preserve-attrs", "p", false, "Preserve the modification times and permissions of the input files on the output files (failing if chmod/chtimes fails)")
 	nopreservedirs := pflag.Bool("no-preserve-dirs", false, "Flatten the directory structure of the input (an error will be shown if there are conflicts)")
 	output := pflag.StringP("output", "o", "", "[>1 inputs || 1 file input with existing dir output]: Directory to place converted files/dirs under; [1 file input with nonexistent output]: Output filename; [1 dir input]: Output directory for contents of input (default: current directory)")
 	calibre := pflag.Bool("calibre", false, "Use .kepub instead of .kepub.epub as the output extension (for Calibre compatibility, only use if you know what you are doing)")
 	copy := pflag.StringSliceP("copy", "x", nil, "Copy files with the specified extension (with a leading period) to the output unchanged (no effect if the filename ends up the same)")
 
-	for _, flag := range []string{"update", "inplace", "no-preserve-dirs", "output", "calibre", "copy"} {
+	for _, flag := range []string{"update", "inplace", "preserve-attrs", "no-preserve-dirs", "output", "calibre", "copy"} {
 		pflag.CommandLine.SetAnnotation(flag, "category", []string{"2.Output Options"})
 	}
 
@@ -249,6 +250,14 @@ func main() {
 							log(true, "          Error (%d): %v\n", i, err)
 							continue
 						}
+						if *preserveattrs {
+							if err := copyAttrs(input, output); err != nil {
+								errs.Store(input, err)
+								atomic.AddInt64(&errored, 1)
+								log(true, "          Error (%d): %v\n", i, err)
+								continue
+							}
+						}
 						atomic.AddInt64(&copied, 1)
 					default:
 						if !*verbose {
@@ -291,6 +300,12 @@ func main() {
 
 							if err := fo.Close(); err != nil {
 								return err
+							}
+
+							if *preserveattrs {
+								if err := copyAttrs(input, fo.Name()); err != nil {
+									return err
+								}
 							}
 
 							if err := os.Rename(fo.Name(), output); err != nil {
@@ -416,6 +431,18 @@ func exit(status int) {
 		time.Sleep(time.Second * 2)
 	}
 	os.Exit(status)
+}
+
+// copyAttrs sets the permissions and modification time of dst to those of src.
+func copyAttrs(src, dst string) error {
+	fi, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if err := os.Chmod(dst, fi.Mode().Perm()); err != nil {
+		return err
+	}
+	return os.Chtimes(dst, time.Time{}, fi.ModTime())
 }
 
 func copyFile(src, dst string) error {
