@@ -814,10 +814,15 @@ func convert(w io.Writer, r io.Reader, popt polyglot.Options) (err error) {
 	return nil // the deferred Close ends the document and sets the error
 }
 
-// filter filters content document tokens, skipping adept meta elements, and
-// whitespace/comment-only o:p/st1:* elements.
+// filter filters content document tokens, skipping adept meta elements,
+// whitespace/comment-only o:p/st1:* elements, and the style elements added by
+// Kobo or a previous conversion (which are added again by kobo).
 type filter struct {
 	pw *polyglot.Writer
+
+	// skipped style element
+	skipping bool
+	skipPos  htmlstream.Pos // of its start tag
 
 	// held empty o:p, st1:*, or Adept meta element
 	held    htmlstream.TokenBuffer
@@ -828,6 +833,12 @@ type filter struct {
 }
 
 func (f *filter) Filter(tok *htmlstream.Token) error {
+	if f.skipping {
+		if tok.Kind() == htmlstream.EndTag && tok.StartPos() == f.skipPos {
+			f.skipping = false
+		}
+		return nil
+	}
 	if f.holding {
 		switch kind := tok.Kind(); {
 		case kind == htmlstream.EndTag && tok.StartPos() == f.holdPos:
@@ -858,6 +869,11 @@ func (f *filter) Filter(tok *htmlstream.Token) error {
 			f.holding, f.holdPos = true, tok.Pos()
 			f.held.Append(tok)
 			return nil
+		case isKoboStyle(tok):
+			if tok.Opens() {
+				f.skipping, f.skipPos = true, tok.Pos()
+			}
+			return nil
 		}
 	}
 	return f.pw.WriteToken(tok)
@@ -872,6 +888,21 @@ func (f *filter) isSpace(tok *htmlstream.Token) bool {
 var isAdeptMeta = htmlstream.Tag("meta", htmlstream.Or(
 	htmlstream.AttrEquals("name", "Adept.expected.resource"),
 	htmlstream.AttrEquals("name", "Adept.resource"),
+))
+
+// isKoboStyle matches the style elements added by Kobo (kobostylehacks by id)
+// or kepubify (kobostylehacks or kepubify-* by class), see newKobo.
+var isKoboStyle = htmlstream.Tag("style", htmlstream.Or(
+	htmlstream.AttrEquals("id", "kobostylehacks"),
+	htmlstream.HasClass("kobostylehacks"),
+	htmlstream.AttrFunc("class", func(v []byte) bool {
+		for _, class := range bytes.Fields(v) {
+			if bytes.HasPrefix(class, []byte("kepubify-")) {
+				return true
+			}
+		}
+		return false
+	}),
 ))
 
 func isMSOTag(tok *htmlstream.Token) bool {

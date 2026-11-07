@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,12 +16,19 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pgaskin/htmlstream"
+	"github.com/pgaskin/htmlstream/polyglot"
 	"golang.org/x/sync/errgroup"
 )
 
 // Convert converts the EPUB root r into a new EPUB written to w. If r is a
 // [zip.Reader], the original zip metadata and unmodified compressed data are
 // preserved where possible.
+//
+// If the EPUB is already a KEPUB (i.e., the body of a content document contains
+// an element with the koboSpan class and a kobo.N.M id), [ErrAlreadyKepub] is
+// returned before anything is written to w unless [Options.ReprocessKepub] is
+// set.
 //
 // Some files are filtered from the EPUB:
 //
@@ -116,6 +124,14 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 	cd, err := epubContentDocuments(r, opf)
 	if err != nil {
 		return fmt.Errorf("read source EPUB: %w", err)
+	}
+
+	if !opt.ReprocessKepub {
+		if kepub, err := epubIsKepub(r, cd); err != nil {
+			return fmt.Errorf("read source EPUB: %w", err)
+		} else if kepub {
+			return ErrAlreadyKepub
+		}
 	}
 
 	// mark the opf to be transformed
@@ -434,6 +450,101 @@ func epubContentDocuments(epub fs.FS, pkg string) ([]string, error) {
 	}
 
 	return docs, nil
+}
+
+// epubIsKepub reports whether any of the content documents cd contain a Kobo
+// span (see hasKoboSpan). Content documents which can't be opened are ignored
+// like in Convert.
+func epubIsKepub(epub fs.FS, cd []string) (bool, error) {
+	for _, fn := range cd {
+		f, err := epub.Open(fn)
+		if err != nil {
+			continue
+		}
+
+		// cheap check first so most EPUBs don't need to be parsed
+		found, err := readerContains(f, []byte("koboSpan"))
+		f.Close()
+		if err != nil {
+			return false, fmt.Errorf("read %q: %w", fn, err)
+		}
+		if !found {
+			continue
+		}
+
+		// the string could be in a comment, style, script, or text
+		f, err = epub.Open(fn)
+		if err != nil {
+			continue
+		}
+		found, err = hasKoboSpan(f)
+		f.Close()
+		if err != nil {
+			return false, fmt.Errorf("parse %q: %w", fn, err)
+		}
+		if found {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func hasKoboSpan(r io.Reader) (bool, error) {
+	var errFound = errors.New("found") // sentinel error so we can stop reading
+
+	var body bool
+	err := convert(io.Discard, r, polyglot.Options{
+		OnTag: func(e *polyglot.Tag) {
+			switch {
+			case e.NS == htmlstream.NamespaceXHTML && e.Local == "body":
+				body = e.Start
+			case body && e.Start && e.Token != nil && isKoboSpan(e.Token) && isKoboSpanID(attrValue(e.Token, "id")):
+				e.Writer().Fail(errFound)
+			}
+		},
+	})
+	if errors.Is(err, errFound) {
+		return true, nil
+	}
+	return false, err
+}
+
+func isKoboSpanID(id string) bool {
+	rest, ok := strings.CutPrefix(id, "kobo.")
+	if !ok {
+		return false
+	}
+	para, seg, ok := strings.Cut(rest, ".")
+	return ok && isDigits(para) && isDigits(seg)
+}
+
+func isDigits(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return len(s) != 0
+}
+
+func readerContains(r io.Reader, needle []byte) (bool, error) {
+	buf := make([]byte, 32*1024)
+	keep := 0 // bytes kept from the previous chunk so a match across chunks is found
+	for {
+		n, err := r.Read(buf[keep:])
+		end := keep + n
+		if bytes.Contains(buf[:end], needle) {
+			return true, nil
+		}
+		if err == io.EOF {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		keep = min(len(needle)-1, end)
+		copy(buf, buf[end-keep:end])
+	}
 }
 
 // zipReplace copies a file from one zip archive to another, preserving the

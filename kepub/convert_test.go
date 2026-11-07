@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"image"
@@ -22,6 +23,7 @@ import (
 	"sync"
 	"testing"
 	"testing/fstest"
+	"testing/iotest"
 	"time"
 )
 
@@ -473,6 +475,172 @@ func TestConvertWarnProgress(t *testing.T) {
 		if d := pcts[i] - pcts[i-1]; d < .01 {
 			t.Errorf("progress %v: step %d is %v", pcts, i, d)
 		}
+	}
+}
+
+func TestReprocessKepub(t *testing.T) {
+	kepub := bytes.NewBuffer(nil)
+	if err := Convert(context.Background(), kepub, testEPUB, Options{}); err != nil {
+		t.Fatalf("convert: unexpected error: %v", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(kepub.Bytes()), int64(kepub.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := bytes.NewBuffer(nil)
+	if err := Convert(context.Background(), out, zr, Options{}); !errors.Is(err, ErrAlreadyKepub) {
+		t.Errorf("convert kepub: expected ErrAlreadyKepub, got %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("convert kepub: expected nothing to be written, got %d bytes", out.Len())
+	}
+
+	out.Reset()
+	if err := Convert(context.Background(), out, zr, Options{ReprocessKepub: true}); err != nil {
+		t.Fatalf("reprocess kepub: unexpected error: %v", err)
+	}
+	zr2, err := zip.NewReader(bytes.NewReader(out.Bytes()), int64(out.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range zr.File {
+		if !strings.HasSuffix(f.Name, ".xhtml") && !strings.HasSuffix(f.Name, ".opf") {
+			continue
+		}
+		a, err := fs.ReadFile(zr, f.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := fs.ReadFile(zr2, f.Name)
+		if err != nil {
+			t.Errorf("reprocess kepub: %s: %v", f.Name, err)
+			continue
+		}
+		if !bytes.Equal(a, b) {
+			t.Errorf("reprocess kepub: %s: expected identical output\n--- first ---\n%s\n--- second ---\n%s", f.Name, a, b)
+		}
+	}
+
+	ConvertTestCase{
+		What:    "kepub with ReprocessKepub",
+		EPUB:    zr,
+		Options: Options{ReprocessKepub: true},
+		Checks: []ShouldFunc{
+			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
+			AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
+			AllDocumentsShould(func(doc string) error {
+				if strings.Contains(doc, `<span class="koboSpan" id="kobo.1.1"><span class="koboSpan"`) {
+					return fmt.Errorf("spans were nested")
+				}
+				return nil
+			}, nil),
+		},
+	}.Run(t)
+
+	ConvertTestCase{
+		What: "koboSpan string without Kobo spans",
+		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+			"OEBPS/xhtml/ch01.xhtml": &fstest.MapFile{
+				Data: []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Chapter 1</title>
+	<style>.koboSpan { color: red }</style>
+</head>
+<body>
+	<!-- <span class="koboSpan" id="kobo.1.1"> -->
+	<p>The markup looks like &lt;span class="koboSpan" id="kobo.1.1"&gt;.</p>
+	<p><span class="koboSpan" id="kobo.1">no segment</span></p>
+	<p><span class="koboSpan" id="kobo.a.b">not numeric</span></p>
+	<p><span class="koboSpan">no id</span></p>
+	<p><span class="other" id="kobo.1.1">no class</span></p>
+	<script>var x = "koboSpan";</script>
+</body>
+</html>
+`),
+				Mode: 0666,
+			},
+		}),
+		Checks: []ShouldFunc{
+			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
+			AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
+		},
+	}.Run(t)
+
+	ConvertTestCase{
+		What: "koboSpan outside content documents",
+		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+			"OEBPS/style.css": &fstest.MapFile{
+				Data: []byte(`.koboSpan { color: red }`),
+				Mode: 0666,
+			},
+		}),
+		Checks: []ShouldFunc{
+			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
+			AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
+		},
+	}.Run(t)
+}
+
+func TestHasKoboSpan(t *testing.T) {
+	for _, tc := range []struct {
+		What  string
+		Doc   string
+		Found bool
+	}{
+		{"kepubify span", `<html><body><p><span class="koboSpan" id="kobo.1.1">text</span></p></body></html>`, true},
+		{"multiple classes", `<html><body><p><span class="a koboSpan b" id="kobo.12.345">text</span></p></body></html>`, true},
+		{"span in comment", `<html><body><!-- <span class="koboSpan" id="kobo.1.1"> --></body></html>`, false},
+		{"span in text", `<html><body>&lt;span class="koboSpan" id="kobo.1.1"&gt;</body></html>`, false},
+		{"span in style", `<html><head><style>.koboSpan{}</style></head><body><p>text</p></body></html>`, false},
+		{"no id", `<html><body><span class="koboSpan">text</span></body></html>`, false},
+		{"no segment", `<html><body><span class="koboSpan" id="kobo.1">text</span></body></html>`, false},
+		{"not numeric", `<html><body><span class="koboSpan" id="kobo.1.x">text</span></body></html>`, false},
+		{"wrong class", `<html><body><span class="kobospan" id="kobo.1.1">text</span></body></html>`, false},
+		{"no body content", `<html><body></body></html>`, false},
+	} {
+		if found, err := hasKoboSpan(strings.NewReader(tc.Doc)); err != nil {
+			t.Errorf("case %q: unexpected error: %v", tc.What, err)
+		} else if found != tc.Found {
+			t.Errorf("case %q: expected %v, got %v", tc.What, tc.Found, found)
+		}
+	}
+}
+
+func TestReaderContains(t *testing.T) {
+	needle := []byte("koboSpan")
+	for _, tc := range []struct {
+		What  string
+		Data  []byte
+		Found bool
+	}{
+		{"empty", nil, false},
+		{"only needle", needle, true},
+		{"needle at start", append(append([]byte(nil), needle...), bytes.Repeat([]byte("a"), 100000)...), true},
+		{"needle at end", append(bytes.Repeat([]byte("a"), 100000), needle...), true},
+		{"needle across chunk boundary", append(append(bytes.Repeat([]byte("a"), 32*1024-3), needle...), bytes.Repeat([]byte("a"), 100)...), true},
+		{"partial needle across chunk boundary", append(append(bytes.Repeat([]byte("a"), 32*1024-3), needle[:5]...), bytes.Repeat([]byte("a"), 100)...), false},
+		{"no needle", bytes.Repeat([]byte("koboSpa"), 20000), false},
+	} {
+		for _, r := range []struct {
+			What string
+			R    io.Reader
+		}{
+			{"bytes", bytes.NewReader(tc.Data)},
+			{"half", iotest.HalfReader(bytes.NewReader(tc.Data))},
+			{"one byte", iotest.OneByteReader(bytes.NewReader(tc.Data))},
+			{"data err", iotest.DataErrReader(bytes.NewReader(tc.Data))},
+		} {
+			if found, err := readerContains(r.R, needle); err != nil {
+				t.Errorf("case %q (%s): unexpected error: %v", tc.What, r.What, err)
+			} else if found != tc.Found {
+				t.Errorf("case %q (%s): expected %v, got %v", tc.What, r.What, tc.Found, found)
+			}
+		}
+	}
+	if _, err := readerContains(iotest.ErrReader(io.ErrUnexpectedEOF), needle); err != io.ErrUnexpectedEOF {
+		t.Errorf("expected error to be passed through, got %v", err)
 	}
 }
 

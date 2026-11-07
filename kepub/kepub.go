@@ -1,6 +1,13 @@
 // Package kepub converts EPUBs to KEPUBs.
 package kepub
 
+import "errors"
+
+// ErrAlreadyKepub is returned by [Convert] when the input is already a KEPUB
+// and [Options.ReprocessKepub] is not set. It is returned before anything is
+// written to the output writer.
+var ErrAlreadyKepub = errors.New("already a kepub")
+
 // Options configures the conversion of EPUB2/EPUB3 books to Kobo's KEPUB
 // format. The zero value applies only the mandatory changes.
 type Options struct {
@@ -37,6 +44,13 @@ type Options struct {
 	// certain books. If nil, a heuristic is used to determine whether it
 	// should be added.
 	DummyTitlepage *bool
+
+	// ReprocessKepub converts input which is already a KEPUB (detected by the
+	// Kobo spans in its content documents) instead of returning
+	// [ErrAlreadyKepub]. Existing spans are kept as-is rather than re-split,
+	// style elements added by a previous conversion are replaced, and the rest
+	// of the conversion is the same as usual.
+	ReprocessKepub bool
 
 	// DetectCover makes the dummy titlepage show the book's cover image, if
 	// one is found, instead of being blank. The cover image is the one

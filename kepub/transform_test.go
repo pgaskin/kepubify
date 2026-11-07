@@ -162,13 +162,39 @@ func TestTransformContentParts(t *testing.T) {
 	})
 
 	t.Run("KoboStyles", func(t *testing.T) {
-		partTest{
-			name:     "add kobo style hacks",
-			in:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="utf-8"/></head><body></body></html>`,
-			doc:      true,
-			contains: true,
-			want:     `<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style></head>`,
-		}.run(t)
+		for _, tc := range []partTest{
+			{
+				name:     "add kobo style hacks",
+				in:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><meta charset="utf-8"/></head><body></body></html>`,
+				doc:      true,
+				contains: true,
+				want:     `<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style></head>`,
+			},
+			{
+				name:     "replace existing kepubify styles",
+				in:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><style type="text/css" class="kobostylehacks">old</style><style type="text/css" class="kepubify-extracss">old</style><style type="text/css" class="kepubify-hyphenate">old</style><style>p { color: red }</style></head><body></body></html>`,
+				doc:      true,
+				opt:      Options{CSS: []string{"new"}},
+				contains: true,
+				want:     `<title>Kepubify Test Case</title><style>p { color: red }</style><style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style><style type="text/css" class="kepubify-extracss">new</style></head>`,
+			},
+			{
+				name:     "replace existing kobo styles",
+				in:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><style xmlns="http://www.w3.org/1999/xhtml" type="text/css" id="kobostylehacks">div#book-inner p, div#book-inner div { font-size: 1.0em; }</style></head><body></body></html>`,
+				doc:      true,
+				contains: true,
+				want:     `<title>Kepubify Test Case</title><style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style></head>`,
+			},
+			{
+				name:     "keep other styles with similar names",
+				in:       `<!DOCTYPE html><head><title>Kepubify Test Case</title><style id="kobostylehacks2">a</style><style class="x-kepubify-y kepubifyz">b</style></head><body></body></html>`,
+				doc:      true,
+				contains: true,
+				want:     `<style id="kobostylehacks2">a</style><style class="x-kepubify-y kepubifyz">b</style><style type="text/css" class="kobostylehacks">`,
+			},
+		} {
+			tc.run(t)
+		}
 	})
 
 	t.Run("KoboDivs", func(t *testing.T) {
