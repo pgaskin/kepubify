@@ -2,7 +2,7 @@
 
 **Kepubify converts EPUBs to Kobo EPUBs.** <a href="https://github.com/pgaskin/kepubify/actions/workflows/kepubify.yml"><img src="https://github.com/pgaskin/kepubify/actions/workflows/kepubify.yml/badge.svg?branch=master&event=push" align="right"/></a>
 
-**[`Website`](https://pgaskin.net/kepubify/)** &nbsp; **[`Download`](https://pgaskin.net/kepubify/dl/)** &nbsp; **[`Documentation`](https://pgaskin.net/kepubify/docs/)** &nbsp; **[`Web Version`](https://pgaskin.net/kepubify/try/)** &nbsp; **[`pkg.go.dev`](https://pkg.go.dev/github.com/pgaskin/kepubify/v4)**
+**[`Website`](https://pgaskin.net/kepubify/)** &nbsp; **[`Download`](https://pgaskin.net/kepubify/dl/)** &nbsp; **[`Documentation`](https://pgaskin.net/kepubify/docs/)** &nbsp; **[`Web Version`](https://pgaskin.net/kepubify/try/)** &nbsp; **[`pkg.go.dev`](https://pkg.go.dev/github.com/pgaskin/kepubify/v5)**
 
 ## About
 

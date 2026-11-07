@@ -6,7 +6,7 @@ package kepub
 import (
 	"io"
 
-	"github.com/pgaskin/kepubify/v4/internal/zip"
+	"github.com/pgaskin/kepubify/v5/internal/zip"
 )
 
 func zipCopyImpl(z *zip.Writer, f *zip.File) error {

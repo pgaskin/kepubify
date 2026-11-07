@@ -3,7 +3,7 @@
 
 package kepub
 
-import "github.com/pgaskin/kepubify/v4/internal/zip"
+import "github.com/pgaskin/kepubify/v5/internal/zip"
 
 func zipCopyImpl(z *zip.Writer, f *zip.File) error {
 	return z.Copy(f)

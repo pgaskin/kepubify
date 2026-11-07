@@ -14,12 +14,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pgaskin/kepubify/v4/internal/zip"
-	"github.com/pgaskin/kepubify/v4/kepub"
+	"github.com/pgaskin/kepubify/v5/internal/zip"
+	"github.com/pgaskin/kepubify/v5/kepub"
 	"github.com/spf13/pflag"
 )
 
-var version = "v4-dev"
+var version = "v5-dev"
 
 func main() {
 	pflag.CommandLine.SortFlags = false
