@@ -2,9 +2,9 @@ package kepub
 
 import (
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"io"
-	"io/fs"
 	"path"
 	"regexp"
 	"slices"
@@ -12,8 +12,6 @@ import (
 	"testing"
 	"testing/fstest"
 	"testing/iotest"
-
-	"github.com/beevik/etree"
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
 )
@@ -703,315 +701,316 @@ func TestTransformFileFilter(t *testing.T) {
 
 func TestTransformDummyTitlepage(t *testing.T) {
 	const lorem = "Lorem ipsum dolor, sit amet consectetur adipisicing elit. Dolorem, placeat. Porro animi architecto pariatur laudantium voluptate, at, odit delectus fugiat beatae autem odio. Iure iste maiores corrupti porro quibusdam. Sunt?"
-
-	transformDummyTitlepageTestCase{
-		What: "separate titlepage (no dummy)",
-		OPFManifest: `
+	twoItems := `
 			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
 			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
 			<item id="cover" href="cover.png" media-type="image/png"/>
-		`,
-		OPFSpine: `
+		`
+	twoItemrefs := `
 			<itemref idref="item1"/>
 			<itemref idref="item2"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"cover.png":  ``,
+		`
+	coverPage := `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`
+	longPage := `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`
+	for _, tc := range []titlepageTest{
+		{
+			name:     "separate titlepage (no dummy)",
+			manifest: twoItems,
+			spine:    twoItemrefs,
+			content:  map[string]string{"item1.html": coverPage, "item2.html": longPage, "cover.png": ``},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "separate titlepage, but with a non-standard extension (no dummy)",
-		OPFManifest: `
+		{
+			name: "separate titlepage, but non-standard extension (no dummy)",
+			manifest: `
 			<item id="item1" href="item1.xml" media-type="application/xhtml+xml"/>
 			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
 			<item id="cover" href="cover.png" media-type="image/png"/>
 		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-			<itemref idref="item2"/>
-		`,
-		Content: map[string]string{
-			"item1.xml":  `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"cover.png":  ``,
+			spine:   twoItemrefs,
+			content: map[string]string{"item1.xml": coverPage, "item2.html": longPage, "cover.png": ``},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "separate titlepage, but with a non-standard media type (no dummy)",
-		OPFManifest: `
+		{
+			name: "separate titlepage, but non-standard media type (no dummy)",
+			manifest: `
 			<item id="item1" href="item1.html" media-type="text/xml"/>
 			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
 			<item id="cover" href="cover.png" media-type="image/png"/>
 		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-			<itemref idref="item2"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"cover.png":  ``,
+			spine:   twoItemrefs,
+			content: map[string]string{"item1.html": coverPage, "item2.html": longPage, "cover.png": ``},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "separate titlepage, but with non-linear content spine item before it (no dummy)",
-		OPFManifest: `
+		{
+			name: "separate titlepage, but non-linear content spine item before it (no dummy)",
+			manifest: `
 			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
 			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
 			<item id="item3" href="item3.html" media-type="application/xhtml+xml"/>
 			<item id="cover" href="cover.png" media-type="image/png"/>
 		`,
-		OPFSpine: `
+			spine: `
 			<itemref idref="item3" linear="no"/>
 			<itemref idref="item1"/>
 			<itemref idref="item2"/>
 		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"item3.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"cover.png":  ``,
+			content: map[string]string{"item1.html": coverPage, "item2.html": longPage, "item3.html": longPage, "cover.png": ``},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "separate titlepage, but with non-existent spine item before it (no dummy)",
-		OPFManifest: `
-			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
-			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
-			<item id="cover" href="cover.png" media-type="image/png"/>
-		`,
-		OPFSpine: `
+		{
+			name:     "separate titlepage, but non-existent spine item before it (no dummy)",
+			manifest: twoItems,
+			spine: `
 			<itemref idref="item3"/>
 			<itemref idref="item1"/>
 			<itemref idref="item2"/>
 		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"cover.png":  ``,
+			content: map[string]string{"item1.html": coverPage, "item2.html": longPage, "cover.png": ``},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What:      "separate titlepage (force enable)",
-		Converter: NewConverterWithOptions(ConverterOptionDummyTitlepage(true)),
-		OPFManifest: `
-			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
-			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
-			<item id="cover" href="cover.png" media-type="image/png"/>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-			<itemref idref="item2"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"cover.png":  ``,
+		{
+			name:     "separate titlepage (force enable)",
+			force:    new(true),
+			manifest: twoItems,
+			spine:    twoItemrefs,
+			content:  map[string]string{"item1.html": coverPage, "item2.html": longPage, "cover.png": ``},
+			added:    true,
 		},
-		ShouldError:  false,
-		ShouldDetect: true,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What:      "separate titlepage (force disable)",
-		Converter: NewConverterWithOptions(ConverterOptionDummyTitlepage(false)),
-		OPFManifest: `
-			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
-			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
-			<item id="cover" href="cover.png" media-type="image/png"/>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-			<itemref idref="item2"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><img src="cover.png"></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"cover.png":  ``,
+		{
+			name:     "separate titlepage (force disable)",
+			force:    new(false),
+			manifest: twoItems,
+			spine:    twoItemrefs,
+			content:  map[string]string{"item1.html": coverPage, "item2.html": longPage, "cover.png": ``},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "no titlepage, many words (dummy)",
-		OPFManifest: `
-			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<div>`+lorem+`</div>`, 5) + `</body></html>`,
+		{
+			name:     "no titlepage, many words (dummy)",
+			manifest: `<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<div>`+lorem+`</div>`, 5) + `</body></html>`},
+			added:    true,
 		},
-		ShouldError:  false,
-		ShouldDetect: true,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "no titlepage, many images (dummy)",
-		OPFManifest: `
-			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<img><svg></svg>`, 4) + `</body></html>`,
+		{
+			name:     "no titlepage, many images (dummy)",
+			manifest: `<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<img><svg></svg>`, 4) + `</body></html>`},
+			added:    true,
 		},
-		ShouldError:  false,
-		ShouldDetect: true,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "no titlepage, many short paragraphs (dummy)",
-		OPFManifest: `
-			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><p>Paragraph 1.</p><p>Paragraph 2.</p><p>Paragraph 3.</p><p>Paragraph 4.</p><p>Paragraph 5.</p></body></html>`,
+		{
+			name:     "no titlepage, many short paragraphs (dummy)",
+			manifest: `<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><p>Paragraph 1.</p><p>Paragraph 2.</p><p>Paragraph 3.</p><p>Paragraph 4.</p><p>Paragraph 5.</p></body></html>`},
+			added:    true,
 		},
-		ShouldError:  false,
-		ShouldDetect: true,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "titlepage doesn't match heuristic but name includes cover (no dummy)",
-		OPFManifest: `
-			<item id="item1" href="Cover.html" media-type="application/xhtml+xml"/>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+		{
+			name:     "titlepage doesn't match heuristic but name includes cover (no dummy)",
+			manifest: `<item id="item1" href="Cover.html" media-type="application/xhtml+xml"/>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": longPage},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "titlepage doesn't match heuristic but name includes title (no dummy)",
-		OPFManifest: `
-			<item id="item1" href="Title.html" media-type="application/xhtml+xml"/>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+		{
+			name:     "titlepage doesn't match heuristic but name includes title (no dummy)",
+			manifest: `<item id="item1" href="Title.html" media-type="application/xhtml+xml"/>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": longPage},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "textual titlepage (no dummy)",
-		OPFManifest: `
+		{
+			name: "textual titlepage (no dummy)",
+			manifest: `
 			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
 			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
 		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-			<itemref idref="item2"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><h1>A Long Title on a Title Page</h1><h2>The Subtitle of the Book</h2></body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+			spine:   twoItemrefs,
+			content: map[string]string{"item1.html": `<!DOCTYPE html><html><head><title></title></head><body><h1>A Long Title on a Title Page</h1><h2>The Subtitle of the Book</h2></body></html>`, "item2.html": longPage},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "nonexistent first manifest file (no dummy)",
-		OPFManifest: `
+		{
+			name: "nonexistent first manifest file (no dummy)",
+			manifest: `
 			<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>
 			<item id="item2" href="item2.html" media-type="application/xhtml+xml"/>
 		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-			<itemref idref="item2"/>
-		`,
-		Content: map[string]string{
-			"Item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
-			"item2.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+			spine:   twoItemrefs,
+			content: map[string]string{"Item2.html": longPage, "item2.html": longPage},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What:        "spine without whitespace",
-		Converter:   NewConverterWithOptions(ConverterOptionDummyTitlepage(true)),
-		OPFManifest: `<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>`,
-		OPFSpine:    `<itemref idref="item1"/>`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+		{
+			name:     "spine without whitespace",
+			force:    new(true),
+			manifest: `<item id="item1" href="item1.html" media-type="application/xhtml+xml"/>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": longPage},
+			added:    true,
 		},
-		ShouldError:  false,
-		ShouldDetect: true,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What:         "empty opf package",
-		OPFManifest:  ``,
-		OPFSpine:     ``,
-		Content:      map[string]string{},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What: "bad opf package",
-		OPFManifest: `
-			<invalid>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+		{
+			name: "empty opf package",
 		},
-		ShouldError:  true,
-		ShouldDetect: false,
-	}.Run(t)
-
-	transformDummyTitlepageTestCase{
-		What:      "bad opf package, but titlepage force disabled (no dummy)",
-		Converter: NewConverterWithOptions(ConverterOptionDummyTitlepage(false)),
-		OPFManifest: `
-			<invalid>
-		`,
-		OPFSpine: `
-			<itemref idref="item1"/>
-		`,
-		Content: map[string]string{
-			"item1.html": `<!DOCTYPE html><html><head><title></title></head><body>` + strings.Repeat(`<p>`+lorem+`</p>`, 5) + `</body></html>`,
+		// note: we don't check well-formedness
+		{
+			name:     "bad opf package",
+			manifest: `<invalid>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": longPage},
 		},
-		ShouldError:  false,
-		ShouldDetect: false,
-	}.Run(t)
+		{
+			name:     "bad opf package, but titlepage force disabled (no dummy)",
+			force:    new(false),
+			manifest: `<invalid>`,
+			spine:    `<itemref idref="item1"/>`,
+			content:  map[string]string{"item1.html": longPage},
+		},
+	} {
+		tc.run(t)
+	}
+}
+
+func TestTransformDummyTitlepageParts(t *testing.T) {
+	const lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+	words := map[string]string{"text.xhtml": `<html><body><div>` + lorem + ` ` + lorem + `</div></body></html>`}
+	for _, tc := range []titlepageTest{
+		{
+			name: "indentation",
+			opf: `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <manifest>
+    <item id="text" href="text.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="text"/>
+  </spine>
+</package>
+`,
+			content: words,
+			added:   true,
+			want: `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <manifest>
+    <item id="text" href="text.xhtml" media-type="application/xhtml+xml"/>
+    <item id="kepubify-titlepage-dummy" href="kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml" />
+  </manifest>
+  <spine>
+    <itemref idref="kepubify-titlepage-dummy" />
+    <itemref idref="text"/>
+  </spine>
+</package>
+`,
+		},
+		{
+			name:    "no whitespace",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/><itemref idref="x"/></spine></package>`,
+			content: words,
+			added:   true,
+			want:    `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/><item id="kepubify-titlepage-dummy" href="kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml" /></manifest><spine><itemref idref="kepubify-titlepage-dummy" /><itemref idref="text"/><itemref idref="x"/></spine></package>`,
+		},
+		{
+			name:    "prefixes",
+			opf:     `<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns="urn:x"><opf:manifest><opf:item id="text" href="text.xhtml"/></opf:manifest><opf:spine><opf:itemref idref="text"/></opf:spine></opf:package>`,
+			content: words,
+			added:   true,
+			want:    `<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns="urn:x"><opf:manifest><opf:item id="text" href="text.xhtml"/><opf:item id="kepubify-titlepage-dummy" href="kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml" /></opf:manifest><opf:spine><opf:itemref idref="kepubify-titlepage-dummy" /><opf:itemref idref="text"/></opf:spine></opf:package>`,
+		},
+		{
+			name:    "other namespaces and attributes",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf" xmlns:x="urn:x"><manifest><item x:id="text" href="text.xhtml"/><x:item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: words,
+		},
+		{
+			name:    "manifest and spine elsewhere",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><x><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></x></package>`,
+			content: words,
+		},
+		{
+			name:    "first elements only",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest/><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine><spine/></package>`,
+			content: words,
+			added:   true,
+			want:    `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="kepubify-titlepage-dummy" href="kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml" /></manifest><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="kepubify-titlepage-dummy" /><itemref idref="text"/></spine><spine/></package>`,
+		},
+		{
+			name:  "empty elements",
+			force: new(true),
+			opf:   `<package xmlns="http://www.idpf.org/2007/opf"><manifest x="/"/><spine/></package>`,
+			added: true,
+			want:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest x="/"><item id="kepubify-titlepage-dummy" href="kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml" /></manifest><spine><itemref idref="kepubify-titlepage-dummy" /></spine></package>`,
+		},
+		{
+			name:  "empty elements with whitespace",
+			force: new(true),
+			opf:   "<package xmlns=\"http://www.idpf.org/2007/opf\">\n <manifest>\n </manifest>\n <spine>\n </spine>\n</package>",
+			added: true,
+			want:  "<package xmlns=\"http://www.idpf.org/2007/opf\">\n <manifest>\n <item id=\"kepubify-titlepage-dummy\" href=\"kepubify-titlepage-dummy.xhtml\" media-type=\"application/xhtml+xml\" />\n </manifest>\n <spine>\n <itemref idref=\"kepubify-titlepage-dummy\" />\n </spine>\n</package>",
+		},
+		{
+			name: "root element isn't a package element",
+			opf:  `<x:package xmlns:x="urn:x"/>`,
+			err:  true,
+		},
+		{
+			name: "no root element",
+			opf:  `<!-- -->`,
+			err:  true,
+		},
+		{
+			name:    "escaped href",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="my%20text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"my text.xhtml": words["text.xhtml"]},
+			added:   true,
+		},
+		{
+			name:    "linear spine item without idref",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref linear="no" idref="text"/><itemref/><itemref idref="text"/></spine></package>`,
+			content: words,
+		},
+		{
+			name:    "duplicate manifest items",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/><item id="text" href="text.png"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: words,
+		},
+		{
+			name:    "content in p elements isn't counted",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": `<html><body><p><img src="cover.jpg"/></p><p>` + lorem + `</p></body></html>`},
+			added:   true,
+		},
+		{
+			name:    "images",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": `<html><body><div><image src="cover.jpg"/><span>A title</span></div></body></html>`},
+		},
+		{
+			name:    "words split by elements and comments",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": `<html><head><title>` + lorem + ` ` + lorem + `</title></head><body><img src="x"/>` + strings.Repeat(`ab<b>cd</b>ef<!---->gh `, 21) + `</body></html>`},
+		},
+		{
+			name:    "words not split by references",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": `<html><body><img src="x"/>` + strings.Repeat(`ab&amp;c&#32;`, 21) + `</body></html>`},
+			added:   true,
+		},
+		{
+			name:    "stray p end tags",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": `<html><body><img src="x"/><div></p></p></p></p></p></div></body></html>`},
+			added:   true,
+		},
+		{
+			// test html5 parsing rules
+			name:    "misnested formatting elements with a warning",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": `<html><body><img src="x"/><b><p>x</b>` + lorem + ` ` + lorem + `</p></body></html>`},
+			added:   true,
+		},
+		{
+			name:    "frameset",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": `<html><head></head><frameset><frame src="a.html"/></frameset></html>`},
+			added:   true,
+		},
+		{
+			name:    "UTF-16 content document",
+			opf:     `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="text" href="text.xhtml"/></manifest><spine><itemref idref="text"/></spine></package>`,
+			content: map[string]string{"text.xhtml": "\xff\xfe<\x00h\x00t\x00m\x00l\x00>\x00"},
+		},
+	} {
+		tc.run(t)
+	}
 }
 
 type transformContentCase struct {
@@ -1083,175 +1082,111 @@ func (tc transformContentCase) Run(t *testing.T) {
 	}
 }
 
-type transformDummyTitlepageTestCase struct {
-	What         string
-	Converter    *Converter
-	OPFManifest  string            // opf manifest xml
-	OPFSpine     string            // opf spine xml
-	Content      map[string]string // relative to the opf dir
-	ShouldError  bool
-	ShouldDetect bool
+type titlepageTest struct {
+	name     string
+	force    *bool
+	opf      string // override default test package document
+	manifest string
+	spine    string
+	content  map[string]string // relative to the package document
+	err      bool
+	added    bool
+	want     string // new opf to check (if not empty)
 }
 
-func (tc transformDummyTitlepageTestCase) Run(t *testing.T) {
-	t.Logf("case %q", tc.What)
+const titlepageOPF = "OEBPS/content.opf"
 
-	epub := tc.EPUB()
-
-	opf, err := epubPackage(epub)
-	if err != nil {
-		panic(err)
-	}
-
-	orig, err := fs.ReadFile(epub, opf)
-	if err != nil {
-		panic(err)
-	}
-
-	var buf *bytes.Buffer
-	buf = bytes.NewBuffer(orig)
-
-	var c *Converter
-	if tc.Converter != nil {
-		c = tc.Converter
-	} else {
-		c = NewConverter()
-	}
-
-	fn, r, a, err := c.TransformDummyTitlepage(epub, opf, buf)
-	if tc.ShouldError {
-		if err == nil {
-			t.Errorf("case %q: expected error", tc.What)
-		}
-	} else if err != nil {
-		t.Errorf("case %q: expected no error, got %v", tc.What, err)
-	}
-	if tc.ShouldDetect {
-		if !a {
-			t.Errorf("case %q: heuristic should have returned true", tc.What)
-		}
-	} else if a {
-		t.Errorf("case %q: heuristic should have returned false", tc.What)
-	}
-	if err == nil {
-		if a {
-			if err := tc.CheckOPF(buf, fn); err != nil {
-				t.Errorf("case %q: no error and heuristic returned true, opf transformation is incorrect: %v", tc.What, err)
-			}
-		} else {
-			if !bytes.Equal(buf.Bytes(), orig) {
-				t.Errorf("case %q: no error and heuristic returned false, buf opf was modified", tc.What)
-			}
-		}
-	}
-	if a && err == nil {
-		if fn == "" {
-			t.Errorf("case %q: no error and heuristic returned true, but new content document filename is empty", tc.What)
-		}
-		if r == nil {
-			t.Errorf("case %q: no error and heuristic returned true, but new content document content reader is nil", tc.What)
-		} else if _, err := io.ReadAll(r); err != nil {
-			t.Errorf("case %q: new content document content reader errored: %v", tc.What, err)
-		}
-	}
-}
-
-func (tc transformDummyTitlepageTestCase) CheckOPF(r io.Reader, fn string) error {
-	const opf = "OEBPS/content.opf"
-
-	doc := etree.NewDocument()
-	if _, err := doc.ReadFrom(r); err != nil {
-		return fmt.Errorf("read opf: %w", err)
-	}
-
-	var itm *etree.Element
-	for _, m := range doc.FindElements(`/package/manifest/item`) {
-		if a := m.SelectAttr("href"); a != nil {
-			if path.Join(path.Dir(opf), a.Value) == path.Clean(fn) {
-				itm = m
-				break
-			}
-		}
-	}
-	if itm == nil {
-		return fmt.Errorf("opf missing manifest item referring to %q", fn)
-	}
-	if a := itm.SelectAttr("media-type"); a == nil {
-		return fmt.Errorf("opf manifest item missing media type")
-	} else if a.Value != "application/xhtml+xml" {
-		return fmt.Errorf("opf manifest item has wrong media type %q", a.Value)
-	}
-
-	var id string
-	if a := itm.SelectAttr("id"); a == nil {
-		return fmt.Errorf("no spine item referring to manifest item")
-	} else {
-		id = a.Value
-	}
-
-	var its *etree.Element
-	for _, m := range doc.FindElements("/package/spine/itemref") {
-		if a := m.SelectAttr("idref"); a != nil {
-			if a.Value == id {
-				its = m
-				break
-			}
-		}
-	}
-	if its == nil {
-		return fmt.Errorf("no spine item referring to manifest item")
-	}
-	if its.SelectAttrValue("linear", "") == "no" {
-		return fmt.Errorf("spine item is not in the content flow")
-	}
-	for _, m := range its.Parent().ChildElements() {
-		if m.SelectAttrValue("linear", "") != "no" {
-			if m == its {
-				break
-			}
-			return fmt.Errorf("spine item is not at the beginning of the content flow")
-		}
-	}
-
-	return nil
-}
-
-func (tc transformDummyTitlepageTestCase) EPUB() fs.FS {
-	const opf = "OEBPS/content.opf"
-	epub := fstest.MapFS{}
-	epub["mimetype"] = &fstest.MapFile{
-		Mode: 0666,
-		Data: []byte(`application/epub+zip`),
-	}
-	epub["META-INF/container.xml"] = &fstest.MapFile{
-		Mode: 0666,
-		Data: []byte(`<?xml version="1.0" encoding="UTF-8"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-	<rootfiles>
-		<rootfile full-path="` + opf + `" media-type="application/oebps-package+xml"/>
-	</rootfiles>
-</container>
-`),
-	}
-	epub[opf] = &fstest.MapFile{
-		Mode: 0666,
-		Data: []byte(`<?xml version="1.0" encoding="UTF-8"?>
+func (tc titlepageTest) run(t *testing.T) {
+	t.Run(tc.name, func(t *testing.T) {
+		epub := fstest.MapFS{}
+		opf := tc.opf
+		if opf == "" {
+			opf = `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <dc:title>Test</dc:title>
     </metadata>
-    <manifest>` + tc.OPFManifest + `</manifest>
-    <spine toc="ncx">` + tc.OPFSpine + `</spine>
+    <manifest>` + tc.manifest + `</manifest>
+    <spine toc="ncx">` + tc.spine + `</spine>
 </package>
-`),
+`
+		}
+		epub[titlepageOPF] = &fstest.MapFile{Data: []byte(opf)}
+		for name, s := range tc.content {
+			epub[path.Join(path.Dir(titlepageOPF), name)] = &fstest.MapFile{Data: []byte(s)}
+		}
+		c := NewConverter()
+		if tc.force != nil {
+			c = NewConverterWithOptions(ConverterOptionDummyTitlepage(*tc.force))
+		}
+		buf := bytes.NewBufferString(opf)
+		name, r, added, err := c.TransformDummyTitlepage(epub, titlepageOPF, buf)
+		if tc.err != (err != nil) {
+			t.Errorf("error %v, want error %v", err, tc.err)
+		}
+		if added != tc.added {
+			t.Errorf("added %v, want %v", added, tc.added)
+		}
+		if err != nil {
+			return
+		}
+		if !added {
+			if buf.String() != opf {
+				t.Errorf("package document changed:\n%s", buf.String())
+			}
+			return
+		}
+		if name != "OEBPS/kepubify-titlepage-dummy.xhtml" {
+			t.Errorf("name %q", name)
+		}
+		if b, err := io.ReadAll(r); err != nil || string(b) != dummyTitlepage {
+			t.Errorf("content document %q, %v", b, err)
+		}
+		if err := checkTitlepageOPF(buf.Bytes()); err != nil {
+			t.Errorf("%v:\n%s", err, buf.String())
+		}
+		if tc.want != "" && buf.String() != tc.want {
+			t.Errorf("got:\n%s\nwant:\n%s", buf.String(), tc.want)
+		}
+	})
+}
+
+func checkTitlepageOPF(opf []byte) error {
+	var p struct {
+		Items []struct {
+			ID        string `xml:"id,attr"`
+			Href      string `xml:"href,attr"`
+			MediaType string `xml:"media-type,attr"`
+		} `xml:"http://www.idpf.org/2007/opf manifest>item"`
+		Itemrefs []struct {
+			IDRef  string `xml:"idref,attr"`
+			Linear string `xml:"linear,attr"`
+		} `xml:"http://www.idpf.org/2007/opf spine>itemref"`
 	}
-	for fn, f := range tc.Content {
-		epub[path.Join(path.Dir(opf), fn)] = &fstest.MapFile{
-			Mode: 0666,
-			Data: []byte(f),
+	if err := xml.Unmarshal(opf, &p); err != nil {
+		return err
+	}
+	var item bool
+	for _, it := range p.Items {
+		if it.Href == "kepubify-titlepage-dummy.xhtml" {
+			if it.ID != "kepubify-titlepage-dummy" || it.MediaType != "application/xhtml+xml" {
+				return fmt.Errorf("incorrect manifest item %+v", it)
+			}
+			item = true
 		}
 	}
-	return epub
+	if !item {
+		return fmt.Errorf("no manifest item")
+	}
+	for _, it := range p.Itemrefs {
+		if it.Linear != "no" {
+			if it.IDRef != "kepubify-titlepage-dummy" {
+				return fmt.Errorf("first linear spine item is %q, not the title page", it.IDRef)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("no linear spine item")
 }
 
 var testSentences = []string{

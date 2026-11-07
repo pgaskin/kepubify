@@ -3,7 +3,6 @@ module github.com/pgaskin/kepubify/v5
 go 1.27.0
 
 require (
-	github.com/beevik/etree v1.1.0
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/kr/smartypants v0.1.0
 	github.com/pgaskin/htmlstream v0.0.4-0.20261102213320-2dcec3a2a421

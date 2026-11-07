@@ -2,22 +2,23 @@ package kepub
 
 import (
 	"bytes"
-	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"iter"
 	"mime"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/beevik/etree"
 	"github.com/kr/smartypants"
 	"github.com/pgaskin/htmlstream"
 	"github.com/pgaskin/htmlstream/ascii"
+	"github.com/pgaskin/htmlstream/polyglot"
 	"golang.org/x/text/transform"
 
 	"github.com/pgaskin/kepubify/_/html/golang.org/x/net/html"
@@ -131,7 +132,7 @@ func (c *Converter) TransformOPF(w io.Writer, r io.Reader) error {
 				t.SetAttr("properties", "cover-image")
 			}
 		}
-		space.Next(t)
+		space.Next(t, nil)
 	}
 	return t.Close()
 }
@@ -140,16 +141,31 @@ type indentHolder struct {
 	hold htmlstream.Hold
 }
 
-// Next stops holding the whitespace before the current token, then holds the
-// current token if it is a whitespace-only text token.
-func (s *indentHolder) Next(t *htmlstream.Transformer) {
+// Next stops holding the whitespace before the current token, writing raw (if
+// not nil) before it, then holds the current token if it is a whitespace-only
+// text token.
+func (s *indentHolder) Next(t *htmlstream.Transformer, raw []byte) {
 	if s.hold != (htmlstream.Hold{}) {
-		t.HoldRelease(s.hold)
+		if raw != nil {
+			t.HoldDiscard(s.hold, append(raw, t.Held(s.hold)...))
+		} else {
+			t.HoldRelease(s.hold)
+		}
 		s.hold = htmlstream.Hold{}
+	} else if raw != nil {
+		t.InsertBefore(raw)
 	}
 	if tok := t.Token(); tok != nil && isBlankText(tok) {
 		s.hold = t.Hold()
 	}
+}
+
+// Held returns the whitespace before the current token.
+func (s *indentHolder) Held(t *htmlstream.Transformer) []byte {
+	if s.hold == (htmlstream.Hold{}) {
+		return nil
+	}
+	return t.Held(s.hold)
 }
 
 // Drop removes the whitespace before the current token.
@@ -708,6 +724,12 @@ func transformContentReplacements(w io.Writer, find, replace [][]byte) io.WriteC
 	return transform.NewWriter(w, transform.Chain(t...))
 }
 
+const (
+	dummyTitlepageID   = "kepubify-titlepage-dummy"
+	dummyTitlepageHref = dummyTitlepageID + ".xhtml"
+	dummyTitlepage     = `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title></title></head><body><p style="text-align: center; margin: 4em 0; font-size: .7em; font-style: italic;">Page intentionally left blank by kepubify.</p></body></html>`
+)
+
 // TransformDummyTitlepage adds a dummy titlepage if forced or the heuristic
 // determines that is is necessary. If there was an error determining if the
 // titlepage is required, false and an error is returned. If it is not required,
@@ -722,169 +744,372 @@ func transformContentReplacements(w io.Writer, find, replace [][]byte) io.WriteC
 // spine entry specially (e.g. no margins) for full-screen book covers. See #33.
 //
 // Note that the heuristic is subject to change between kepubify versions.
+//
+// The heuristic counts the paragraphs, images and words in the body of the
+// first linear spine item, as transformed by TransformContent. Formatting is
+// preserved where possible, and malformed documents are transformed on a
+// best-effort basis. Element matching is namespace-aware.
 func (c *Converter) TransformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer) (string, io.Reader, bool, error) {
 	if c.dummyTitlepageForce {
 		if !c.dummyTitlepageForceValue {
 			return "", nil, false, nil
 		}
 	} else {
-		if req, err := transformDummyTitlepageRequired(epub, opfF, bytes.NewReader(opf.Bytes())); err != nil {
+		if req, err := transformDummyTitlepageRequired(epub, opfF, opf.Bytes()); err != nil {
 			return "", nil, false, fmt.Errorf("check if dummy titlepage is required: %w", err)
 		} else if !req {
 			return "", nil, false, nil
 		}
 	}
-	fn, r, err := transformDummyTitlepageAdd(opf, opfF)
-	if err != nil {
+	var b bytes.Buffer
+	if err := transformDummyTitlepageAdd(&b, opf.Bytes()); err != nil {
 		return "", nil, true, fmt.Errorf("apply title page fix: %w", err)
 	}
-	return fn, r, true, nil
+	opf.Reset()
+	opf.Write(b.Bytes())
+	return path.Join(path.Dir(opfF), dummyTitlepageHref), strings.NewReader(dummyTitlepage), true, nil
 }
 
-func transformDummyTitlepageRequired(epub fs.FS, opfF string, opfR io.Reader) (bool, error) {
-	var opf struct {
-		XMLName      xml.Name `xml:"http://www.idpf.org/2007/opf package"`
-		ManifestItem []struct {
-			Id        string `xml:"id,attr"`
-			Href      string `xml:"href,attr"`
-			MediaType string `xml:"media-type,attr"`
-		} `xml:"http://www.idpf.org/2007/opf manifest>item"`
-		SpineItemref []struct {
-			Idref  string `xml:"idref,attr"`
-			Linear string `xml:"linear,attr"`
-		} `xml:"http://www.idpf.org/2007/opf spine>itemref"`
+func transformDummyTitlepageRequired(epub fs.FS, opfF string, opf []byte) (bool, error) {
+	type item struct {
+		id   string
+		href string
 	}
-
-	if err := xml.NewDecoder(opfR).Decode(&opf); err != nil {
-		return false, fmt.Errorf("parse OPF package: %w", err)
-	}
-
-	var idref string
-	for _, it := range opf.SpineItemref {
-		if it.Linear != "no" {
-			idref = it.Idref
-			break
+	var (
+		items  []item
+		idref  string
+		linear bool   // first linear spine item found
+		root   bool   // root element found
+		parent string // local name of open child element of package element
+	)
+	rd := htmlstream.NewReader(bytes.NewReader(opf))
+	rd.SetMode(htmlstream.XML)
+	for tok := range rd.All() {
+		if tok.Kind() == htmlstream.EndTag {
+			if rd.Depth() == 1 {
+				break // the end of the package element
+			}
+			if rd.Depth() == 2 {
+				parent = ""
+			}
+			continue
+		}
+		if tok.Kind() != htmlstream.StartTag {
+			continue
+		}
+		local := string(tok.Local())
+		if tok.NS() != nsOPF {
+			local = ""
+		}
+		switch rd.Depth() {
+		case 1:
+			if local != "package" {
+				return false, fmt.Errorf("root element %s isn't an OPF package element", tok.Name())
+			}
+			root = true
+		case 2:
+			if tok.Opens() {
+				parent = local
+			}
+		case 3:
+			switch {
+			case parent == "manifest" && local == "item":
+				items = append(items, item{attrValue(tok, "id"), attrValue(tok, "href")})
+			case parent == "spine" && local == "itemref" && !linear:
+				if attrValue(tok, "linear") != "no" {
+					linear, idref = true, attrValue(tok, "idref")
+				}
+			}
 		}
 	}
+	if err := rd.Err(); err != nil {
+		return false, err
+	}
+	if !root {
+		return false, errors.New("no root element")
+	}
 	if idref == "" {
-		return false, nil // there should always be at least one linear spine item, and it should always reference something, but we'll be lenient
+		return false, nil // no linear spine item, or one without an idref
 	}
 
 	var href string
-	for _, it := range opf.ManifestItem {
-		if it.Id == idref {
-			switch it.MediaType {
-			case "application/xhtml+xml", "text/html":
-				href = it.Href
-				break
-			}
-			switch strings.ToLower(path.Ext(it.Href)) {
-			case ".htm", ".html", ".xhtml":
-				href = it.Href
-				break
-			default:
-				return false, nil // the first spine item is not a content document, so let it be
-			}
+	for _, it := range items {
+		if it.id != idref {
+			continue
+		}
+		switch strings.ToLower(path.Ext(it.href)) {
+		case ".htm", ".html", ".xhtml":
+			href = it.href
+		default:
+			return false, nil // not a content document
 		}
 	}
 	if href == "" {
-		return false, nil // the thing it references should always exist, but we'll be lenient
+		return false, nil // not in the manifest
 	}
-
+	if p, err := url.PathUnescape(href); err == nil {
+		href = p
+	}
 	if n := strings.ToLower(path.Base(href)); strings.Contains(n, "cover") || strings.Contains(n, "title") {
-		return false, nil // this is intended to be the cover/title page (or else why would it have cover/title in the name?)
+		return false, nil // a cover or title page
 	}
-
-	href = path.Join(path.Dir(opfF), href)
-
-	rc, err := epub.Open(href)
+	f, err := epub.Open(path.Join(path.Dir(opfF), href))
 	if err != nil {
-		return false, nil // the file it references should exist, but we'll be lenient
+		return false, nil // a missing file
 	}
-	defer rc.Close()
-
-	doc, err := html.ParseWithOptions(rc,
-		html.ParseOptionEnableScripting(true),
-		html.ParseOptionIgnoreBOM(true),
-		html.ParseOptionLenientSelfClosing(true))
+	defer f.Close()
+	x, err := isTitlepage(f)
 	if err != nil {
-		return false, nil // we'll ignore it here
+		return false, nil // if unparseable, assume it's a titlepage
 	}
-
-	var wc, pc, ic int
-	var cur *html.Node
-	var stack []*html.Node
-	stack = append(stack, findAtom(doc, atom.Body))
-	for len(stack) != 0 {
-		stack, cur = stack[:len(stack)-1], stack[len(stack)-1]
-		switch cur.Type {
-		case html.ElementNode:
-			switch cur.DataAtom {
-			case atom.P:
-				pc++
-				if pc > 4 {
-					return true, nil
-				}
-			case atom.Img, atom.Svg:
-				ic++
-				fallthrough
-			case atom.Script, atom.Style, atom.Pre, atom.Audio, atom.Video, atom.Math:
-				continue
-			default:
-				for c := cur.LastChild; c != nil; c = c.PrevSibling {
-					stack = append(stack, c)
-				}
-			}
-		case html.TextNode:
-			for _, w := range strings.Fields(cur.Data) {
-				if len(w) > 3 {
-					wc++
-				}
-			}
-			if wc > 20 {
-				return true, nil
-			}
-		}
-	}
-
-	if (ic == 0 && wc < 5) || ic > 4 {
-		return true, nil
-	}
-
-	return false, nil
+	return !x, nil
 }
 
-func transformDummyTitlepageAdd(opf *bytes.Buffer, opfF string) (string, io.Reader, error) {
-	id, mime := "kepubify-titlepage-dummy", "application/xhtml+xml"
-	href := id + ".xhtml"
-	fn := path.Join(path.Dir(opfF), href)
-
-	doc := etree.NewDocument()
-	if _, err := doc.ReadFrom(bytes.NewReader(opf.Bytes())); err != nil {
-		return "", nil, fmt.Errorf("parse opf: %w", err)
+func attrValue(tok *htmlstream.Token, name string) string {
+	if a, ok := tok.Attr(name); ok {
+		return a.Value()
 	}
+	return ""
+}
 
-	if m := doc.FindElement("/package/manifest"); m != nil {
-		it := m.CreateElement("item")
-		it.Space = m.Space // shouldn't usually be needed, but just in case they used a namespace prefix
-		it.CreateAttr("id", id)
-		it.CreateAttr("href", href)
-		it.CreateAttr("media-type", mime)
-	}
-	if m := doc.FindElement("/package/spine"); m != nil {
-		it := etree.NewElement("itemref")
-		it.Space = m.Space // shouldn't usually be needed, but just in case they used a namespace prefix
-		it.CreateAttr("idref", id)
-		m.InsertChildAt(0, it)
-	}
-	doc.Indent(4)
+func isTitlepage(r io.Reader) (bool, error) {
+	var errNotTitlepage = errors.New("not title page") // sentinel error so we can stop reading
 
-	opf.Reset()
-	if _, err := doc.WriteTo(opf); err != nil {
-		return "", nil, fmt.Errorf("render opf: %w", err)
+	// note: we use polyglot so it gets parsed with proper html rules
+	var (
+		paras, images, words int
+		word                 int  // length of current word
+		body                 bool // in body
+		skip                 int  // id of skipped element
+	)
+	err := convert(io.Discard, r, polyglot.Options{
+		OnTag: func(e *polyglot.Tag) {
+			html := e.NS == htmlstream.NamespaceXHTML
+			switch {
+			case skip != 0:
+				if e.ID == skip && !e.Start {
+					skip = 0
+				}
+			case html && e.Local == "body":
+				body = e.Start
+			case !body || !e.Start:
+			case html && e.Local == "p":
+				if paras++; paras > 4 {
+					e.Writer().Fail(errNotTitlepage)
+				}
+				skip = e.ID // don't count words/images in p elements (e.g., cover image in p)
+			case html && (e.Local == "img" || e.Local == "image"), e.NS == htmlstream.NamespaceSVG:
+				images++
+				skip = e.ID
+			case html && (e.Local == "script" || e.Local == "style" || e.Local == "pre" || e.Local == "audio" || e.Local == "video"), e.NS == htmlstream.NamespaceMathML:
+				skip = e.ID
+			}
+		},
+		OnText: func(t *polyglot.Text) {
+			if skip != 0 || !body {
+				return
+			}
+			for s := t.Data; len(s) != 0; {
+				r, n := utf8.DecodeRune(s)
+				if unicode.IsSpace(r) {
+					if word > 3 {
+						words++
+					}
+					word = 0
+				} else {
+					word += n
+				}
+				s = s[n:]
+			}
+			if t.Last {
+				if word > 3 {
+					words++
+				}
+				word = 0
+			}
+			if words > 20 {
+				t.Writer().Fail(errNotTitlepage)
+			}
+		},
+	})
+	if errors.Is(err, errNotTitlepage) {
+		return false, nil
 	}
+	if err != nil {
+		return false, err
+	}
+	return !(images == 0 && words < 5 || images > 4), nil
+}
 
-	return fn, strings.NewReader(`<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title></title></head><body><p style="text-align: center; margin: 4em 0; font-size: .7em; font-style: italic;">Page intentionally left blank by kepubify.</p></body></html>`), nil
+// transformDummyTitlepageAdd writes opf to w, adding the dummy titlepage
+// manifest/spine items.
+func transformDummyTitlepageAdd(w io.Writer, opf []byte) error {
+	t := htmlstream.NewTransformer(w, bytes.NewReader(opf))
+	t.SetMode(htmlstream.XML)
+	var (
+		space    indentHolder
+		root     bool                // root element found
+		pkg      bool                // package element in root element
+		manifest bool                // first manifest element found
+		spine    bool                // first spine element found
+		open     htmlstream.Pos = -1 // position of the first manifest element (while open)
+		item     []byte              // manifest item to add before the end tag of the manifest element
+		last     []byte              // whitespace before the last child element of the manifest element
+		itemref  []byte              // spine item to add before the token after the spine start tag
+	)
+	for tok := range t.All() {
+		if itemref != nil {
+			// start of spine, after whitespace
+			if isBlankText(tok) {
+				t.InsertAfter(append(itemref, tok.Raw()...))
+			} else {
+				t.InsertBefore(itemref)
+			}
+			itemref = nil
+		}
+		var before []byte // stuff to add before whitespace before tok
+		switch tok.Kind() {
+		case htmlstream.StartTag:
+			switch depth := t.Depth(); {
+			case depth == 1 && !root:
+				root = true
+				pkg = tok.NS() == nsOPF && string(tok.Local()) == "package"
+			case depth == 2 && pkg && tok.NS() == nsOPF && string(tok.Local()) == "manifest" && !manifest:
+				manifest = true
+				item = appendSibling(nil, tok, "item", "id", dummyTitlepageID, "href", dummyTitlepageHref, "media-type", "application/xhtml+xml")
+				if tok.Opens() {
+					open = tok.Pos()
+				} else {
+					t.ExpandSelfClosing()
+					t.InsertAfter(item)
+				}
+			case depth == 2 && pkg && tok.NS() == nsOPF && string(tok.Local()) == "spine" && !spine:
+				spine = true
+				itemref = appendSibling(nil, tok, "itemref", "idref", dummyTitlepageID)
+				if !tok.Opens() {
+					t.ExpandSelfClosing()
+					t.InsertAfter(itemref)
+					itemref = nil
+				}
+			case depth == 3 && open >= 0:
+				last = append(last[:0], space.Held(t)...)
+			}
+		case htmlstream.EndTag:
+			if tok.StartPos() == open {
+				// end of the manifest, same indentation as items (or end tag if
+				// none)
+				if len(last) == 0 {
+					last = space.Held(t)
+				}
+				before = append(append(before, last...), item...)
+				open = -1
+			}
+			if t.Depth() == 1 {
+				pkg = false
+			}
+		}
+		space.Next(t, before)
+	}
+	return t.Close()
+}
+
+// appendSibling appends an empty element named local with the specified
+// attributes (name/value pairs) to dst, with the same namespace prefix as tok.
+func appendSibling(dst []byte, tok *htmlstream.Token, local string, attrs ...string) []byte {
+	if p := tok.Prefix(); p != nil {
+		local = string(p) + ":" + local
+	}
+	return htmlstream.AppendStartTag(dst, local, true, attrs...)
+}
+
+// convert reads a content document from r, and writes filtered polyglot XHTML
+// to w.
+func convert(w io.Writer, r io.Reader, popt polyglot.Options) (err error) {
+	// note: we parse with HTML rules, but with lenient parsing of XML-isms
+	popt.XMLSyntax = true
+	pw := polyglot.NewWriter(w, popt)
+	f := filter{pw: pw}
+	rd := popt.NewReader(r)
+	defer func() {
+		pw.Fail(rd.Err()) // a read error comes first
+		pw.Fail(err)      // nothing more is written after an error
+		if cerr := pw.Close(); cerr != nil {
+			err = cerr
+		}
+	}()
+	for tok := range rd.All() {
+		if err := f.Filter(tok); err != nil {
+			return err
+		}
+	}
+	return nil // the deferred Close ends the document and reports the errors
+}
+
+// filter filters content document tokens, skipping adept meta elements, and
+// whitespace/comment-only o:p/st1:* elements.
+type filter struct {
+	pw *polyglot.Writer
+
+	// held empty o:p, st1:*, or Adept meta element
+	held    htmlstream.TokenBuffer
+	holding bool
+	holdPos htmlstream.Pos // of its start tag
+
+	buf []byte // decoded text of a held text token
+}
+
+func (f *filter) Filter(tok *htmlstream.Token) error {
+	const holdMax = 64 << 10
+	if f.holding {
+		switch kind := tok.Kind(); {
+		case kind == htmlstream.EndTag && tok.StartPos() == f.holdPos:
+			// held token is empty, drop it
+			f.holding = false
+			f.held.Reset()
+			return nil
+		case f.held.Size() >= holdMax:
+		case kind == htmlstream.Comment,
+			kind == htmlstream.Text && f.isSpace(tok):
+			f.held.Append(tok)
+			return nil
+		}
+		f.holding = false
+		for t := range f.held.All() {
+			if err := f.pw.WriteToken(t); err != nil {
+				return err
+			}
+		}
+		f.held.Reset()
+	}
+	if tok.Kind() == htmlstream.StartTag && !tok.Incomplete() && tok.NS() == htmlstream.NamespaceXHTML {
+		switch {
+		case (isAdeptMeta(tok) || isMSOTag(tok)) && !tok.Opens():
+			return nil // nothing left for self-closing o:p or meta
+		case isAdeptMeta(tok), isMSOTag(tok):
+			// if xml syntax, might be open and closed by (possibly implied) end tag
+			f.holding, f.holdPos = true, tok.Pos()
+			f.held.Append(tok)
+			return nil
+		}
+	}
+	return f.pw.WriteToken(tok)
+}
+
+// isSpace returns true if the decoded text token is whitespace.
+func (f *filter) isSpace(tok *htmlstream.Token) bool {
+	f.buf = tok.AppendText(f.buf[:0])
+	return isSpace(string(f.buf))
+}
+
+var isAdeptMeta = htmlstream.Tag("meta", htmlstream.Or(
+	htmlstream.AttrEquals("name", "Adept.expected.resource"),
+	htmlstream.AttrEquals("name", "Adept.resource"),
+))
+
+func isMSOTag(tok *htmlstream.Token) bool {
+	var b [16]byte
+	n := tok.AppendLocalName(b[:0])
+	return string(n) == "o:p" || bytes.HasPrefix(n, []byte("st1:"))
 }
 
 // withText adds text to a node and returns it.
