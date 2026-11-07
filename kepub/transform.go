@@ -101,62 +101,61 @@ func transformOPFCalibreMeta(doc *etree.Document) {
 
 // TransformContent transforms an HTML4/HTML5/XHTML1.1 document for a KEPUB.
 //
-//  * [important] parses the XHTML with XHTML/XML/HTML4/HTML5-compatible rules
-//    Quite a few books have invalid XHTML, and this prevents the markup from
-//    being mangled any more than absolutely necessary. This also has the side
-//    effect of fixing bad markup when combined with the render step at the end.
-//    The intention is to match or exceed the kepub renderer's leniency. This
-//    lenient parsing is also why kepubify often works better with badly-formed
-//    HTML than Calibre. See the documentation in the x/net/html fork for more
-//    information about how this works.
+//   - [important] parses the XHTML with XHTML/XML/HTML4/HTML5-compatible rules
+//     Quite a few books have invalid XHTML, and this prevents the markup from
+//     being mangled any more than absolutely necessary. This also has the side
+//     effect of fixing bad markup when combined with the render step at the end.
+//     The intention is to match or exceed the kepub renderer's leniency. This
+//     lenient parsing is also why kepubify often works better with badly-formed
+//     HTML than Calibre. See the documentation in the x/net/html fork for more
+//     information about how this works.
 //
-//    The most important changes to default HTML5 parsing rules are to allow
-//    more tags to be self-closing, to ignore UTF-8 byte order marks, and to
-//    preserve XML instructions.
+//     The most important changes to default HTML5 parsing rules are to allow
+//     more tags to be self-closing, to ignore UTF-8 byte order marks, and to
+//     preserve XML instructions.
 //
-//  * [mandatory] add Kobo style tweaks
-//    To match official KEPUBs.
+//   - [mandatory] add Kobo style tweaks
+//     To match official KEPUBs.
 //
-//  * [mandatory] add Kobo div wrappers
-//    To match official KEPUBs. Kobo wraps the body with two div tags,
-//    `div#book-columns > div#book-inner`, to provide a target for applying
-//    pagination styles.
+//   - [mandatory] add Kobo div wrappers
+//     To match official KEPUBs. Kobo wraps the body with two div tags,
+//     `div#book-columns > div#book-inner`, to provide a target for applying
+//     pagination styles.
 //
-//  * [mandatory] add Kobo spans
-//    To match official KEPUBs. Kobo adds spans surrounding each fragment (see
-//    the regexp and matching logic) to provide better references to chunks of
-//    text. Highlighting, bookmarking, and other related features don't work
-//    without this.
+//   - [mandatory] add Kobo spans
+//     To match official KEPUBs. Kobo adds spans surrounding each fragment (see
+//     the regexp and matching logic) to provide better references to chunks of
+//     text. Highlighting, bookmarking, and other related features don't work
+//     without this.
 //
-//  * [optional] add extra CSS
-//    For customization or to fix common issues.
+//   - [optional] add extra CSS
+//     For customization or to fix common issues.
 //
-//  * [optional] smarten punctuation
-//    A common tweak to improve badly-formatted books.
+//   - [optional] smarten punctuation
+//     A common tweak to improve badly-formatted books.
 //
-//  * [extra] content cleanup
-//    Removes Adept tags, extraneous MS Office tags, Unicode replacement chars,
-//    etc.
+//   - [extra] content cleanup
+//     Removes Adept tags, extraneous MS Office tags, Unicode replacement chars,
+//     etc.
 //
-//  * [important] renders the HTML as polyglot XHTML/HTML4/HTML5
-//    The HTML is rendered for maximum compatibility and to be as close to the
-//    original HTML as possible. See the documentation in the x/net/html fork
-//    for more information about how this works.
+//   - [important] renders the HTML as polyglot XHTML/HTML4/HTML5
+//     The HTML is rendered for maximum compatibility and to be as close to the
+//     original HTML as possible. See the documentation in the x/net/html fork
+//     for more information about how this works.
 //
-//    The most important aspects are: the use of &#160; for non-breaking spaces,
-//    always specifying xmlns on html/math/svg, always specifying a type on
-//    script and style, always specifying a value for boolean attributes, always
-//    adding a closing slash to void elements, never self-closing non-void
-//    elements, only using XML-defined named escapes `<>&`, only using
-//    HTML-style comments, ensuring table contents are well-formed, and
-//    preserving the XML declaration if in the original code.
+//     The most important aspects are: the use of &#160; for non-breaking spaces,
+//     always specifying xmlns on html/math/svg, always specifying a type on
+//     script and style, always specifying a value for boolean attributes, always
+//     adding a closing slash to void elements, never self-closing non-void
+//     elements, only using XML-defined named escapes `<>&`, only using
+//     HTML-style comments, ensuring table contents are well-formed, and
+//     preserving the XML declaration if in the original code.
 //
-//  * [optional] find/replace
-//    To allow users to apply quick one-off fixes to the generated HTML.
+//   - [optional] find/replace
+//     To allow users to apply quick one-off fixes to the generated HTML.
 //
-//  * [important] ensure charset is UTF-8
-//    EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
-//
+//   - [important] ensure charset is UTF-8
+//     EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
 func (c *Converter) TransformContent(w io.Writer, r io.Reader) error {
 	switch strings.ToLower(c.charset) {
 	case "utf-8", "":
