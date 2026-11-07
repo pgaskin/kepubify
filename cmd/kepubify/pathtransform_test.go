@@ -635,6 +635,195 @@ func TestTransformPaths(t *testing.T) {
 		ShouldError: true,
 	}.Run(t)
 
+	transformPathsCase{
+		What: "converting the current directory should convert into (dir name)_converted",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/subdir/book2.epub",
+		},
+		Cwd:         "dir1",
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"."},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+			"dir1_converted/subdir/book2.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting the parent directory should convert into (dir name)_converted",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/subdir/book2.epub",
+		},
+		Cwd:         "dir1/subdir",
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{".."},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+			"dir1_converted/subdir/book2.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting the current directory in place should convert back into it",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/subdir/book2.epub",
+		},
+		Cwd: "dir1",
+		Transformer: mkTestTransformer(transformer{
+			Inplace: true,
+		}),
+		Inputs: []string{"."},
+		Outputs: []string{
+			"book1.kepub.epub",
+			"subdir/book2.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a symlink to a dir should follow it",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/subdir/book2.epub",
+		},
+		Symlinks:    map[string]string{"link": "dir1"},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"link"},
+		Outputs: []string{
+			"link_converted/book1.kepub.epub",
+			"link_converted/subdir/book2.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a symlink to a dir in place should convert into the symlink",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/subdir/book2.epub",
+		},
+		Symlinks: map[string]string{"link": "dir1"},
+		Transformer: mkTestTransformer(transformer{
+			Inplace: true,
+		}),
+		Inputs: []string{"link"},
+		Outputs: []string{
+			"link/book1.kepub.epub",
+			"link/subdir/book2.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a file should ignore duplicate inputs spelled differently",
+		Input: []string{
+			"./book.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"./book.epub", "book.epub", "./subdir/../book.epub"},
+		Outputs: []string{
+			"book_converted.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a file with duplicate inputs and an explicit output filename should convert into it",
+		Input: []string{
+			"./book.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Output:      "whatever.kepub.epub",
+		Inputs:      []string{"book.epub", "./book.epub"},
+		Outputs: []string{
+			"whatever.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a file named only by its extension should keep its directory name out of the output",
+		Input: []string{
+			"./dir1/subdir/.epub",
+			"./dir1/subdir.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"dir1"},
+		Outputs: []string{
+			"dir1_converted/subdir/.kepub.epub",
+			"dir1_converted/subdir.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a single file named only by its extension should keep its directory name out of the output",
+		Input: []string{
+			"./dir1/subdir/.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Inputs:      []string{"dir1/subdir/.epub"},
+		Outputs: []string{
+			"_converted.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting multiple files into an existing file should fail",
+		Input: []string{
+			"./book.epub",
+			"./another.epub",
+			"./existing.kepub.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Output:      "existing.kepub.epub",
+		Inputs:      []string{"book.epub", "another.epub"},
+		ShouldError: true,
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a dir into an existing file should fail",
+		Input: []string{
+			"./dir1/book.epub",
+			"./existing.kepub.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Output:      "existing.kepub.epub",
+		Inputs:      []string{"dir1"},
+		ShouldError: true,
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting a single file into an existing file should overwrite it",
+		Input: []string{
+			"./book.epub",
+			"./existing.kepub.epub",
+		},
+		Transformer: mkTestTransformer(transformer{}),
+		Output:      "existing.kepub.epub",
+		Inputs:      []string{"book.epub"},
+		Outputs: []string{
+			"existing.kepub.epub",
+		},
+	}.Run(t)
+
+	transformPathsCase{
+		What: "converting multiple dirs with no output dir should convert into (dir name)_converted and flatten each if nopreservedirs is specified",
+		Input: []string{
+			"./dir1/book1.epub",
+			"./dir1/book2.epub",
+			"./dir1/subdir/book3.epub",
+			"./dir2/book4.epub",
+		},
+		Transformer: mkTestTransformer(transformer{
+			NoPreserveDirs: true,
+		}),
+		Inputs: []string{"./dir1", "./dir2"},
+		Outputs: []string{
+			"dir1_converted/book1.kepub.epub",
+			"dir1_converted/book2.kepub.epub",
+			"dir1_converted/book3.kepub.epub",
+			"dir2_converted/book4.kepub.epub",
+		},
+	}.Run(t)
+
 	// TODO: more mixed tests
 }
 
@@ -660,6 +849,8 @@ func TestHasSuffixFold(t *testing.T) {
 type transformPathsCase struct {
 	What        string
 	Input       []string
+	Symlinks    map[string]string // link => target
+	Cwd         string            // subdirectory to run from
 	Transformer transformer
 
 	Output string
@@ -696,6 +887,17 @@ func (tc transformPathsCase) Run(t *testing.T) {
 			panic(err)
 		}
 		if err := os.WriteFile(fn, []byte(in), 0644); err != nil {
+			panic(err)
+		}
+	}
+	for link, target := range tc.Symlinks {
+		if err := os.Symlink(filepath.FromSlash(target), filepath.FromSlash(link)); err != nil {
+			t.Logf("skipping case %#v: %v", tc.What, err)
+			return
+		}
+	}
+	if tc.Cwd != "" {
+		if err := os.Chdir(filepath.FromSlash(tc.Cwd)); err != nil {
 			panic(err)
 		}
 	}
