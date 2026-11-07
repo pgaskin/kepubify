@@ -115,7 +115,8 @@ const cssHyphenate = `* {
     -webkit-hyphenate-limit-lines: 2;
 }
 
-h1, h2, h3, h4, h5, h6, td {
+h1, h2, h3, h4, h5, h6, td,
+h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, td * {
     -moz-hyphens: none !important;
     -webkit-hyphens: none !important;
     hyphens: none !important;
