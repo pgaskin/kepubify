@@ -1,0 +1,94 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go mod download
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -v -cover -coverprofile=cover.out ./...
+      - run: go tool cover -func=cover.out && rm cover.out
+
+  cross:
+    name: Cross Compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: |
+          set -euo pipefail
+          for target in linux/amd64 linux/386 linux/arm linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/386 windows/arm64; do
+            echo "$target"
+            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 go vet ./...
+            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 go build -o /dev/null .
+          done
+
+  js:
+    name: JavaScript/Website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: js/go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version: latest
+      - name: Install tinygo
+        env:
+          TINYGO_VERSION: 0.44.0
+          TINYGO_SHA256: ed0f45543a49ff2a99120a5a1b8814a0750e1fda1a66f8e2a0a172576134aaf9
+        run: |
+          curl -fsSL -o "${RUNNER_TEMP}/tinygo.tar.gz" "https://github.com/tinygo-org/tinygo/releases/download/v${TINYGO_VERSION}/tinygo${TINYGO_VERSION}.linux-amd64.tar.gz"
+          echo "$TINYGO_SHA256  ${RUNNER_TEMP}/tinygo.tar.gz" | sha256sum -c -
+          tar -xzf "${RUNNER_TEMP}/tinygo.tar.gz" -C "${RUNNER_TEMP}"
+          echo "${RUNNER_TEMP}/tinygo/bin" >> "$GITHUB_PATH"
+      - run: env -C js go mod verify
+      - run: env -C js go vet ./...
+      - run: env -C js GOOS=wasip1 GOARCH=wasm go vet ./...
+      - run: env -C js npm ci --ignore-scripts
+      - run: env -C js node_modules/.bin/tsc -p tsconfig.json --noEmit
+      - run: env -C js go run ./src -toolchain=tinygo
+      - run: env -C website go mod verify
+      - run: env -C website go vet ./...
+      - run: env -C website npm ci --ignore-scripts
+      - run: env -C website node_modules/.bin/tsc -p tsconfig.json
+      - run: env -C website go run .
+
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: |
+          set -euo pipefail
+          # the v4 tags are a different module
+          if ! base=$(git describe --tags --abbrev=0 --match 'v5.*' HEAD^ 2>/dev/null); then
+            echo "no v5 tags yet"
+            exit 0
+          fi
+          GONOPROXY=github.com/pgaskin/kepubify go run golang.org/x/exp/cmd/gorelease@v0.0.0-20261014143641-f0251eb4aa3e -base="$base"

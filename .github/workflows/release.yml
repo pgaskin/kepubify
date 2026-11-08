@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check version
+        id: version
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs')
+            const dryRun = context.eventName === 'workflow_dispatch'
+            const fail = (message) => { if (dryRun) core.warning(message); else throw new Error(message) }
+            const tag = context.ref.replace(/^refs\/tags\//, '')
+            const version = `v${JSON.parse(fs.readFileSync('js/package.json', 'utf8')).version}`
+            const major = fs.readFileSync('go.mod', 'utf8').match(/^module \S+\/(v[0-9]+)$/m)?.[1]
+            if (!major) fail('missing major version suffix in the go.mod module path')
+            if (tag !== version) fail(`tag (${tag}) does not match js/package.json's version (${version})`)
+            if (!version.startsWith(`${major}.`)) fail(`version (${version}) does not match the go.mod module path's major version (${major})`)
+            core.setOutput('tag', tag)
+            core.setOutput('version', version)
+
+  build:
+    name: Build
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Build
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir build
+          while read -r name goos goarch goarm; do
+            echo "$name"
+            GOOS=$goos GOARCH=$goarch GOARM=$goarm CGO_ENABLED=0 go build -trimpath \
+              -ldflags "-s -w -X github.com/pgaskin/kepubify/v5/internal.Version=$VERSION" \
+              -o "build/$name" .
+          done <<'EOF'
+          kepubify-linux-64bit linux amd64
+          kepubify-linux-32bit linux 386
+          kepubify-linux-arm linux arm 7
+          kepubify-linux-armv6 linux arm 6
+          kepubify-linux-arm64 linux arm64
+          kepubify-darwin-64bit darwin amd64
+          kepubify-darwin-arm64 darwin arm64
+          kepubify-windows-64bit.exe windows amd64
+          kepubify-windows-32bit.exe windows 386
+          kepubify-windows-arm64.exe windows arm64
+          EOF
+      - run: test "$(build/kepubify-linux-64bit --version)" = "kepubify ${{ needs.version.outputs.version }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kepubify
+          path: build/*
+          retention-days: 1
+          if-no-files-found: error
+
+  release:
+    name: Release
+    environment:
+      name: release
+      deployment: false
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: kepubify
+          path: build
+      - name: Create release
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/github-script@v9
+        with:
+          retries: 3
+          script: |
+            const fs = require('fs')
+            const tag = ${{ toJSON(needs.version.outputs.tag) }}
+            const {data: {id: id}} = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: tag,
+              draft: true,
+            })
+            for (const name of fs.readdirSync('build').sort()) {
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: id,
+                data: fs.readFileSync(`build/${name}`),
+                name: name,
+              })
+            }
