@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"net/url"
 	"path"
 	"strings"
 	"sync"
@@ -380,17 +381,34 @@ func epubContentDocuments(epub fs.FS, pkg string) ([]string, error) {
 	for _, it := range opf.ManifestItem {
 		switch it.MediaType {
 		case "application/xhtml+xml", "text/html":
-			docs = append(docs, path.Join(path.Dir(pkg), it.Href))
+			docs = append(docs, epubHref(epub, pkg, it.Href))
 			continue
 		}
 		switch strings.ToLower(path.Ext(it.Href)) {
 		case ".htm", ".html", ".xhtml":
-			docs = append(docs, path.Join(path.Dir(pkg), it.Href))
+			docs = append(docs, epubHref(epub, pkg, it.Href))
 			continue
 		}
 	}
 
 	return docs, nil
+}
+
+// epubHref resolves the href of a manifest item of the OPF package document pkg
+// to the name of the file in epub. The href is percent-decoded unless only the
+// file with the undecoded name exists.
+func epubHref(epub fs.FS, pkg, href string) string {
+	name := path.Join(path.Dir(pkg), href)
+	if p, err := url.PathUnescape(href); err == nil && p != href {
+		decoded := path.Join(path.Dir(pkg), p)
+		if _, err := fs.Stat(epub, decoded); err == nil {
+			return decoded
+		}
+		if _, err := fs.Stat(epub, name); err != nil {
+			return decoded
+		}
+	}
+	return name
 }
 
 // epubIsKepub reports whether any of the content documents cd contain a Kobo

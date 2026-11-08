@@ -118,11 +118,7 @@ func transformDummyTitlepageCover(epub fs.FS, opfF string, opf []byte) string {
 			if !slices.Contains(strings.Fields(attrValue(tok, "properties")), "cover-image") {
 				continue
 			}
-			href := attrValue(tok, "href")
-			if p, err := url.PathUnescape(href); err == nil {
-				href = p
-			}
-			name := path.Join(path.Dir(opfF), href)
+			name := epubHref(epub, opfF, attrValue(tok, "href"))
 			if isImage(name) {
 				if _, err := fs.Stat(epub, name); err == nil {
 					return name
@@ -258,13 +254,11 @@ func transformDummyTitlepageRequired(epub fs.FS, opfF string, opf []byte, charse
 	if href == "" {
 		return false, nil // not in the manifest
 	}
-	if p, err := url.PathUnescape(href); err == nil {
-		href = p
-	}
-	if n := strings.ToLower(path.Base(href)); strings.Contains(n, "cover") || strings.Contains(n, "title") {
+	name := epubHref(epub, opfF, href)
+	if n := strings.ToLower(path.Base(name)); strings.Contains(n, "cover") || strings.Contains(n, "title") {
 		return false, nil // a cover or title page
 	}
-	f, err := epub.Open(path.Join(path.Dir(opfF), href))
+	f, err := epub.Open(name)
 	if err != nil {
 		return false, nil // a missing file
 	}

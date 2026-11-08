@@ -128,6 +128,30 @@ func TestConvert(t *testing.T) {
 	}.Run(t)
 
 	ConvertTestCase{
+		What: "with percent-encoded content hrefs",
+		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+			"OEBPS/content.opf": &fstest.MapFile{
+				Data: []byte(strings.NewReplacer(
+					`href="xhtml/ch01.xhtml"`, `href="xhtml/ch%2001.xhtml"`,
+					`href="xhtml/ch02.xhtml"`, `href="xhtml/ch%2002.xhtml"`,
+				).Replace(string(testEPUB["OEBPS/content.opf"].Data))),
+				Mode: testEPUB["OEBPS/content.opf"].Mode,
+			},
+			"OEBPS/xhtml/ch01.xhtml":    nil,
+			"OEBPS/xhtml/ch 01.xhtml":   testEPUB["OEBPS/xhtml/ch01.xhtml"],
+			"OEBPS/xhtml/ch02.xhtml":    nil,
+			"OEBPS/xhtml/ch%2002.xhtml": testEPUB["OEBPS/xhtml/ch02.xhtml"],
+		}),
+		ShouldError: false,
+
+		Checks: []ShouldFunc{
+			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
+			FileShould("OEBPS/xhtml/ch 01.xhtml", DocumentProbablyHasSpans).Because("should decode hrefs"),
+			FileShould("OEBPS/xhtml/ch%2002.xhtml", DocumentProbablyHasSpans).Because("should be lenient if only the undecoded file exists"),
+		},
+	}.Run(t)
+
+	ConvertTestCase{
 		What: "with incorrect extensions and mimetypes",
 		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
 			"META-INF/container.xml": &fstest.MapFile{
