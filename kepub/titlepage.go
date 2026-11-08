@@ -451,7 +451,7 @@ func transformDummyTitlepageAdd(w io.Writer, opf []byte, cover titlepageCover) e
 				last = append(last[:0], space.Held(t)...)
 			}
 			if cover.name != "" && !cover.declared && tok.Pos() == cover.item {
-				t.SetAttr("properties", strings.Join(append(strings.Fields(attrValue(tok, "properties")), "cover-image"), " "))
+				addProperty(t, tok, "cover-image")
 			}
 		case htmlstream.EndTag:
 			if tok.StartPos() == open {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 
 	"github.com/pgaskin/htmlstream"
 	"github.com/pgaskin/htmlstream/ascii"
@@ -97,7 +98,7 @@ func transformOPF(w io.Writer, r io.Reader, m *manifestHrefs) error {
 				t.Remove()
 			} else {
 				if tok.Pos() == cover.pos {
-					t.SetAttr("properties", "cover-image")
+					addProperty(t, tok, "cover-image")
 				}
 				switch a, ok := tok.Attr("href"); {
 				case !ok:
@@ -207,6 +208,15 @@ func (s *indentHolder) Drop(t *htmlstream.Transformer) {
 // is split (i.e., it's too long), it always returns false.
 func isBlankText(tok *htmlstream.Token) bool {
 	return tok.Kind() == htmlstream.Text && !tok.Partial() && !tok.Continued() && ascii.IsBlank(tok.Raw())
+}
+
+// addProperty adds prop to the properties attribute of the start tag tok, if
+// not already present.
+func addProperty(t *htmlstream.Transformer, tok *htmlstream.Token, prop string) {
+	props := strings.Fields(attrValue(tok, "properties"))
+	if !slices.Contains(props, prop) {
+		t.SetAttr("properties", strings.Join(append(props, prop), " "))
+	}
 }
 
 func attrValue(tok *htmlstream.Token, name string) string {

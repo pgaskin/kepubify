@@ -185,12 +185,12 @@ func TestTransformOPF(t *testing.T) {
 		{
 			name: "existing properties",
 			in:   `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="svg  scripted" href="c.xhtml"/></manifest></package>`,
-			out:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="cover-image" href="c.xhtml"/></manifest></package>`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="svg scripted cover-image" href="c.xhtml"/></manifest></package>`,
 		},
 		{
 			name: "existing cover-image property",
 			in:   `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties=' cover-image' href="c.jpg"/></manifest></package>`,
-			out:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties="cover-image" href="c.jpg"/></manifest></package>`,
+			out:  `<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="cover" properties=' cover-image' href="c.jpg"/></manifest></package>`,
 		},
 		{
 			name: "id with quotes",
