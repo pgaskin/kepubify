@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +19,8 @@ import (
 	"github.com/pgaskin/htmlstream/polyglot"
 	"github.com/pgaskin/kepubify/v5/internal"
 )
+
+const nsOCF = "urn:oasis:names:tc:opendocument:xmlns:container"
 
 // Convert converts the EPUB root r into a new EPUB written to w. If r is a
 // [zip.Reader], the original zip metadata and unmodified compressed data are
@@ -379,41 +380,64 @@ func epubWriteMimetype(epub *zip.Writer) error {
 // epubPackage gets the filename of the first OPF package document from the OCF
 // container.
 //
-// OCF containers can have technically more than one package document, but
-// like most reading systems, we'll just use the first one.
+// OCF containers can have technically more than one package document, but like
+// most reading systems, we'll just use the first one.
 func epubPackage(epub fs.FS) (string, error) {
-	var ocf struct {
-		XMLName  xml.Name `xml:"urn:oasis:names:tc:opendocument:xmlns:container container"`
-		Version  string   `xml:"version,attr"`
-		RootFile []struct {
-			FullPath  string `xml:"full-path,attr"`
-			MediaType string `xml:"media-type,attr"`
-		} `xml:"urn:oasis:names:tc:opendocument:xmlns:container rootfiles>rootfile"`
-	}
+	var (
+		isContainer = htmlstream.TagNS(nsOCF, "container")
+		isRootfiles = htmlstream.TagNS(nsOCF, "rootfiles")
+		isRootfile  = htmlstream.TagNS(nsOCF, "rootfile")
+	)
 
 	// we will be lenient about the mimetype file by not checking for it
 
-	f, err := epub.Open("META-INF/container.xml")
+	ocf, err := fs.ReadFile(epub, "META-INF/container.xml")
 	if err != nil {
 		return "", fmt.Errorf("parse OCF container: %w", err)
 	}
-	defer f.Close()
-
-	if err := xml.NewDecoder(f).Decode(&ocf); err != nil {
-		f.Close()
+	if ocf, err = transformOPFUTF8(ocf); err != nil {
 		return "", fmt.Errorf("parse OCF container: %w", err)
 	}
 
-	if ocf.Version != "1.0" {
-		return "", fmt.Errorf("parse OCF container: invalid OCF version %q", ocf.Version)
-	}
-
-	for _, f := range ocf.RootFile {
-		if f.MediaType == "application/oebps-package+xml" {
-			return f.FullPath, nil
+	var (
+		root      bool // root is container
+		rootfiles bool // in rootfiles under root
+	)
+	rd := htmlstream.NewReader(bytes.NewReader(ocf))
+	rd.SetMode(htmlstream.XML)
+	for tok := range rd.All() {
+		if tok.Kind() == htmlstream.EndTag {
+			if rd.Depth() == 1 {
+				break // only read the first root element (others are malformed)
+			}
+			if rd.Depth() == 2 {
+				rootfiles = false
+			}
+			continue
+		}
+		switch {
+		case tok.Kind() != htmlstream.StartTag:
+		case rd.Depth() == 1:
+			if root = isContainer(tok); !root {
+				return "", fmt.Errorf("parse OCF container: root element is not an OCF container element")
+			}
+			if v := attrValue(tok, "version"); v != "1.0" {
+				return "", fmt.Errorf("parse OCF container: invalid OCF version %q", v)
+			}
+		case rd.Depth() == 2:
+			rootfiles = tok.Opens() && isRootfiles(tok)
+		case rd.Depth() == 3 && rootfiles && isRootfile(tok):
+			if attrValue(tok, "media-type") == "application/oebps-package+xml" {
+				return attrValue(tok, "full-path"), nil
+			}
 		}
 	}
-
+	if err := rd.Err(); err != nil {
+		return "", fmt.Errorf("parse OCF container: %w", err)
+	}
+	if !root {
+		return "", fmt.Errorf("parse OCF container: no root element")
+	}
 	return "", fmt.Errorf("parse OCF container: no valid package documents found")
 }
 
@@ -442,7 +466,7 @@ func epubContentDocuments(epub fs.FS, pkg string) ([]string, error) {
 	for tok := range rd.All() {
 		if tok.Kind() == htmlstream.EndTag {
 			if rd.Depth() == 1 {
-				break // like encoding/xml, only read the first root element
+				break // only read the first root element (others are malformed)
 			}
 			if rd.Depth() == 2 {
 				manifest = false

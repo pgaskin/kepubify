@@ -69,6 +69,49 @@ func TestConvert(t *testing.T) {
 	}.Run(t)
 
 	ConvertTestCase{
+		What: "container not in the OCF namespace",
+		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+			"META-INF/container.xml": &fstest.MapFile{
+				Data: bytes.Replace(testEPUB["META-INF/container.xml"].Data, []byte(`xmlns="urn:oasis:names:tc:opendocument:xmlns:container"`), []byte(`xmlns="http://example.com/"`), 1),
+				Mode: testEPUB["META-INF/container.xml"].Mode,
+			},
+		}),
+		ShouldError: true,
+	}.Run(t)
+
+	for _, c := range []struct {
+		what string
+		data func([]byte) []byte
+	}{
+		{"UTF-16", func(b []byte) []byte {
+			b, err := unicode.UTF16(unicode.BigEndian, unicode.UseBOM).NewEncoder().Bytes(bytes.Replace(b, []byte(`encoding="UTF-8"`), []byte(`encoding="UTF-16"`), 1))
+			if err != nil {
+				panic(err)
+			}
+			return b
+		}},
+		{"malformed", func(b []byte) []byte {
+			return bytes.Replace(b, []byte(`<rootfiles>`), []byte(`<x>&nbsp; & </x><rootfiles>`), 1)
+		}},
+	} {
+		ConvertTestCase{
+			What: "with " + c.what + " container",
+			EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+				"META-INF/container.xml": &fstest.MapFile{
+					Data: c.data(testEPUB["META-INF/container.xml"].Data),
+					Mode: testEPUB["META-INF/container.xml"].Mode,
+				},
+			}),
+			ShouldError: false,
+
+			Checks: []ShouldFunc{
+				AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
+				ShouldBeUnchanged("META-INF/container.xml"),
+			},
+		}.Run(t)
+	}
+
+	ConvertTestCase{
 		What: "no package documents in container",
 		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
 			"META-INF/container.xml": &fstest.MapFile{
