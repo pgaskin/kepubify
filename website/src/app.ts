@@ -7,6 +7,9 @@ declare const KEPUBIFY_VERSION: string
 const maxFileSize = 300_000_000
 const maxConversions = Math.min(navigator.hardwareConcurrency || 2, 4)
 
+// note: iPadOS uses a macOS user agent by default
+const isIOS = /\b(iPhone|iPad|iPod)\b/.test(navigator.userAgent) || /\bMacintosh\b/.test(navigator.userAgent) && navigator.maxTouchPoints > 1
+
 export class KepubifyApp {
     #version = KEPUBIFY_VERSION
     #running = 0
@@ -81,7 +84,9 @@ export class KepubifyApp {
         this.#ref.hint = this.#ref.files.appendChild(document.createElement("div"))
         this.#ref.hint.classList.add("hint")
         this.#ref.hint.classList.add("hint--hidden")
-        this.#ref.hint.textContent = "Each file will turn green when the conversion is complete. Click the blue filename link to download the converted file."
+        this.#ref.hint.textContent = isIOS
+            ? "Each file will turn green when the conversion is complete. Tap the blue filename link to download the converted file, or Share to save it to Files or open it in another app."
+            : "Each file will turn green when the conversion is complete. Click the blue filename link to download the converted file."
 
         this.#ref.placeholder = el
 
@@ -193,9 +198,25 @@ export class KepubifyApp {
         })
 
         try {
-            elInfoName.href = URL.createObjectURL(new Blob([kepub], { type: "application/epub+zip" }))
             elInfoName.download = epub.name.replace(/([.]epub)?$/i, ".kepub.epub")
             elInfoName.textContent = elInfoName.download
+            const file = new File([kepub], elInfoName.download, { type: "application/epub+zip" })
+            elInfoName.href = URL.createObjectURL(file)
+
+            // note: iOS Safari opens downloaded epubs in Books, and some in-app
+            // browsers can't download files at all
+            if (isIOS && navigator.canShare?.({ files: [file] })) {
+                const elInfoShare = elInfo.appendChild(document.createElement("button"))
+                elInfoShare.textContent = "Share"
+                elInfoShare.title = "Share (e.g., save to Files)"
+                elInfoShare.addEventListener("click", () => {
+                    navigator.share({ files: [file] }).catch(ex => {
+                        if (!(ex instanceof DOMException && ex.name == "AbortError")) {
+                            Sentry.captureException(new Error(`failed to share file: ${ex}`))
+                        }
+                    })
+                })
+            }
 
             const elInfoRemove = elInfo.appendChild(document.createElement("button"))
             elInfoRemove.textContent = "−"
