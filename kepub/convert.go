@@ -253,20 +253,16 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 	}
 
 	// reuse a pool of buffers
-	type transformed struct {
-		index int
-		buf   *bytes.Buffer
-	}
 	pool := &sync.Pool{
 		New: func() any {
 			return bytes.NewBuffer(nil)
 		},
 	}
-	for t := range internal.Parallel(ctx, opt.workers(), content, func(i int) (transformed, error) {
+	for k, buf := range internal.Parallel(ctx, opt.workers(), content, func(_, i int) (*bytes.Buffer, error) {
 		f := files[i]
 		rc, err := r.Open(f.Name)
 		if err != nil {
-			return transformed{}, fmt.Errorf("transform %q: %w", f.Name, err)
+			return nil, fmt.Errorf("transform %q: %w", f.Name, err)
 		}
 		buf := pool.Get().(*bytes.Buffer)
 		err = transformContent(buf, rc, opt, f.Name)
@@ -274,16 +270,16 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 		if err != nil {
 			buf.Reset()
 			pool.Put(buf)
-			return transformed{}, fmt.Errorf("transform %q: %w", f.Name, err)
+			return nil, fmt.Errorf("transform %q: %w", f.Name, err)
 		}
-		return transformed{i, buf}, nil
+		return buf, nil
 	})(&err) {
-		f := files[t.index]
-		if err := zipReplace(zw, f, t.buf); err != nil {
+		f := files[content[k]]
+		if err := zipReplace(zw, f, buf); err != nil {
 			return fmt.Errorf("write %q to output EPUB: %w", f.Name, err)
 		}
-		t.buf.Reset()
-		pool.Put(t.buf)
+		buf.Reset()
+		pool.Put(buf)
 		written()
 	}
 	if err != nil {

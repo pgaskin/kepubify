@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -15,19 +16,22 @@ func TestParallel(t *testing.T) {
 	for i := range items {
 		items[i] = i
 	}
-	square := func(i int) (int, error) {
-		if i%7 == 0 {
+	square := func(i, x int) (int, error) {
+		if i != x {
+			return 0, fmt.Errorf("item %d: got index %d", x, i)
+		}
+		if x%7 == 0 {
 			time.Sleep(time.Millisecond) // vary the completion order
 		}
-		return i * i, nil
+		return x * x, nil
 	}
-	tracked := func(t *testing.T, fn func(int) (int, error)) (func(int) (int, error), func()) {
+	tracked := func(t *testing.T, fn func(int, int) (int, error)) (func(int, int) (int, error), func()) {
 		var running, started atomic.Int64
-		return func(i int) (int, error) {
+		return func(i, x int) (int, error) {
 				started.Add(1)
 				running.Add(1)
 				defer running.Add(-1)
-				return fn(i)
+				return fn(i, x)
 			}, func() {
 				if n := running.Load(); n != 0 {
 					t.Errorf("expected no calls to be running after the iteration, got %d", n)
@@ -44,7 +48,10 @@ func TestParallel(t *testing.T) {
 			t.Run("Simple", func(t *testing.T) {
 				var err error
 				var got []int
-				for r := range Parallel(context.Background(), n, items, square)(&err) {
+				for i, r := range Parallel(context.Background(), n, items, square)(&err) {
+					if i != len(got) {
+						t.Fatalf("expected index %d, got %d", len(got), i)
+					}
 					got = append(got, r)
 				}
 				if err != nil {
@@ -62,15 +69,15 @@ func TestParallel(t *testing.T) {
 
 			t.Run("Error", func(t *testing.T) {
 				errTest := errors.New("test")
-				fn, check := tracked(t, func(i int) (int, error) {
-					if i == 10 {
+				fn, check := tracked(t, func(i, x int) (int, error) {
+					if x == 10 {
 						return 0, errTest
 					}
-					return square(i)
+					return square(i, x)
 				})
 				var err error
 				var got []int
-				for r := range Parallel(context.Background(), n, items, fn)(&err) {
+				for _, r := range Parallel(context.Background(), n, items, fn)(&err) {
 					got = append(got, r)
 				}
 				check()
@@ -86,7 +93,7 @@ func TestParallel(t *testing.T) {
 				fn, check := tracked(t, square)
 				var err error
 				var got []int
-				for r := range Parallel(context.Background(), n, items, fn)(&err) {
+				for _, r := range Parallel(context.Background(), n, items, fn)(&err) {
 					if got = append(got, r); len(got) == 5 {
 						break
 					}
@@ -106,7 +113,7 @@ func TestParallel(t *testing.T) {
 				fn, check := tracked(t, square)
 				var err error
 				var got []int
-				for r := range Parallel(ctx, n, items, fn)(&err) {
+				for _, r := range Parallel(ctx, n, items, fn)(&err) {
 					if got = append(got, r); len(got) == 5 {
 						cancel()
 					}
@@ -146,8 +153,8 @@ func TestParallel(t *testing.T) {
 				// delay the first item until the second has started so the
 				// panic happens on another goroutine if there is one
 				second := make(chan struct{})
-				fn, check := tracked(t, func(i int) (int, error) {
-					switch i {
+				fn, check := tracked(t, func(i, x int) (int, error) {
+					switch x {
 					case 0:
 						if n > 1 {
 							<-second
@@ -156,7 +163,7 @@ func TestParallel(t *testing.T) {
 						close(second)
 						panic("test")
 					}
-					return square(i)
+					return square(i, x)
 				})
 				defer func() {
 					v := recover()
@@ -185,7 +192,7 @@ func TestParallel(t *testing.T) {
 					}
 				}()
 				var err error
-				for r := range Parallel(context.Background(), n, items, fn)(&err) {
+				for _, r := range Parallel(context.Background(), n, items, fn)(&err) {
 					if r == 25 {
 						panic("loop")
 					}
@@ -208,7 +215,7 @@ func TestParallel(t *testing.T) {
 		}()
 		var err error
 		var got int
-		for range Parallel(context.Background(), 4, items, func(i int) (int, error) {
+		for range Parallel(context.Background(), 4, items, func(i, _ int) (int, error) {
 			started.Add(1)
 			if i == 0 {
 				<-release

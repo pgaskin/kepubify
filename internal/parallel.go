@@ -9,43 +9,44 @@ import (
 	"sync/atomic"
 )
 
-// Parallel calls fn for each item on n goroutines (one of which is the current
-// one, so no new ones are started if n <= 1), and yields the results in order.
-// At most n results are held while waiting for an earlier one. It stops at the
-// first error, when ctx is done, or when the caller stops iterating, and
-// returns once the calls in progress have finished.
-func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(T) (R, error)) func(err *error) iter.Seq[R] {
+// Parallel calls fn for each item and its index on n goroutines (one of which
+// is the current one, so no new ones are started if n <= 1), and yields the
+// index and result of each item in order. At most n results are held while
+// waiting for an earlier one. It stops at the first error, when ctx is done, or
+// when the caller stops iterating, and returns once the calls in progress have
+// finished.
+func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(int, T) (R, error)) func(err *error) iter.Seq2[int, R] {
 	type result struct {
 		val   R
 		err   error
 		panic *parallelPanic
 	}
-	call := func(item T) (r result) {
+	call := func(i int, item T) (r result) {
 		defer func() {
 			if v := recover(); v != nil {
 				r.panic = &parallelPanic{v, debug.Stack()}
 			}
 		}()
-		r.val, r.err = fn(item)
+		r.val, r.err = fn(i, item)
 		return r
 	}
-	return func(err *error) iter.Seq[R] {
-		return func(yield func(R) bool) {
+	return func(err *error) iter.Seq2[int, R] {
+		return func(yield func(int, R) bool) {
 			*err = func() (err error) {
 				n := min(n, len(items)) // don't start more goroutines than the number of items
 				if n <= 1 {
-					for _, item := range items {
+					for i, item := range items {
 						if err := ctx.Err(); err != nil {
 							return err
 						}
-						r := call(item)
+						r := call(i, item)
 						if r.panic != nil {
 							panic(r.panic)
 						}
 						if r.err != nil {
 							return r.err
 						}
-						if !yield(r.val) {
+						if !yield(i, r.val) {
 							return nil
 						}
 					}
@@ -83,7 +84,7 @@ func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(T) (R, er
 							if i >= len(items) {
 								return
 							}
-							results[i] = call(items[i])
+							results[i] = call(i, items[i])
 							close(done[i])
 						}
 					}()
@@ -94,7 +95,7 @@ func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(T) (R, er
 						return err
 					}
 					if next.CompareAndSwap(int64(i), int64(i+1)) {
-						results[i] = call(items[i])
+						results[i] = call(i, items[i])
 					} else {
 						<-done[i]
 						<-taken
@@ -107,7 +108,7 @@ func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(T) (R, er
 					if r.err != nil {
 						return r.err
 					}
-					if !yield(r.val) {
+					if !yield(i, r.val) {
 						return nil
 					}
 				}
