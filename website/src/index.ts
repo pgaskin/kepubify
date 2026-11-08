@@ -14,4 +14,9 @@ app.start()
     .catch(ex => Sentry.captureException(new Error(`failed to start kepubify: ${ex}`)))
 document.getElementById("unsupported-browser")!.style.display = "none"
 
+// note: in-app browsers often can't download files (the app has to handle it)
+if (/\b(GSA|FBAN|FBAV|FB_IAB|Line|MicroMessenger)\/|\b(Instagram|LinkedInApp|Snapchat|musical_ly|BytedanceWebview)\b|; wv\)/.test(navigator.userAgent)) {
+    document.getElementById("in-app-browser")!.classList.remove("hidden")
+}
+
 export default app
