@@ -1,6 +1,6 @@
 module github.com/pgaskin/kepubify/v5
 
-go 1.27.0
+go 1.26.0
 
 require (
 	github.com/pgaskin/htmlstream v0.0.4

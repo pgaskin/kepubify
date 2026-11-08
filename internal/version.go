@@ -43,8 +43,8 @@ func init() {
 					}
 				}
 			}
-			if _, rest, ok := strings.CutLast(info.Main.Path, "/"); ok && strings.Trim(strings.TrimPrefix(rest, "v"), "0123456789") == "" {
-				major = rest
+			if i := strings.LastIndex(info.Main.Path, "/"); i >= 0 && strings.Trim(strings.TrimPrefix(info.Main.Path[i+1:], "v"), "0123456789") == "" {
+				major = info.Main.Path[i+1:]
 			}
 			if info.Main.Version != "" && info.Main.Version != "(devel)" {
 				modver = info.Main.Version
