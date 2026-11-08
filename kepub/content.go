@@ -16,38 +16,44 @@ import (
 	"golang.org/x/text/transform"
 )
 
-const cssHyphenate = `* {
-    -webkit-hyphens: auto;
-    -moz-hyphens: auto;
-    hyphens: auto;
+var cssHyphenate = fixIndent("    ", false, `
+	* {
+		-webkit-hyphens: auto;
+		-moz-hyphens: auto;
+		hyphens: auto;
 
-    -webkit-hyphenate-limit-after: 3;
-    -webkit-hyphenate-limit-before: 3;
-    -webkit-hyphenate-limit-lines: 2;
-}
+		-webkit-hyphenate-limit-after: 3;
+		-webkit-hyphenate-limit-before: 3;
+		-webkit-hyphenate-limit-lines: 2;
+	}
 
-h1, h2, h3, h4, h5, h6, td,
-h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, td * {
-    -moz-hyphens: none !important;
-    -webkit-hyphens: none !important;
-    hyphens: none !important;
-}`
+	h1, h2, h3, h4, h5, h6, td,
+	h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, td * {
+		-moz-hyphens: none !important;
+		-webkit-hyphens: none !important;
+		hyphens: none !important;
+	}
+`)
 
-const cssNoHyphenate = `* {
-    -moz-hyphens: none !important;
-    -webkit-hyphens: none !important;
-    hyphens: none !important;
-}`
+var cssNoHyphenate = fixIndent("    ", false, `
+	* {
+		-moz-hyphens: none !important;
+		-webkit-hyphens: none !important;
+		hyphens: none !important;
+	}
+`)
 
-const cssFullScreenFixes = `body {
-    margin: 0 !important;
-    padding: 0 !important;
-}
+var cssFullScreenFixes = fixIndent("    ", false, `
+	body {
+		margin: 0 !important;
+		padding: 0 !important;
+	}
 
-body>div {
-    padding-left: 0.2em !important;
-    padding-right: 0.2em !important;
-}`
+	body>div {
+		padding-left: 0.2em !important;
+		padding-right: 0.2em !important;
+	}
+`)
 
 // TransformContent transforms an HTML4/HTML5/XHTML1.1 document for a KEPUB.
 //

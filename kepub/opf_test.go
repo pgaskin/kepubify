@@ -34,112 +34,132 @@ func TestTransformOPF(t *testing.T) {
 		},
 		{
 			name: "set cover-image property on ID from meta[name=cover]",
-			in: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <!-- other stuff left out for brevity -->
-        <meta name="cover" content="cover-image"/>
-    </metadata>
-    <manifest>
-        <item id="cover-image" href="book_cover.jpg" media-type="image/jpeg"/>
-        <item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
-        <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-        <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
-    </manifest>
-    <spine toc="ncx">
-        <itemref idref="xhtml_text1"/>
-    </spine>
-</package>`,
-			out: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <!-- other stuff left out for brevity -->
-        <meta name="cover" content="cover-image"/>
-    </metadata>
-    <manifest>
-        <item id="cover-image" href="book_cover.jpg" media-type="image/jpeg" properties="cover-image"/>
-        <item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
-        <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
-        <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
-    </manifest>
-    <spine toc="ncx">
-        <itemref idref="xhtml_text1"/>
-    </spine>
-</package>`,
+			in: fixIndent("    ", false, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+						<!-- other stuff left out for brevity -->
+						<meta name="cover" content="cover-image"/>
+					</metadata>
+					<manifest>
+						<item id="cover-image" href="book_cover.jpg" media-type="image/jpeg"/>
+						<item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
+						<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+						<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+					</manifest>
+					<spine toc="ncx">
+						<itemref idref="xhtml_text1"/>
+					</spine>
+				</package>
+			`),
+			out: fixIndent("    ", false, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+						<!-- other stuff left out for brevity -->
+						<meta name="cover" content="cover-image"/>
+					</metadata>
+					<manifest>
+						<item id="cover-image" href="book_cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+						<item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
+						<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+						<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+					</manifest>
+					<spine toc="ncx">
+						<itemref idref="xhtml_text1"/>
+					</spine>
+				</package>
+			`),
 		},
 		{
 			name: "set cover-image property on #cover if meta[name=cover] not present",
-			in: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <!-- other stuff left out for brevity -->
-    </metadata>
-    <manifest>
-        <item id="cover" href="book_cover.jpg" media-type="image/jpeg"/>
-        <item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
-    </manifest>
-</package>`,
-			out: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <!-- other stuff left out for brevity -->
-    </metadata>
-    <manifest>
-        <item id="cover" href="book_cover.jpg" media-type="image/jpeg" properties="cover-image"/>
-        <item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
-    </manifest>
-</package>`,
+			in: fixIndent("    ", false, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+						<!-- other stuff left out for brevity -->
+					</metadata>
+					<manifest>
+						<item id="cover" href="book_cover.jpg" media-type="image/jpeg"/>
+						<item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
+					</manifest>
+				</package>
+			`),
+			out: fixIndent("    ", false, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+						<!-- other stuff left out for brevity -->
+					</metadata>
+					<manifest>
+						<item id="cover" href="book_cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+						<item id="xhtml_text1" href="xhtml/text1.xhtml" media-type="application/xhtml+xml"/>
+					</manifest>
+				</package>
+			`),
 		},
 		{
 			name: "remove calibre:timestamp and calibre contributor",
-			in: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <!-- --><meta content="whatever" name="calibre:timestamp"/>
-        <!-- --><dc:contributor file-as="calibre" role="bkp">calibre (#.#.#) [https://calibre-ebook.com]</dc:contributor>
-        <!-- --><dc:contributor>whatever</dc:contributor>
-    </metadata>
-    <!-- other stuff left out for brevity -->
-</package>`,
-			out: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
-    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <!-- -->
-        <!-- -->
-        <!-- --><dc:contributor>whatever</dc:contributor>
-    </metadata>
-    <!-- other stuff left out for brevity -->
-</package>`,
+			in: fixIndent("    ", false, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+						<!-- --><meta content="whatever" name="calibre:timestamp"/>
+						<!-- --><dc:contributor file-as="calibre" role="bkp">calibre (#.#.#) [https://calibre-ebook.com]</dc:contributor>
+						<!-- --><dc:contributor>whatever</dc:contributor>
+					</metadata>
+					<!-- other stuff left out for brevity -->
+				</package>
+			`),
+			out: fixIndent("    ", false, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uuid_id">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+						<!-- -->
+						<!-- -->
+						<!-- --><dc:contributor>whatever</dc:contributor>
+					</metadata>
+					<!-- other stuff left out for brevity -->
+				</package>
+			`),
 		},
 		{
 			name: "more calibre metadata, epub2 prefixes",
-			in: `<?xml version='1.0' encoding='utf-8'?>
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
-    <dc:title>Title</dc:title>
-    <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (5.0.0) [https://calibre-ebook.com]</dc:contributor>
-    <dc:contributor opf:role="edt">Editor</dc:contributor>
-    <opf:meta name="calibre:timestamp" content="2020-01-01T00:00:00+00:00"/>
-  </metadata>
-</package>`,
-			out: `<?xml version='1.0' encoding='utf-8'?>
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
-    <dc:title>Title</dc:title>
-    <dc:contributor opf:role="edt">Editor</dc:contributor>
-  </metadata>
-</package>`,
+			in: fixIndent("  ", false, `
+				<?xml version='1.0' encoding='utf-8'?>
+				<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+						<dc:title>Title</dc:title>
+						<dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (5.0.0) [https://calibre-ebook.com]</dc:contributor>
+						<dc:contributor opf:role="edt">Editor</dc:contributor>
+						<opf:meta name="calibre:timestamp" content="2020-01-01T00:00:00+00:00"/>
+					</metadata>
+				</package>
+			`),
+			out: fixIndent("  ", false, `
+				<?xml version='1.0' encoding='utf-8'?>
+				<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+					<metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+						<dc:title>Title</dc:title>
+						<dc:contributor opf:role="edt">Editor</dc:contributor>
+					</metadata>
+				</package>
+			`),
 		},
 		{
 			name: "prefixed package document",
-			in: `<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:x="http://purl.org/dc/elements/1.1/" version="2.0">
-<opf:metadata><x:contributor opf:role="bkp">calibre</x:contributor><opf:meta name="cover" content="img"/></opf:metadata>
-<opf:manifest><opf:item id="img" href="c.jpg" media-type="image/jpeg"/></opf:manifest>
-</opf:package>`,
-			out: `<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:x="http://purl.org/dc/elements/1.1/" version="2.0">
-<opf:metadata><opf:meta name="cover" content="img"/></opf:metadata>
-<opf:manifest><opf:item id="img" href="c.jpg" media-type="image/jpeg" properties="cover-image"/></opf:manifest>
-</opf:package>`,
+			in: fixIndent("    ", false, `
+				<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:x="http://purl.org/dc/elements/1.1/" version="2.0">
+				<opf:metadata><x:contributor opf:role="bkp">calibre</x:contributor><opf:meta name="cover" content="img"/></opf:metadata>
+				<opf:manifest><opf:item id="img" href="c.jpg" media-type="image/jpeg"/></opf:manifest>
+				</opf:package>
+			`),
+			out: fixIndent("    ", false, `
+				<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:x="http://purl.org/dc/elements/1.1/" version="2.0">
+				<opf:metadata><opf:meta name="cover" content="img"/></opf:metadata>
+				<opf:manifest><opf:item id="img" href="c.jpg" media-type="image/jpeg" properties="cover-image"/></opf:manifest>
+				</opf:package>
+			`),
 		},
 		{
 			name: "cover meta element after the manifest",

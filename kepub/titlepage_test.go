@@ -270,30 +270,32 @@ func TestTransformDummyTitlepageParts(t *testing.T) {
 	for _, tc := range []titlepageTest{
 		{
 			name: "indentation",
-			opf: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
-  <manifest>
-    <item id="text" href="text.xhtml" media-type="application/xhtml+xml"/>
-  </manifest>
-  <spine>
-    <itemref idref="text"/>
-  </spine>
-</package>
-`,
+			opf: fixIndent("  ", true, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+					<manifest>
+						<item id="text" href="text.xhtml" media-type="application/xhtml+xml"/>
+					</manifest>
+					<spine>
+						<itemref idref="text"/>
+					</spine>
+				</package>
+			`),
 			content: words,
 			added:   true,
-			want: `<?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
-  <manifest>
-    <item id="text" href="text.xhtml" media-type="application/xhtml+xml"/>
-    <item id="kepubify-titlepage-dummy" href="kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml" />
-  </manifest>
-  <spine>
-    <itemref idref="kepubify-titlepage-dummy" />
-    <itemref idref="text"/>
-  </spine>
-</package>
-`,
+			want: fixIndent("  ", true, `
+				<?xml version="1.0" encoding="UTF-8"?>
+				<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+					<manifest>
+						<item id="text" href="text.xhtml" media-type="application/xhtml+xml"/>
+						<item id="kepubify-titlepage-dummy" href="kepubify-titlepage-dummy.xhtml" media-type="application/xhtml+xml" />
+					</manifest>
+					<spine>
+						<itemref idref="kepubify-titlepage-dummy" />
+						<itemref idref="text"/>
+					</spine>
+				</package>
+			`),
 		},
 		{
 			name:    "no whitespace",

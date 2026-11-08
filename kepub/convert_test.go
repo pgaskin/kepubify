@@ -542,23 +542,24 @@ func TestReprocessKepub(t *testing.T) {
 		What: "koboSpan string without Kobo spans",
 		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
 			"OEBPS/xhtml/ch01.xhtml": &fstest.MapFile{
-				Data: []byte(`<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-	<title>Chapter 1</title>
-	<style>.koboSpan { color: red }</style>
-</head>
-<body>
-	<!-- <span class="koboSpan" id="kobo.1.1"> -->
-	<p>The markup looks like &lt;span class="koboSpan" id="kobo.1.1"&gt;.</p>
-	<p><span class="koboSpan" id="kobo.1">no segment</span></p>
-	<p><span class="koboSpan" id="kobo.a.b">not numeric</span></p>
-	<p><span class="koboSpan">no id</span></p>
-	<p><span class="other" id="kobo.1.1">no class</span></p>
-	<script>var x = "koboSpan";</script>
-</body>
-</html>
-`),
+				Data: []byte(fixIndent("\t", true, `
+					<?xml version="1.0" encoding="UTF-8"?>
+					<html xmlns="http://www.w3.org/1999/xhtml">
+					<head>
+						<title>Chapter 1</title>
+						<style>.koboSpan { color: red }</style>
+					</head>
+					<body>
+						<!-- <span class="koboSpan" id="kobo.1.1"> -->
+						<p>The markup looks like &lt;span class="koboSpan" id="kobo.1.1"&gt;.</p>
+						<p><span class="koboSpan" id="kobo.1">no segment</span></p>
+						<p><span class="koboSpan" id="kobo.a.b">not numeric</span></p>
+						<p><span class="koboSpan">no id</span></p>
+						<p><span class="other" id="kobo.1.1">no class</span></p>
+						<script>var x = "koboSpan";</script>
+					</body>
+					</html>
+				`)),
 				Mode: 0666,
 			},
 		}),
@@ -1062,13 +1063,14 @@ func init() {
 	}
 
 	testEPUB["META-INF/container.xml"] = &fstest.MapFile{
-		Data: []byte(`<?xml version="1.0" encoding="UTF-8"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-	<rootfiles>
-		<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
-	</rootfiles>
-</container>
-`),
+		Data: []byte(fixIndent("\t", true, `
+			<?xml version="1.0" encoding="UTF-8"?>
+			<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+				<rootfiles>
+					<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+				</rootfiles>
+			</container>
+		`)),
 		Mode: 0666,
 	}
 
@@ -1109,55 +1111,56 @@ func init() {
 	}
 
 	testEPUB["OEBPS/nav.xhtml"] = &fstest.MapFile{
-		Data: []byte(`<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
-	<head>
-		<title>Test Book</title>
-		<meta charset="utf-8/>
-	</head>
-	<body>
-		<nav epub:type="toc">
-			<ol>
-				<li><a href="xhtml/title.xhtml">Cover Page</a></li>` + stringFor(`
-				<li><a href="xhtml/ch00.xhtml">Chapter #</a></li>`, 1, 100, func(s string, i int) string {
+		Data: []byte(fixIndent("\t", true, `
+			<!DOCTYPE html>
+			<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
+				<head>
+					<title>Test Book</title>
+					<meta charset="utf-8/>
+				</head>
+				<body>
+					<nav epub:type="toc">
+						<ol>
+							<li><a href="xhtml/title.xhtml">Cover Page</a></li>`+stringFor(`
+							<li><a href="xhtml/ch00.xhtml">Chapter #</a></li>`, 1, 100, func(s string, i int) string {
 			return strings.ReplaceAll(strings.ReplaceAll(s, "00", fmt.Sprintf("%02d", i)), "#", strconv.Itoa(i))
-		}) + `
-			</ol>
-		</nav>
-	</body>
-</html>	
-`),
+		})+`
+						</ol>
+					</nav>
+				</body>
+			</html>
+		`)),
 		Mode: 0666,
 	}
 
 	testEPUB["OEBPS/xhtml/title.xhtml"] = &fstest.MapFile{
-		Data: []byte(`<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
-	<head>
-		<title>Test Book</title>
-		<meta charset="utf-8/>
-	</head>
-	<body>
-		<img style="height: 100%; max-width: 100%" src="cover.png" alt="Cover image"/>
-	</body>
-</html>	
-`),
+		Data: []byte(fixIndent("\t", true, `
+			<!DOCTYPE html>
+			<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
+				<head>
+					<title>Test Book</title>
+					<meta charset="utf-8/>
+				</head>
+				<body>
+					<img style="height: 100%; max-width: 100%" src="cover.png" alt="Cover image"/>
+				</body>
+			</html>
+		`)),
 		Mode: 0666,
 	}
 
 	for i := 1; i < 100; i++ {
 		var b strings.Builder
-		b.WriteString(`<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
-<head>
-	<title>Test Book</title>
-	<meta charset="utf-8/>
-</head>
-<body>
-	<h1>Chapter `)
-		b.WriteString(strconv.Itoa(i))
-		b.WriteString(`</h1>
-`)
+		b.WriteString(fixIndent("\t", true, `
+			<!DOCTYPE html>
+			<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
+			<head>
+				<title>Test Book</title>
+				<meta charset="utf-8/>
+			</head>
+			<body>
+				<h1>Chapter `+strconv.Itoa(i)+`</h1>
+		`))
 
 		r := rand.New(rand.NewSource(int64(i)))
 		for j, jn := 0, r.Intn(200)+50; j < jn; j++ {
@@ -1190,10 +1193,11 @@ func init() {
 			b.WriteByte('\n')
 		}
 
-		b.WriteString(`
-</body>
-</html>	
-`)
+		b.WriteString(fixIndent("\t", true, `
+
+			</body>
+			</html>
+		`))
 		testEPUB["OEBPS/xhtml/ch"+fmt.Sprintf("%02d", i)+".xhtml"] = &fstest.MapFile{
 			Data: []byte(b.String()),
 			Mode: 0666,

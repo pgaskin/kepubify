@@ -3,6 +3,8 @@ package kepub
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 )
 
 // ErrAlreadyKepub is returned by [Convert] when the input is already a KEPUB
@@ -95,4 +97,49 @@ func (opt Options) progress() func(pct float64, force bool) {
 			opt.Progress(pct)
 		}
 	}
+}
+
+// fixIndent removes the indentation from s, which must start with a newline
+// (e.g., a raw string literal where the contents start on the line after the
+// opening backtick). The indentation removed is based on the common leading
+// tabs across lines, and the final line (the closing backtick's) must only
+// contain less or equal indentation. Each remaining leading tab is replaced
+// with indent, and lines with only tabs become empty lines. If newline is
+// false, the final newline is removed.
+//
+// ONLY USE THIS IN TESTS AND PACKAGE-LEVEL VARIABLES (it panics if the
+// requirements aren't met)
+func fixIndent(indent string, newline bool, s string) string {
+	s, ok := strings.CutPrefix(s, "\n")
+	if !ok {
+		panic("fixIndent: doesn't start with a newline")
+	}
+	body := strings.TrimRight(s, "\t")
+	closing := len(s) - len(body)
+	base := -1
+	for line := range strings.Lines(body) {
+		if strings.Trim(line, "\t\n") != "" {
+			if n := len(line) - len(strings.TrimLeft(line, "\t")); base < 0 || n < base {
+				base = n
+			}
+		}
+	}
+	if base >= 0 && closing > base {
+		panic("fixIndent: too much indentation on final line: " + strconv.Quote(s))
+	}
+	var b strings.Builder
+	for line := range strings.Lines(body) {
+		line = strings.TrimSuffix(line, "\n")
+		if strings.Trim(line, "\t") != "" {
+			rest := line[base:]
+			n := len(rest) - len(strings.TrimLeft(rest, "\t"))
+			b.WriteString(strings.Repeat(indent, n))
+			b.WriteString(rest[n:])
+		}
+		b.WriteByte('\n')
+	}
+	if !newline {
+		return strings.TrimSuffix(b.String(), "\n")
+	}
+	return b.String()
 }
