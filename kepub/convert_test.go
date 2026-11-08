@@ -25,6 +25,10 @@ import (
 	"testing/fstest"
 	"testing/iotest"
 	"time"
+
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/unicode"
 )
 
 // The intention of these tests are to provide quick checks for important
@@ -85,6 +89,59 @@ func TestConvert(t *testing.T) {
 		}),
 		ShouldError: true,
 	}.Run(t)
+
+	ConvertTestCase{
+		What: "package not in the OPF namespace",
+		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+			"OEBPS/content.opf": &fstest.MapFile{
+				Data: bytes.Replace(testEPUB["OEBPS/content.opf"].Data, []byte(`xmlns="http://www.idpf.org/2007/opf"`), []byte(`xmlns="http://example.com/"`), 1),
+				Mode: testEPUB["OEBPS/content.opf"].Mode,
+			},
+		}),
+		ShouldError: true,
+	}.Run(t)
+
+	for _, c := range []struct {
+		what  string
+		label string
+		enc   encoding.Encoding
+		title string
+	}{
+		{"ISO-8859-1", "ISO-8859-1", charmap.ISO8859_1, "Café"},
+		{"UTF-16", "UTF-16", unicode.UTF16(unicode.LittleEndian, unicode.UseBOM), "Café"},
+		{"malformed", "UTF-8", encoding.Nop, "Test & test&nbsp;"},
+	} {
+		opf, err := c.enc.NewEncoder().String(strings.NewReplacer(
+			`encoding="UTF-8"`, `encoding="`+c.label+`"`,
+			`<dc:title>Test</dc:title>`, `<dc:title>`+c.title+`</dc:title>`,
+		).Replace(string(testEPUB["OEBPS/content.opf"].Data)))
+		if err != nil {
+			panic(err)
+		}
+		ConvertTestCase{
+			What: "with " + c.what + " package",
+			EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+				"OEBPS/content.opf": &fstest.MapFile{
+					Data: []byte(opf),
+					Mode: testEPUB["OEBPS/content.opf"].Mode,
+				},
+			}),
+			ShouldError: false,
+
+			Checks: []ShouldFunc{
+				ShouldHaveAllSourceDocumentsWithSaneOPF(0),
+				AllDocumentsShould(DocumentProbablyHasSpans, []string{"OEBPS/xhtml/title.xhtml"}),
+				FileShould("OEBPS/content.opf", func(contents string) error {
+					for _, s := range []string{`encoding="UTF-8"`, `<dc:title>` + c.title + `</dc:title>`} {
+						if !strings.Contains(contents, s) {
+							return fmt.Errorf("no %s", s)
+						}
+					}
+					return nil
+				}).Because("should convert the package to UTF-8"),
+			},
+		}.Run(t)
+	}
 
 	ConvertTestCase{
 		What:        "simple",

@@ -424,37 +424,58 @@ func epubPackage(epub fs.FS) (string, error) {
 // 2.0.1 - 3.3), some invalid EPUBs use text/html, and others use
 // application/xml or text/xml with a .htm, .xhtml, or .html extension.
 func epubContentDocuments(epub fs.FS, pkg string) ([]string, error) {
-	var opf struct {
-		XMLName      xml.Name `xml:"http://www.idpf.org/2007/opf package"`
-		ManifestItem []struct {
-			Href      string `xml:"href,attr"`
-			MediaType string `xml:"media-type,attr"`
-		} `xml:"http://www.idpf.org/2007/opf manifest>item"`
-	}
-
-	f, err := epub.Open(pkg)
+	opf, err := fs.ReadFile(epub, pkg)
 	if err != nil {
 		return nil, fmt.Errorf("parse OPF package: %w", err)
 	}
-	defer f.Close()
-
-	if err := xml.NewDecoder(f).Decode(&opf); err != nil {
-		f.Close()
+	if opf, err = transformOPFUTF8(opf); err != nil {
 		return nil, fmt.Errorf("parse OPF package: %w", err)
 	}
 
-	var docs []string
-	for _, it := range opf.ManifestItem {
-		switch it.MediaType {
-		case "application/xhtml+xml", "text/html":
-			docs = append(docs, epubHref(epub, pkg, it.Href))
+	var (
+		docs     []string
+		root     bool // root element is a package element
+		manifest bool // in a manifest child element of the root
+	)
+	rd := htmlstream.NewReader(bytes.NewReader(opf))
+	rd.SetMode(htmlstream.XML)
+	for tok := range rd.All() {
+		if tok.Kind() == htmlstream.EndTag {
+			if rd.Depth() == 1 {
+				break // like encoding/xml, only read the first root element
+			}
+			if rd.Depth() == 2 {
+				manifest = false
+			}
 			continue
 		}
-		switch strings.ToLower(path.Ext(it.Href)) {
-		case ".htm", ".html", ".xhtml":
-			docs = append(docs, epubHref(epub, pkg, it.Href))
-			continue
+		switch {
+		case tok.Kind() != htmlstream.StartTag:
+		case rd.Depth() == 1:
+			if root = isPackage(tok); !root {
+				return nil, fmt.Errorf("parse OPF package: root element is not an OPF package element")
+			}
+		case rd.Depth() == 2:
+			manifest = tok.Opens() && isManifest(tok)
+		case rd.Depth() == 3 && manifest && isManifestItem(tok):
+			href := attrValue(tok, "href")
+			switch attrValue(tok, "media-type") {
+			case "application/xhtml+xml", "text/html":
+				docs = append(docs, epubHref(epub, pkg, href))
+				continue
+			}
+			switch strings.ToLower(path.Ext(href)) {
+			case ".htm", ".html", ".xhtml":
+				docs = append(docs, epubHref(epub, pkg, href))
+				continue
+			}
 		}
+	}
+	if err := rd.Err(); err != nil {
+		return nil, fmt.Errorf("parse OPF package: %w", err)
+	}
+	if !root {
+		return nil, fmt.Errorf("parse OPF package: no root element")
 	}
 
 	return docs, nil

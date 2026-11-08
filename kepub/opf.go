@@ -27,6 +27,8 @@ var (
 		htmlstream.AttrEquals("role", "bkp"),
 		htmlstream.AttrNSEquals(nsOPF, "role", "bkp"),
 	))
+	isPackage        = htmlstream.TagNS(nsOPF, "package")
+	isManifest       = htmlstream.TagNS(nsOPF, "manifest")
 	isManifestItem   = htmlstream.TagNS(nsOPF, "item")
 	isGuideReference = htmlstream.TagNS(nsOPF, "reference")
 )
