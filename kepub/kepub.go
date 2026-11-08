@@ -57,10 +57,11 @@ type Options struct {
 	// of the conversion is the same as usual.
 	ReprocessKepub bool
 
-	// DetectCover makes the dummy titlepage show the book's cover image, if
-	// one is found, instead of being blank. The cover image is the one
-	// declared in the OPF, or an image file named like a cover (e.g.,
-	// cover.jpg).
+	// DetectCover makes the dummy titlepage show the book's cover image, if one
+	// is found, instead of being blank. The cover image is the one declared in
+	// the OPF, or an image file named like a cover (e.g., cover.jpg), which is
+	// added to the manifest if it isn't listed, with cover-image if there isn't
+	// already one.
 	DetectCover bool
 
 	// Workers is the number of goroutines used by [Convert] to transform

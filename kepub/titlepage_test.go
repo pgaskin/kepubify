@@ -182,12 +182,14 @@ func TestTransformDummyTitlepageCover(t *testing.T) {
 			manifest: `<item id="c" href="images/front.jpg" media-type="image/jpeg" properties="cover-image"/>`,
 			content:  map[string]string{"images/front.jpg": img, "cover.jpg": img},
 			cover:    "images/front.jpg",
+			excludes: []string{`kepubify-cover`},
 		},
 		{
 			name:     "declared in the opf, but not an image",
 			manifest: `<item id="cover" href="cover.xhtml" media-type="application/xhtml+xml" properties="cover-image"/>`,
 			content:  map[string]string{"cover.xhtml": "", "cover.png": img},
 			cover:    "cover.png",
+			contains: []string{`<item id="kepubify-cover" href="cover.png" media-type="image/png" />`},
 		},
 		{
 			name:     "declared in the opf, but missing",
@@ -196,9 +198,10 @@ func TestTransformDummyTitlepageCover(t *testing.T) {
 			cover:    "cover.jpg",
 		},
 		{
-			name:    "package directory first",
-			content: map[string]string{"cover.jpg": img, "images/cover.jpg": img, "../cover.jpg": img},
-			cover:   "cover.jpg",
+			name:     "package directory first",
+			content:  map[string]string{"cover.jpg": img, "images/cover.jpg": img, "../cover.jpg": img},
+			cover:    "cover.jpg",
+			contains: []string{`<item id="kepubify-cover" href="cover.jpg" media-type="image/jpeg" properties="cover-image" />`},
 		},
 		{
 			name:    "anywhere before the next pattern",
@@ -226,9 +229,40 @@ func TestTransformDummyTitlepageCover(t *testing.T) {
 			cover:   "Images/COVER.JPEG",
 		},
 		{
-			name:    "escaped",
-			content: map[string]string{"my cover.jpg": img},
-			cover:   "my%20cover.jpg",
+			name:     "escaped",
+			content:  map[string]string{"my cover.jpg": img},
+			cover:    "my%20cover.jpg",
+			contains: []string{`<item id="kepubify-cover" href="my%20cover.jpg" media-type="image/jpeg" properties="cover-image" />`},
+		},
+		{
+			name:     "listed but not declared",
+			manifest: `<item id="i" href="images/cover.jpg" media-type="image/jpeg" properties="x"/>`,
+			content:  map[string]string{"images/cover.jpg": img},
+			cover:    "images/cover.jpg",
+			contains: []string{`<item id="i" href="images/cover.jpg" media-type="image/jpeg" properties="x cover-image"/>`},
+			excludes: []string{`kepubify-cover`},
+		},
+		{
+			name:     "listed with a different case",
+			manifest: `<item id="i" href="images/Cover.jpg" media-type="image/jpeg"/>`,
+			content:  map[string]string{"images/cover.jpg": img},
+			cover:    "images/cover.jpg",
+			contains: []string{`<item id="i" href="images/Cover.jpg" media-type="image/jpeg" properties="cover-image"/>`},
+			excludes: []string{`kepubify-cover`},
+		},
+		{
+			name:     "id taken",
+			manifest: `<item id="kepubify-cover" href="a.css" media-type="text/css"/>`,
+			content:  map[string]string{"a.css": "", "cover.gif": img},
+			cover:    "cover.gif",
+			contains: []string{`<item id="kepubify-cover-2" href="cover.gif" media-type="image/gif" properties="cover-image" />`},
+		},
+		{
+			name:     "indentation",
+			manifest: "\n        <item id=\"a\" href=\"a.css\" media-type=\"text/css\"/>\n    ",
+			content:  map[string]string{"a.css": "", "cover.jpg": img},
+			cover:    "cover.jpg",
+			contains: []string{"<item id=\"a\" href=\"a.css\" media-type=\"text/css\"/>\n        <item id=\"kepubify-titlepage-dummy\" href=\"kepubify-titlepage-dummy.xhtml\" media-type=\"application/xhtml+xml\" />\n        <item id=\"kepubify-cover\" href=\"cover.jpg\" media-type=\"image/jpeg\" properties=\"cover-image\" />\n    </manifest>"},
 		},
 		{
 			name:    "filtered files and other types",
@@ -239,10 +273,11 @@ func TestTransformDummyTitlepageCover(t *testing.T) {
 		tc.run(t)
 	}
 	titlepageTest{
-		name:    "disabled",
-		force:   new(true),
-		added:   true,
-		content: map[string]string{"cover.jpg": img},
+		name:     "disabled",
+		force:    new(true),
+		added:    true,
+		content:  map[string]string{"cover.jpg": img},
+		excludes: []string{`kepubify-cover`, `cover-image`},
 	}.run(t)
 }
 
@@ -450,7 +485,9 @@ type titlepageTest struct {
 	content  map[string]string // relative to the package document
 	err      bool
 	added    bool
-	want     string // new opf to check (if not empty)
+	want     string   // new opf to check (if not empty)
+	contains []string // substrings of the new opf
+	excludes []string // substrings not in the new opf
 
 	detectCover bool
 	cover       string // expected cover image src (if not empty)
@@ -511,6 +548,16 @@ func (tc titlepageTest) run(t *testing.T) {
 		}
 		if tc.want != "" && buf.String() != tc.want {
 			t.Errorf("got:\n%s\nwant:\n%s", buf.String(), tc.want)
+		}
+		for _, x := range tc.contains {
+			if !strings.Contains(buf.String(), x) {
+				t.Errorf("no %s in:\n%s", x, buf.String())
+			}
+		}
+		for _, x := range tc.excludes {
+			if strings.Contains(buf.String(), x) {
+				t.Errorf("%s in:\n%s", x, buf.String())
+			}
 		}
 	})
 }

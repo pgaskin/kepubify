@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -45,8 +46,9 @@ const (
 //
 // The options used are DummyTitlepage, DetectCover (if true, the dummy
 // titlepage shows the cover image if one is found, see
-// transformDummyTitlepageCover, instead of being blank), and Charset (for
-// reading the first content document).
+// transformDummyTitlepageCover, instead of being blank, and the image is added
+// to the manifest if it isn't listed, with cover-image if there isn't one
+// already, and Charset (for reading the first content document).
 func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, opt Options) (string, io.Reader, bool, error) {
 	switch force := opt.DummyTitlepage; {
 	case force == nil:
@@ -58,15 +60,16 @@ func transformDummyTitlepage(epub fs.FS, opfF string, opf *bytes.Buffer, opt Opt
 	case !*force:
 		return "", nil, false, nil
 	}
-	var b bytes.Buffer
-	if err := transformDummyTitlepageAdd(&b, opf.Bytes()); err != nil {
-		return "", nil, true, fmt.Errorf("apply title page fix: %w", err)
-	}
 	page := dummyTitlepage
+	var cover titlepageCover
 	if opt.DetectCover {
-		if cover := transformDummyTitlepageCover(epub, opfF, opf.Bytes()); cover != "" {
-			page = dummyTitlepageWithCover(relativeHref(path.Dir(opfF), cover))
+		if cover = transformDummyTitlepageCover(epub, opfF, opf.Bytes()); cover.name != "" {
+			page = dummyTitlepageWithCover(cover.href)
 		}
+	}
+	var b bytes.Buffer
+	if err := transformDummyTitlepageAdd(&b, opf.Bytes(), cover); err != nil {
+		return "", nil, true, fmt.Errorf("apply title page fix: %w", err)
 	}
 	opf.Reset()
 	opf.Write(b.Bytes())
@@ -81,8 +84,17 @@ func dummyTitlepageWithCover(href string) string {
 	return string(b)
 }
 
-// transformDummyTitlepageCover returns the path in epub of the cover image of
-// the package document opf at opfF, or "" if none is found.
+// titlepageCover is the cover image found by transformDummyTitlepageCover.
+type titlepageCover struct {
+	name     string         // path in the epub, or empty if none was found
+	href     string         // name relative to the package document
+	item     htmlstream.Pos // position of the manifest item, or -1 if not listed
+	declared bool           // the manifest has a cover-image item
+	id       string         // unused id for a new manifest item
+}
+
+// transformDummyTitlepageCover finds the cover image of the package document
+// opf at opfF.
 //
 // The cover image is the manifest item with the cover-image property, if it is
 // an image which exists. Otherwise, it is the first image file (by
@@ -90,11 +102,7 @@ func dummyTitlepageWithCover(href string) string {
 // starts with cover_, ends with _cover, ends with cover, or contains cover, in
 // that order of preference, preferring the ones in the directory of the
 // package document over the others for each.
-func transformDummyTitlepageCover(epub fs.FS, opfF string, opf []byte) string {
-	// TODO: add the detected cover to the manifest if not already listed? it
-	// should work fine as-is, though it is technically supposed to be listed
-	// there
-
+func transformDummyTitlepageCover(epub fs.FS, opfF string, opf []byte) titlepageCover {
 	isImage := func(name string) bool {
 		switch strings.ToLower(path.Ext(name)) {
 		case ".jpg", ".jpeg", ".png", ".gif":
@@ -104,10 +112,21 @@ func transformDummyTitlepageCover(epub fs.FS, opfF string, opf []byte) string {
 	}
 
 	// note: transformOPF sets the cover-image property on the cover
+	var (
+		cover    = titlepageCover{item: -1}
+		items    = map[string]htmlstream.Pos{} // [name]first-manifest-item
+		lower    = map[string]htmlstream.Pos{} // [lowercase-name]first-manifest-item, or -1 if ambiguous
+		ids      = map[string]bool{}
+		manifest bool
+	)
 	rd := htmlstream.NewReader(bytes.NewReader(opf))
 	rd.SetMode(htmlstream.XML)
-	var manifest bool
 	for tok := range rd.All() {
+		if tok.Kind() == htmlstream.StartTag {
+			if a, ok := tok.Attr("id"); ok {
+				ids[a.Value()] = true
+			}
+		}
 		switch {
 		case tok.Kind() == htmlstream.EndTag && rd.Depth() == 2:
 			manifest = false
@@ -115,16 +134,42 @@ func transformDummyTitlepageCover(epub fs.FS, opfF string, opf []byte) string {
 		case rd.Depth() == 2:
 			manifest = tok.Opens() && string(tok.Local()) == "manifest"
 		case rd.Depth() == 3 && manifest && string(tok.Local()) == "item":
+			name := epubHref(epub, opfF, attrValue(tok, "href"))
+			if _, ok := items[name]; !ok {
+				items[name] = tok.Pos()
+				l := strings.ToLower(name)
+				if _, ok := lower[l]; ok {
+					lower[l] = -1
+				} else {
+					lower[l] = tok.Pos()
+				}
+			}
 			if !slices.Contains(strings.Fields(attrValue(tok, "properties")), "cover-image") {
 				continue
 			}
-			name := epubHref(epub, opfF, attrValue(tok, "href"))
+			cover.declared = true
 			if isImage(name) {
 				if _, err := fs.Stat(epub, name); err == nil {
-					return name
+					cover.name, cover.href, cover.item = name, relativeHref(path.Dir(opfF), name), tok.Pos()
+					return cover
 				}
 			}
 		}
+	}
+	found := func(name string) titlepageCover {
+		cover.name, cover.href = name, relativeHref(path.Dir(opfF), name)
+		if pos, ok := items[name]; ok {
+			cover.item = pos
+		} else if pos, ok := lower[strings.ToLower(name)]; ok {
+			cover.item = pos
+		}
+		if cover.item < 0 {
+			cover.id = "kepubify-cover"
+			for i := 2; ids[cover.id]; i++ {
+				cover.id = "kepubify-cover-" + strconv.Itoa(i)
+			}
+		}
+		return cover
 	}
 
 	var images []string
@@ -149,12 +194,12 @@ func transformDummyTitlepageCover(epub fs.FS, opfF string, opf []byte) string {
 				}
 				base := strings.ToLower(path.Base(name))
 				if match(strings.TrimSuffix(base, path.Ext(base))) {
-					return name
+					return found(name)
 				}
 			}
 		}
 	}
-	return ""
+	return cover
 }
 
 // relativeHref returns a relative URL referencing the slash-separated path
@@ -344,20 +389,22 @@ func isTitlepage(r io.Reader) (bool, error) {
 }
 
 // transformDummyTitlepageAdd writes opf to w, adding the dummy titlepage
-// manifest/spine items.
-func transformDummyTitlepageAdd(w io.Writer, opf []byte) error {
+// manifest/spine items, and the cover to the manifest if not listed, declaring
+// it as the cover if there isn't one.
+func transformDummyTitlepageAdd(w io.Writer, opf []byte, cover titlepageCover) error {
 	t := htmlstream.NewTransformer(w, bytes.NewReader(opf))
 	t.SetMode(htmlstream.XML)
 	var (
-		space    indentHolder
-		root     bool                // root element found
-		pkg      bool                // package element in root element
-		manifest bool                // first manifest element found
-		spine    bool                // first spine element found
-		open     htmlstream.Pos = -1 // position of the first manifest element (while open)
-		item     []byte              // manifest item to add before the end tag of the manifest element
-		last     []byte              // whitespace before the last child element of the manifest element
-		itemref  []byte              // spine item to add before the token after the spine start tag
+		space     indentHolder
+		root      bool                // root element found
+		pkg       bool                // package element in root element
+		manifest  bool                // first manifest element found
+		spine     bool                // first spine element found
+		open      htmlstream.Pos = -1 // position of the first manifest element (while open)
+		item      []byte              // manifest item to add before the end tag of the manifest element
+		coverItem []byte              // manifest item for the cover to add after item
+		last      []byte              // whitespace before the last child element of the manifest element
+		itemref   []byte              // spine item to add before the token after the spine start tag
 	)
 	for tok := range t.All() {
 		if itemref != nil {
@@ -379,11 +426,18 @@ func transformDummyTitlepageAdd(w io.Writer, opf []byte) error {
 			case depth == 2 && pkg && tok.NS() == nsOPF && string(tok.Local()) == "manifest" && !manifest:
 				manifest = true
 				item = appendSibling(nil, tok, "item", "id", dummyTitlepageID, "href", dummyTitlepageHref, "media-type", "application/xhtml+xml")
+				if cover.name != "" && cover.item < 0 {
+					attrs := []string{"id", cover.id, "href", cover.href, "media-type", imageMediaType(cover.name)}
+					if !cover.declared {
+						attrs = append(attrs, "properties", "cover-image")
+					}
+					coverItem = appendSibling(nil, tok, "item", attrs...)
+				}
 				if tok.Opens() {
 					open = tok.Pos()
 				} else {
 					t.ExpandSelfClosing()
-					t.InsertAfter(item)
+					t.InsertAfter(append(item, coverItem...))
 				}
 			case depth == 2 && pkg && tok.NS() == nsOPF && string(tok.Local()) == "spine" && !spine:
 				spine = true
@@ -396,6 +450,9 @@ func transformDummyTitlepageAdd(w io.Writer, opf []byte) error {
 			case depth == 3 && open >= 0:
 				last = append(last[:0], space.Held(t)...)
 			}
+			if cover.name != "" && !cover.declared && tok.Pos() == cover.item {
+				t.SetAttr("properties", strings.Join(append(strings.Fields(attrValue(tok, "properties")), "cover-image"), " "))
+			}
 		case htmlstream.EndTag:
 			if tok.StartPos() == open {
 				// end of the manifest, same indentation as items (or end tag if
@@ -404,6 +461,9 @@ func transformDummyTitlepageAdd(w io.Writer, opf []byte) error {
 					last = space.Held(t)
 				}
 				before = append(append(before, last...), item...)
+				if coverItem != nil {
+					before = append(append(before, last...), coverItem...)
+				}
 				open = -1
 			}
 			if t.Depth() == 1 {
@@ -413,6 +473,20 @@ func transformDummyTitlepageAdd(w io.Writer, opf []byte) error {
 		space.Next(t, before)
 	}
 	return t.Close()
+}
+
+// imageMediaType returns the media type of an image file by extension, for the
+// extensions detected by [transformDummyTitlepageCover].
+func imageMediaType(name string) string {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	}
+	return "application/octet-stream"
 }
 
 // appendSibling appends an empty element named local with the specified
