@@ -14,7 +14,7 @@ See the [releases](https://github.com/pgaskin/kepubify/releases/latest) page for
  
 ## Building
 
-Kepubify requires Go 1.16 or later. To install kepubify directly, run `go install github.com/pgaskin/kepubify@latest`. To build from source, clone this repository, and run `go build ./cmd/kepubify`.
+Kepubify requires Go 1.27 or later. To install kepubify directly, run `go install github.com/pgaskin/kepubify/v5@latest`. To build from source, clone this repository, and run `go build .`.
 
 On Go 1.17 or later, additional optimizations are automatically used to significantly improve kepubify's performance by preventing unchanged files from being re-compressed. To use a [backported](https://github.com/pgaskin/kepubify/tree/forks/go116-zip.go117) version of these optimizations on Go 1.16, add the option `-tags zip117` to the build/install command. If you are using kepubify as a library in another application with `-tags zip117` enabled on Go 1.16, it must also use the backported package when passing a `*zip.Reader` to `(*kepub.Converter).Transform`.
 
