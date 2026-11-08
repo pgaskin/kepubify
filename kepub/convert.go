@@ -10,15 +10,16 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"iter"
 	"math"
 	"path"
-	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/pgaskin/htmlstream"
 	"github.com/pgaskin/htmlstream/polyglot"
-	"golang.org/x/sync/errgroup"
 )
 
 // Convert converts the EPUB root r into a new EPUB written to w. If r is a
@@ -52,6 +53,9 @@ import (
 // If processing untrusted EPUBs, r should be a [zip.Reader] or other
 // in-memory/sandboxed filesystem, rather than an on-disk filesystem since paths
 // are not sanitized.
+//
+// The output is deterministic and should be byte-identical for conversions
+// using the same kepubify/dependency/Go versions.
 func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 	type FileAction int
 	const (
@@ -175,131 +179,6 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 		fileAct[i] = FileActionIgnore
 	}
 
-	// start transforming and writing the content files in parallel
-	type File struct {
-		Index  int             // -1 for a new file
-		Header *zip.FileHeader // if Index is -1
-		// We could have passed around a *html.Node or a *etree.Document, and
-		// encoded it directly to the zip writer, but this gives better
-		// performance for a few reasons. Firstly, writing to the zip file can
-		// only be done on a single thread, which is also where the compression
-		// is being done. By pre-rendering the document, we do as much work as
-		// possible in parallel. Secondly, passing around a node results in
-		// passing around a complex tree of pointers. By passing just the
-		// rendered bytes (which also happens to be more compact in-memory), we
-		// reduce the load on the GC and reduce the memory required by files
-		// waiting to be written. Thirdly, the impact of passing around bytes is
-		// significantly reduced by using a buffer pool rather than passing
-		// around new slices each time.
-		Bytes *bytes.Buffer
-	}
-
-	g, ctx := errgroup.WithContext(ctx)
-
-	pool := &sync.Pool{
-		New: func() interface{} {
-			return bytes.NewBuffer(nil)
-		},
-	}
-	queue := make(chan int)
-	output := make(chan File)
-
-	g.Go(func() error {
-		defer close(queue)
-
-		// we don't need to do anything with files to be removed
-
-		// add copied files to the EPUB first (the order will be preserved)
-		for i := range files {
-			if fileAct[i] == FileActionCopy {
-				select {
-				case output <- File{Index: i}:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		}
-
-		// then queue the files to be transformed in parallel
-		for i := range files {
-			if fileAct[i] == FileActionTransformOPF || fileAct[i] == FileActionTransformContent {
-				select {
-				case queue <- i:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		}
-
-		return nil
-	})
-
-	// start the transformation goroutines
-	for i := 0; i < runtime.NumCPU(); i++ {
-		g.Go(func() error {
-			for i := range queue {
-				f := files[i]
-
-				rc, err := r.Open(f.Name)
-				if err != nil {
-					return fmt.Errorf("transform %q: %w", f.Name, err)
-				}
-
-				buf := pool.Get().(*bytes.Buffer)
-
-				switch a := fileAct[i]; a {
-				case FileActionTransformOPF:
-					err = transformOPF(buf, rc)
-					if err == nil {
-						if fn, r, a, err1 := transformDummyTitlepage(r, opf, buf, opt); err1 != nil {
-							err = err1
-						} else if a {
-							buf1 := pool.Get().(*bytes.Buffer)
-							if _, err := buf1.ReadFrom(r); err != nil {
-								err = fmt.Errorf("apply title page fix: %w", err)
-							} else {
-								fh := &zip.FileHeader{
-									Name:   fn,
-									Method: zip.Deflate,
-								}
-								fh.SetMode(0666)
-								output <- File{
-									Index:  -1,
-									Header: fh,
-									Bytes:  buf1,
-								}
-							}
-						}
-					}
-				case FileActionTransformContent:
-					err = transformContent(buf, rc, opt, f.Name)
-				default:
-					panic(fmt.Sprintf("unexpected action %d in transformation goroutine", a))
-				}
-
-				rc.Close()
-
-				if err != nil {
-					buf.Reset()
-					pool.Put(buf)
-					return fmt.Errorf("transform %q: %w", f.Name, err)
-				}
-
-				select {
-				case output <- File{Index: i, Bytes: buf}:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-			return nil
-		})
-	}
-	go func() {
-		// close the channel after we finish to prevent deadlocks on error
-		g.Wait()
-		close(output)
-	}()
-
 	// initialize the output EPUB
 	zw := zip.NewWriter(w)
 
@@ -308,40 +187,108 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 		return fmt.Errorf("write mimetype: %w", err)
 	}
 
-	// write the files
 	var n int
-	for of := range output {
-		if of.Index == -1 {
-			if err := zipReplace(zw, of.Header, of.Bytes); err != nil {
-				return fmt.Errorf("write new file %q to output EPUB: %w", of.Header.Name, err)
-			}
-			of.Bytes.Reset()
-			pool.Put(of.Bytes)
-			continue
-		}
-		f := files[of.Index]
-		switch b := of.Bytes; b {
-		case nil:
-			var err error
-			if zr, ok := r.(*zip.Reader); ok {
-				err = zw.Copy(zr.File[of.Index])
-			} else {
-				err = zipCopyFS(zw, f, r)
-			}
-			if err != nil {
-				return fmt.Errorf("copy %q to output EPUB: %w", f.Name, err)
-			}
-		default:
-			if err := zipReplace(zw, f, b); err != nil {
-				return fmt.Errorf("write %q to output EPUB: %w", f.Name, err)
-			}
-			b.Reset()
-			pool.Put(b)
-		}
+	written := func() {
 		n++
 		p(float64(n)/float64(len(files)), false)
 	}
-	if err := g.Wait(); err != nil {
+
+	// we don't need to do anything with files to be removed
+
+	// copy the unchanged files first
+	for i, f := range files {
+		if fileAct[i] != FileActionCopy {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var err error
+		if zr, ok := r.(*zip.Reader); ok {
+			err = zw.Copy(zr.File[i])
+		} else {
+			err = zipCopyFS(zw, f, r)
+		}
+		if err != nil {
+			return fmt.Errorf("copy %q to output EPUB: %w", f.Name, err)
+		}
+		written()
+	}
+
+	// transform the OPF, adding the dummy titlepage if needed
+	{
+		f := files[fileIdx[opf]]
+		rc, err := r.Open(f.Name)
+		if err != nil {
+			return fmt.Errorf("transform %q: %w", f.Name, err)
+		}
+		buf := bytes.NewBuffer(nil)
+		err = transformOPF(buf, rc)
+		rc.Close()
+		if err != nil {
+			return fmt.Errorf("transform %q: %w", f.Name, err)
+		}
+		if fn, tp, add, err := transformDummyTitlepage(r, opf, buf, opt); err != nil {
+			return fmt.Errorf("transform %q: %w", f.Name, err)
+		} else if add {
+			fh := &zip.FileHeader{
+				Name:   fn,
+				Method: zip.Deflate,
+			}
+			fh.SetMode(0666)
+			if err := zipReplace(zw, fh, tp); err != nil {
+				return fmt.Errorf("write new file %q to output EPUB: %w", fn, err)
+			}
+		}
+		if err := zipReplace(zw, f, buf); err != nil {
+			return fmt.Errorf("write %q to output EPUB: %w", f.Name, err)
+		}
+		written()
+	}
+
+	// transform the content documents in parallel, writing them in order
+	var content []int
+	for i := range files {
+		if fileAct[i] == FileActionTransformContent {
+			content = append(content, i)
+		}
+	}
+
+	// reuse a pool of buffers
+	type transformed struct {
+		index int
+		buf   *bytes.Buffer
+	}
+	pool := &sync.Pool{
+		New: func() any {
+			return bytes.NewBuffer(nil)
+		},
+	}
+	for t := range parallel(ctx, opt.workers(), content, func(i int) (transformed, error) {
+		f := files[i]
+		rc, err := r.Open(f.Name)
+		if err != nil {
+			return transformed{}, fmt.Errorf("transform %q: %w", f.Name, err)
+		}
+		buf := pool.Get().(*bytes.Buffer)
+		err = transformContent(buf, rc, opt, f.Name)
+		rc.Close()
+		if err != nil {
+			buf.Reset()
+			pool.Put(buf)
+			return transformed{}, fmt.Errorf("transform %q: %w", f.Name, err)
+		}
+		return transformed{i, buf}, nil
+	})(&err) {
+		f := files[t.index]
+		if err := zipReplace(zw, f, t.buf); err != nil {
+			return fmt.Errorf("write %q to output EPUB: %w", f.Name, err)
+		}
+		t.buf.Reset()
+		pool.Put(t.buf)
+		written()
+	}
+	if err != nil {
 		return err
 	}
 
@@ -630,4 +577,121 @@ func transformFileFilter(fn string) bool {
 		return true
 	}
 	return strings.HasPrefix(fn, "__MACOSX/") // macOS archivers
+}
+
+// parallel calls fn for each item on n goroutines (one of which is the current
+// one, so no new ones are started if n <= 1), and yields the results in order.
+// At most n results are held while waiting for an earlier one. It stops at the
+// first error, when ctx is done, or when the caller stops iterating, and
+// returns once the calls in progress have finished.
+func parallel[T, R any](ctx context.Context, n int, items []T, fn func(T) (R, error)) func(err *error) iter.Seq[R] {
+	type result struct {
+		val   R
+		err   error
+		panic *parallelPanic
+	}
+	call := func(item T) (r result) {
+		defer func() {
+			if v := recover(); v != nil {
+				r.panic = &parallelPanic{v, debug.Stack()}
+			}
+		}()
+		r.val, r.err = fn(item)
+		return r
+	}
+	return func(err *error) iter.Seq[R] {
+		return func(yield func(R) bool) {
+			*err = func() (err error) {
+				n := min(n, len(items)) // don't start more goroutines than the number of items
+				if n <= 1 {
+					for _, item := range items {
+						if err := ctx.Err(); err != nil {
+							return err
+						}
+						r := call(item)
+						if r.panic != nil {
+							panic(r.panic)
+						}
+						if r.err != nil {
+							return r.err
+						}
+						if !yield(r.val) {
+							return nil
+						}
+					}
+					return nil
+				}
+
+				var (
+					next    atomic.Int64
+					results = make([]result, len(items))
+					done    = make([]chan struct{}, len(items))
+					taken   = make(chan struct{}, n-1) // held by items from other goroutines until yielded
+					stop    = make(chan struct{})
+					wg      sync.WaitGroup
+				)
+				for i := range done {
+					done[i] = make(chan struct{})
+				}
+				defer func() {
+					close(stop)
+					next.Store(int64(len(items))) // nothing more is claimed
+					wg.Wait()
+				}()
+
+				for range n - 1 {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						for {
+							select {
+							case taken <- struct{}{}:
+							case <-stop:
+								return
+							}
+							i := int(next.Add(1) - 1)
+							if i >= len(items) {
+								return
+							}
+							results[i] = call(items[i])
+							close(done[i])
+						}
+					}()
+				}
+
+				for i := range items {
+					if err := ctx.Err(); err != nil {
+						return err
+					}
+					if next.CompareAndSwap(int64(i), int64(i+1)) {
+						results[i] = call(items[i])
+					} else {
+						<-done[i]
+						<-taken
+					}
+					r := results[i]
+					results[i] = result{}
+					if r.panic != nil {
+						panic(r.panic)
+					}
+					if r.err != nil {
+						return r.err
+					}
+					if !yield(r.val) {
+						return nil
+					}
+				}
+				return nil
+			}()
+		}
+	}
+}
+
+type parallelPanic struct {
+	value any
+	stack []byte
+}
+
+func (p *parallelPanic) Error() string {
+	return fmt.Sprintf("%v\n\n%s", p.value, p.stack)
 }

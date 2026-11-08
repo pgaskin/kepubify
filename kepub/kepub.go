@@ -3,6 +3,7 @@ package kepub
 
 import (
 	"errors"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -62,6 +63,12 @@ type Options struct {
 	// cover.jpg).
 	DetectCover bool
 
+	// Workers is the number of goroutines used by [Convert] to transform
+	// content documents, including the calling one. If 0 or 1, no goroutines
+	// are started, and documents are processed directly on the calling
+	// goroutine. If negative, [runtime.NumCPU] is used.
+	Workers int
+
 	// Warn, if not nil, is called for content which can't be converted exactly
 	// (e.g., due to malformed on ambiguous HTML), with the path of the file in
 	// the EPUB (empty if TransformContent is called directly, or if not
@@ -84,6 +91,13 @@ type Options struct {
 type Replacement struct {
 	Find    string
 	Replace string
+}
+
+func (opt Options) workers() int {
+	if opt.Workers < 0 {
+		return runtime.NumCPU()
+	}
+	return opt.Workers
 }
 
 func (opt Options) progress() func(pct float64, force bool) {

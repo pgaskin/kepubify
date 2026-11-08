@@ -166,6 +166,7 @@ func main() {
 		DetectCover:     *detectcover,
 		Smartypants:     *smartenpunct,
 		ReprocessKepub:  *reprocesskepub,
+		Workers:         -1,
 	}
 	if *hyphenate {
 		opt.Hyphenate = new(true)
