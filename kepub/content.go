@@ -105,8 +105,11 @@ var cssFullScreenFixes = fixIndent("    ", false, `
 //   - [important] ensure charset is UTF-8
 //     EPUBs (and KEPUBs by extension) must be UTF-8/UTF-16.
 //
-// The document is streamed, so existing Kobo divs and spans are only detected
-// if they are close to the start of the body (which they should be).
+// The document is streamed, so existing Kobo divs are only detected if they are
+// close to the start of the body, and existing Kobo spans if they come before
+// the first span added (which they should). If kobo spans are detected after
+// new spans have already started to be added (unlikely, but theoretically
+// possible), we drop the koboSpan class/id for the existing ones.
 func TransformContent(w io.Writer, r io.Reader, opt Options) error {
 	return transformContent(w, r, opt, "", nil)
 }

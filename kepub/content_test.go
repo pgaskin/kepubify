@@ -213,6 +213,16 @@ func TestTransformContentParts(t *testing.T) {
 				want: `<p><span class="koboSpan" id="kobo.1.1">Test</span></p>`,
 			},
 			{
+				name: "existing spans after added spans",
+				in:   `<p>Some <span class="koboSpan" id="kobo.1.1">existing</span> <span class="a koboSpan  b" id="kobo.1.2">spans</span><span class="koboSpan" id="x">.</span></p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Some </span><span class="koboSpan" id="kobo.1.2">existing</span><span class="koboSpan" id="kobo.1.3"> </span><span class="a b"><span class="koboSpan" id="kobo.1.4">spans</span></span><span id="x"><span class="koboSpan" id="kobo.1.5">.</span></span></p>`,
+			},
+			{
+				name: "reopened existing span after added spans",
+				in:   `<p>Some <i><b class="koboSpan" id="kobo.1.1">existing</i> span</b></p>`,
+				want: `<p><span class="koboSpan" id="kobo.1.1">Some </span><i><b><span class="koboSpan" id="kobo.1.2">existing</span></b></i><b><span class="koboSpan" id="kobo.1.3"> span</span></b></p>`,
+			},
+			{
 				name: "increment segment counter from 1 for every sentence",
 				in:   `<p>Sentence 1. Sentence 2. Sentence 3.</p>`,
 				want: `<p><span class="koboSpan" id="kobo.1.1">Sentence 1. </span><span class="koboSpan" id="kobo.1.2">Sentence 2. </span><span class="koboSpan" id="kobo.1.3">Sentence 3.</span></p>`,
@@ -516,7 +526,7 @@ func TestTransformContentStreaming(t *testing.T) {
 		{
 			name: "existing spans after an image",
 			in:   `<p><img src="x"/><span class="koboSpan" id="kobo.1.1">x</span>y</p>`,
-			want: `<p><span class="koboSpan" id="kobo.1.1"><img src="x" /></span><span class="koboSpan" id="kobo.1.1">x</span><span class="koboSpan" id="kobo.1.2">y</span></p>`,
+			want: `<p><span class="koboSpan" id="kobo.1.1"><img src="x" /></span><span class="koboSpan" id="kobo.1.2">x</span><span class="koboSpan" id="kobo.1.3">y</span></p>`,
 		},
 		{
 			name: "existing spans after whitespace",

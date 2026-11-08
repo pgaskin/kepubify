@@ -23,11 +23,11 @@ type kobo struct {
 	bufArr  [1024]byte
 	buf     []byte // markup written for a text part (bufArr while it fits to reduce unnecessary allocations)
 
-	// Formatting elements with the koboSpan class (while spans are added) or
-	// the wrapper div ids (while deciding the wrapper divs), by ID, for copies
-	// reopened after a misnested end tag (for which the events don't have end
-	// tokens). This is effectively never used since most EPUBs have properly
-	// nested tags, and the attributes are on span and div elements.
+	// Formatting elements with the koboSpan class or the wrapper div ids while
+	// deciding the wrapper divs, by ID, for copies reopened after a misnested
+	// end tag (for which the events don't have end tokens). This is effectively
+	// never used since most EPUBs have properly nested tags, and the attributes
+	// are on span and div elements.
 	flagged []flaggedElement
 
 	// wrapper divs
@@ -181,7 +181,7 @@ func (k *kobo) flagsOf(e *polyglot.Tag) uint8 {
 			flags |= flagBookInner
 		}
 	}
-	if flags != 0 && (k.hold != 0 || k.spans == 1) && htmlutil.IsFormatting(e.Token) {
+	if flags != 0 && k.hold != 0 && htmlutil.IsFormatting(e.Token) {
 		k.flagged = append(k.flagged, flaggedElement{e.ID, flags})
 	}
 	return flags
@@ -234,7 +234,11 @@ func (k *kobo) startTag(e *polyglot.Tag, flags uint8) {
 			case 0:
 				k.spans = -1
 			case 1:
-				f.noSpans = true // don't nest spans
+				// spans were added before it, so add them in it too instead of
+				// keeping its id (which may be a duplicate)
+				if e.Token != nil {
+					removeKoboSpan(e)
+				}
 			}
 		}
 		if !parent.noSpans && k.spans >= 0 {
@@ -308,6 +312,39 @@ func (k *kobo) appendSpanStart(b []byte) []byte {
 	b = append(b, '.')
 	b = strconv.AppendInt(b, int64(k.seg), 10)
 	return append(b, `">`...)
+}
+
+// removeKoboSpan removes the koboSpan class and the Kobo span id from the start
+// tag e, and unwraps it if it's a span without other attributes. The edits are
+// repeated by the reopened copies of a formatting element.
+func removeKoboSpan(e *polyglot.Tag) {
+	attrs := e.Token.NumAttrs()
+	var class []string
+	for c := range strings.FieldsFuncSeq(attrValue(e.Token, "class"), isHTMLSpace) {
+		if c != "koboSpan" {
+			class = append(class, c)
+		}
+	}
+	if len(class) == 0 {
+		e.RemoveAttr("class")
+		attrs--
+	} else {
+		e.SetAttr("class", strings.Join(class, " "))
+	}
+	if isKoboSpanID(attrValue(e.Token, "id")) {
+		e.RemoveAttr("id")
+		attrs--
+	}
+	if attrs == 0 && e.NS == htmlstream.NamespaceXHTML && e.Local == "span" {
+		e.Unwrap()
+	}
+}
+
+// TODO: we could make a dekepubify tool or something like that since this is
+// already most of it
+
+func isHTMLSpace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\f' || r == '\r'
 }
 
 // Implements [polyglot.Options.OnText].
