@@ -1,4 +1,4 @@
-[SIZE=5][B]kepubify[/B] v4[/SIZE]
+[SIZE=5][B]kepubify[/B] v5[/SIZE]
 [SIZE=4]Convert EPUBs to Kobo EPUBs.[/SIZE]
 
 [B]Features:[/B]
@@ -12,8 +12,21 @@
 [*]Optionally pre-convert books for use in Calibre.
 [*]Batch conversion with control over the output file structure (see [URL="https://ci.appveyor.com/project/pgaskin/kepubify/builds/30198538#L171"]here[/URL] for detailed examples).
 [*]Nearly identical output to KEPUBs from the Kobo Store.
-[*]Standalone tool to pre-generate cover images (including aspect ratio changes, grayscale, and color inversion).
-[*]Standalone tool to update the database with Calibre or EPUB3 series metadata.
-[*]Well-tested.
+[*]Very tolerant of malformed OPF and XHTML documents.
 [/LIST]
+
+[B]New in v5:[/B]
+[LIST]
+[*]Faster conversion, lower memory usage.
+[*]Output may differ slightly from v4 (including koboSpan numbering), especially for malformed books.
+[*]New kepub renderer bug workaround for non-canonical encoded paths in manifest/ncx/nav causing double-counted page numbers and erratic navigation.
+[*]Many bugfixes: self-closing formatting elements, spans in special elements, whitespace handling, heading hyphenation, content document paths with special characters.
+[*]More workarounds for malformed books: XML 1.1 declarations, malformed OPFs, non-UTF-8 charsets, invalid zip attributes.
+[*]CLI improvements: skip/copy/reprocess existing KEPUBs, preserve file attributes.
+[*]Dummy titlepage now uses the real cover image if known (or detected, if enabled).
+[*]See the [URL="https://pgaskin.net/kepubify"]website[/URL] or [URL="https://github.com/pgaskin/kepubify/releases/tag/v5.0.0"]downloads[/URL] for the full changelog.
+[/LIST]
+
 [SIZE=4][URL="https://pgaskin.net/kepubify/"]Website[/URL] | [URL="https://pgaskin.net/kepubify/dl/"]Download[/URL] | [URL="https://pgaskin.net/kepubify/try/"]Web Version[/URL][/SIZE]
+
+[SIZE="1"]Old threads: [URL="https://www.mobileread.com/forums/showthread.php?t=340435"]kepubify v4[/URL] | [URL="https://www.mobileread.com/forums/showthread.php?t=326652"]kepubify v3[/URL][/SIZE]
