@@ -10,15 +10,15 @@ import (
 )
 
 // Parallel calls fn for each item and its index on n goroutines (one of which
-// is the current one, so no new ones are started if n <= 1), and yields the
-// index and result of each item in order. At most n results are held while
-// waiting for an earlier one. It stops at the first error, when ctx is done, or
-// when the caller stops iterating, and returns once the calls in progress have
-// finished.
+// is the current one, so no new ones are started if n <= 1, or if built by
+// TinyGo without a scheduler), and yields the index and result of each item in
+// order. At most n results are held while waiting for an earlier one. It stops
+// at the first error, when ctx is done, or when the caller stops iterating, and
+// returns once the calls in progress have finished.
 func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(int, T) (R, error)) func(err *error) iter.Seq2[int, R] {
 	return iterErr2(func(yield func(int, R) bool) error {
 		n := min(n, len(items)) // don't start more goroutines than the number of items
-		if n <= 1 {
+		if n <= 1 || !parallelGoroutines {
 			for i, item := range items {
 				if err := ctx.Err(); err != nil {
 					return err
@@ -55,9 +55,7 @@ func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(int, T) (
 		}()
 
 		for range n - 1 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for {
 					select {
 					case taken <- struct{}{}:
@@ -71,7 +69,7 @@ func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(int, T) (
 					results[i] = parallelCall(fn, i, items[i])
 					close(done[i])
 				}
-			}()
+			})
 		}
 
 		for i := range items {
@@ -105,7 +103,7 @@ func Parallel[T, R any](ctx context.Context, n int, items []T, fn func(int, T) (
 // goroutines, and the current one only yields results. At most n results are
 // held while waiting for the caller.
 func ParallelUnordered[T, R any](ctx context.Context, n int, items []T, fn func(int, T) (R, error)) func(err *error) iter.Seq2[int, R] {
-	if min(n, len(items)) <= 1 {
+	if min(n, len(items)) <= 1 || !parallelGoroutines {
 		return Parallel(ctx, n, items, fn)
 	}
 	return iterErr2(func(yield func(int, R) bool) error {
@@ -125,9 +123,7 @@ func ParallelUnordered[T, R any](ctx context.Context, n int, items []T, fn func(
 		}()
 
 		for range min(n, len(items)) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for {
 					select {
 					case <-stop:
@@ -147,7 +143,7 @@ func ParallelUnordered[T, R any](ctx context.Context, n int, items []T, fn func(
 						return
 					}
 				}
-			}()
+			})
 		}
 
 		for range items {
