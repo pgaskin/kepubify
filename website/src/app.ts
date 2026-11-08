@@ -194,7 +194,7 @@ export class KepubifyApp {
 
         try {
             elInfoName.href = URL.createObjectURL(new Blob([kepub], { type: "application/epub+zip" }))
-            elInfoName.download = epub.name.replace(/([.]epub)?$/, ".kepub.epub")
+            elInfoName.download = epub.name.replace(/([.]epub)?$/i, ".kepub.epub")
             elInfoName.textContent = elInfoName.download
 
             const elInfoRemove = elInfo.appendChild(document.createElement("button"))
