@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/pgaskin/kepubify/v5/internal"
@@ -152,6 +151,16 @@ func main() {
 
 	// --- Convert --- //
 
+	var conversions int
+	for _, output := range pathMap {
+		if strings.HasSuffix(output, ext) {
+			conversions++
+		}
+	}
+	if conversions > 1 {
+		opt.Workers = 1 // convert books in parallel instead of content documents
+	}
+
 	fmt.Printf("Kepubify %s\n", internal.Version)
 	if *calibre {
 		fmt.Printf("Using extension %s for Calibre compatibility (this is meant for use with a Calibre library and will not work directly on a Kobo reader)\n", ext)
@@ -166,221 +175,192 @@ func main() {
 	sort.Strings(inputs)
 
 	// --- Conversion Pipeline --- //
-	var cur int64                                 // progress
-	var converted, copied, skipped, errored int64 // counters (sum == total)
-	var errs sync.Map                             // input -> error
-	total := int64(len(pathMap) + len(skipList))  // immutable
-
-	var allWg sync.WaitGroup
+	var converted, copied, skipped, errored int // counters (sum == total)
+	errs := make([]error, len(inputs))          // by input index
+	total := len(inputs)                        // immutable
 
 	// logging
 
-	type loge struct {
-		stderr bool
-		msg    string
-	}
-	logCh := make(chan loge)
-	log := func(stderr bool, format string, a ...interface{}) {
-		logCh <- loge{stderr, fmt.Sprintf(format, a...)}
-	}
-
-	allWg.Add(1)
-	go func() {
-		defer allWg.Done()
-		for l := range logCh {
-			if l.stderr {
-				fmt.Fprint(os.Stderr, l.msg)
-			} else {
-				fmt.Print(l.msg)
-			}
+	var logMu sync.Mutex
+	log := func(stderr bool, format string, a ...any) {
+		logMu.Lock()
+		defer logMu.Unlock()
+		if stderr {
+			fmt.Fprintf(os.Stderr, format, a...)
+		} else {
+			fmt.Printf(format, a...)
 		}
-	}()
-
-	// tasks
-
-	inCh := make(chan [2]string)
-
-	allWg.Add(1)
-	go func() {
-		defer allWg.Done()
-		defer close(inCh)
-		for _, input := range inputs {
-			output, ok := pathMap[input]
-			if !ok {
-				atomic.AddInt64(&cur, 1)
-				atomic.AddInt64(&skipped, 1)
-				log(false, "[%3d/%3d] Skipping %s\n", atomic.LoadInt64(&cur), total, input)
-				continue
-			}
-			input := input // copy
-			inCh <- [2]string{input, output}
-		}
-	}()
+	}
 
 	// processing
 
-	allWg.Add(1)
-	go func() {
-		defer allWg.Done()
-		defer close(logCh)
+	type status int
+	const (
+		statusConverted status = iota
+		statusCopied
+		statusSkipped
+		statusCopiedKepub    // already a KEPUB, copied
+		statusUnchangedKepub // already a KEPUB, and the output is the input
+	)
+	type result struct {
+		status status
+		warns  string // formatted warnings
+		err    error
+	}
+	process := func(i int, input string) result {
+		output, ok := pathMap[input]
+		if !ok {
+			log(false, "[%3d/%3d] Skipping %s\n", i, total, input)
+			return result{status: statusSkipped}
+		}
+		switch {
+		case !strings.HasSuffix(output, ext):
+			if !*verbose {
+				log(false, "[%3d/%3d] Copying %s\n", i, total, input)
+			} else {
+				log(false, "[%3d/%3d] Copying %s\n          => %s\n", i, total, input, output)
+			}
+			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+				return result{err: err}
+			}
+			if err := copyFile(input, output); err != nil {
+				return result{err: err}
+			}
+			if *preserveattrs {
+				if err := copyAttrs(input, output); err != nil {
+					return result{err: err}
+				}
+			}
+			return result{status: statusCopied}
+		default:
+			if !*verbose {
+				log(false, "[%3d/%3d] Converting %s\n", i, total, input)
+			} else {
+				log(false, "[%3d/%3d] Converting %s\n          => %s\n", i, total, input, output)
+			}
+			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+				return result{err: err}
+			}
+			var warns warnings
+			var alreadyKepub, unchanged bool
+			if err := func() error {
+				opt := opt
+				if *verbose {
+					opt.Warn = warns.add
+				}
 
-		var workerWg sync.WaitGroup
-		defer workerWg.Wait()
+				fi, err := zip.OpenReader(input)
+				if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
+					return err
+				}
+				defer fi.Close()
 
-		for i := 0; i < runtime.NumCPU(); i++ {
-			workerWg.Add(1)
-			go func() {
-				defer workerWg.Done()
-				for t := range inCh {
-					var i int64
-					for {
-						if tmp := atomic.LoadInt64(&cur); atomic.CompareAndSwapInt64(&cur, tmp, tmp+1) {
-							i = tmp + 1
-							break
-						}
+				fo, err := os.CreateTemp(filepath.Dir(output), ".kepubify."+filepath.Base(output)+".*")
+				if err != nil {
+					return err
+				}
+				defer os.Remove(fo.Name())
+
+				if err := kepub.Convert(context.Background(), fo, fi, opt); errors.Is(err, kepub.ErrAlreadyKepub) {
+					alreadyKepub = true
+					if sameFile(input, output) {
+						unchanged = true
+						return nil
 					}
-					input, output := t[0], t[1]
-					switch {
-					case !strings.HasSuffix(output, ext):
-						if !*verbose {
-							log(false, "[%3d/%3d] Copying %s\n", i, total, input)
-						} else {
-							log(false, "[%3d/%3d] Copying %s\n          => %s\n", atomic.LoadInt64(&cur), total, input, output)
-						}
-						if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
-							errs.Store(input, err)
-							atomic.AddInt64(&errored, 1)
-							log(true, "          Error (%d): %v\n", i, err)
-							continue
-						}
-						if err := copyFile(input, output); err != nil {
-							errs.Store(input, err)
-							atomic.AddInt64(&errored, 1)
-							log(true, "          Error (%d): %v\n", i, err)
-							continue
-						}
-						if *preserveattrs {
-							if err := copyAttrs(input, output); err != nil {
-								errs.Store(input, err)
-								atomic.AddInt64(&errored, 1)
-								log(true, "          Error (%d): %v\n", i, err)
-								continue
-							}
-						}
-						atomic.AddInt64(&copied, 1)
-					default:
-						if !*verbose {
-							log(false, "[%3d/%3d] Converting %s\n", i, total, input)
-						} else {
-							log(false, "[%3d/%3d] Converting %s\n          => %s\n", atomic.LoadInt64(&cur), total, input, output)
-						}
-						if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
-							errs.Store(input, err)
-							atomic.AddInt64(&errored, 1)
-							log(true, "          Error (%d): %v\n", i, err)
-							continue
-						}
-						var warns warnings
-						var alreadyKepub, unchanged bool
-						if err := func() error {
-							opt := opt
-							if *verbose {
-								opt.Warn = warns.add
-							}
+					in, err := os.Open(input)
+					if err != nil {
+						return err
+					}
+					_, err = io.Copy(fo, in)
+					in.Close()
+					if err != nil {
+						return err
+					}
+				} else if err != nil {
+					return err
+				}
 
-							fi, err := zip.OpenReader(input)
-							if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
-								return err
-							}
-							defer fi.Close()
+				if err := fo.Sync(); err != nil {
+					return err
+				}
 
-							fo, err := os.CreateTemp(filepath.Dir(output), ".kepubify."+filepath.Base(output)+".*")
-							if err != nil {
-								return err
-							}
-							defer os.Remove(fo.Name())
+				if err := fo.Close(); err != nil {
+					return err
+				}
 
-							if err := kepub.Convert(context.Background(), fo, fi, opt); errors.Is(err, kepub.ErrAlreadyKepub) {
-								alreadyKepub = true
-								if sameFile(input, output) {
-									unchanged = true
-									return nil
-								}
-								in, err := os.Open(input)
-								if err != nil {
-									return err
-								}
-								_, err = io.Copy(fo, in)
-								in.Close()
-								if err != nil {
-									return err
-								}
-							} else if err != nil {
-								return err
-							}
+				_ = os.Chmod(fo.Name(), 0644) // CreateTemp uses 0600
 
-							if err := fo.Sync(); err != nil {
-								return err
-							}
-
-							if err := fo.Close(); err != nil {
-								return err
-							}
-
-							_ = os.Chmod(fo.Name(), 0644) // CreateTemp uses 0600
-
-							if *preserveattrs {
-								if err := copyAttrs(input, fo.Name()); err != nil {
-									return err
-								}
-							}
-
-							if err := os.Rename(fo.Name(), output); err != nil {
-								return err
-							}
-
-							return nil
-						}(); err != nil {
-							if w := warns.Format(i); w != "" {
-								log(true, "%s", w)
-							}
-							errs.Store(input, err)
-							atomic.AddInt64(&errored, 1)
-							log(true, "          Error (%d): %v\n", i, err)
-							continue
-						}
-						if w := warns.Format(i); w != "" {
-							log(true, "%s", w)
-						}
-						switch {
-						case unchanged:
-							log(false, "          Unchanged (%d): already a KEPUB\n", i)
-							atomic.AddInt64(&skipped, 1)
-						case alreadyKepub:
-							log(false, "          Copied (%d): already a KEPUB\n", i)
-							atomic.AddInt64(&copied, 1)
-						default:
-							atomic.AddInt64(&converted, 1)
-						}
+				if *preserveattrs {
+					if err := copyAttrs(input, fo.Name()); err != nil {
+						return err
 					}
 				}
-			}()
-		}
-	}()
 
-	allWg.Wait()
+				if err := os.Rename(fo.Name(), output); err != nil {
+					return err
+				}
+
+				return nil
+			}(); err != nil {
+				return result{warns: warns.Format(i), err: err}
+			}
+			switch {
+			case unchanged:
+				return result{status: statusUnchangedKepub, warns: warns.Format(i)}
+			case alreadyKepub:
+				return result{status: statusCopiedKepub, warns: warns.Format(i)}
+			default:
+				return result{status: statusConverted, warns: warns.Format(i)}
+			}
+		}
+	}
+
+	for i, r := range internal.ParallelUnordered(context.Background(), runtime.NumCPU(), inputs, func(i int, input string) (result, error) {
+		return process(i+1, input), nil
+	})(&err) {
+		if r.warns != "" {
+			log(true, "%s", r.warns)
+		}
+		if r.err != nil {
+			errs[i] = r.err
+			errored++
+			log(true, "          Error (%d): %v\n", i+1, r.err)
+			continue
+		}
+		switch r.status {
+		case statusConverted:
+			converted++
+		case statusCopied:
+			copied++
+		case statusSkipped:
+			skipped++
+		case statusCopiedKepub:
+			log(false, "          Copied (%d): already a KEPUB\n", i+1)
+			copied++
+		case statusUnchangedKepub:
+			log(false, "          Unchanged (%d): already a KEPUB\n", i+1)
+			skipped++
+		}
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		exit(1)
+		return
+	}
 
 	fmt.Printf("\n%d total: %d converted, %d copied, %d skipped, %d errored\n", total, converted, copied, skipped, errored)
 
 	var tmp bool
-	errs.Range(func(input, err interface{}) bool {
+	for i, err := range errs {
+		if err == nil {
+			continue
+		}
 		if !tmp {
 			fmt.Fprintf(os.Stderr, "\nErrors:\n")
 			tmp = true
 		}
-		fmt.Fprintf(os.Stderr, "  %#v\n  => %#v\n  Error: %v\n\n", input, pathMap[input.(string)], err)
-		return true
-	})
+		fmt.Fprintf(os.Stderr, "  %#v\n  => %#v\n  Error: %v\n\n", inputs[i], pathMap[inputs[i]], err)
+	}
 	if tmp {
 		exit(1)
 		return
@@ -407,7 +387,7 @@ func (w *warnings) add(name, msg string) {
 	w.count[k]++
 }
 
-func (w *warnings) Format(i int64) string {
+func (w *warnings) Format(i int) string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	ks := append([][2]string(nil), w.order...)
