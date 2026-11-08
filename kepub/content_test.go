@@ -536,17 +536,30 @@ func TestTransformContentStreaming(t *testing.T) {
 		// longer than the chunk size of the Reader
 		var text strings.Builder
 		for i := range 20000 {
-			text.WriteString("Sentence number " + strings.Repeat("x", i%7) + `. "Quoted" -- `)
+			text.WriteString("Sentence number ")
+			text.WriteString(strings.Repeat("x", i%7))
+			text.WriteString(`. "Quoted" -- `)
 		}
-		text.WriteString(strings.Repeat(" ", 100000) + "end")
+		text.WriteString(strings.Repeat(" ", 100000))
+		text.WriteString("end")
 		var in, want strings.Builder
-		in.WriteString("<p>" + text.String() + "</p><div>" + strings.Repeat("\u00a0", 1000) + "</div>")
+		in.WriteString("<p>")
+		in.WriteString(text.String())
+		in.WriteString("</p><div>")
+		in.WriteString(strings.Repeat("\u00a0", 1000))
+		in.WriteString("</div>")
 		want.WriteString("<p>")
 		for i, s := range splitSentencesRegexp(text.String()) {
 			var sp smartypants
-			want.WriteString(`<span class="koboSpan" id="kobo.1.` + strconv.Itoa(i+1) + `">` + string(sp.Convert(nil, []byte(s), true)) + "</span>")
+			want.WriteString(`<span class="koboSpan" id="kobo.1.`)
+			want.WriteString(strconv.Itoa(i + 1))
+			want.WriteString(`">`)
+			want.WriteString(string(sp.Convert(nil, []byte(s), true)))
+			want.WriteString("</span>")
 		}
-		want.WriteString("</p><div>" + strings.Repeat("&#160;", 1000) + "</div>")
+		want.WriteString("</p><div>")
+		want.WriteString(strings.Repeat("&#160;", 1000))
+		want.WriteString("</div>")
 		got := bookInner(t, testTransformContent(t, fragmentDoc(in.String()), Options{Smartypants: true}))
 		if got != want.String() {
 			i := 0

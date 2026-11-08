@@ -142,7 +142,9 @@ func TestTransformNCX(t *testing.T) {
   <navMap>`)
 		for _, s := range src {
 			b.WriteString(`
-    <navPoint id="a"><navLabel><text>A</text></navLabel><content src="` + s + `" /></navPoint>`)
+    <navPoint id="a"><navLabel><text>A</text></navLabel><content src="`)
+			b.WriteString(s)
+			b.WriteString(`" /></navPoint>`)
 		}
 		b.WriteString(`
   </navMap>
