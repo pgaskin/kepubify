@@ -27,29 +27,58 @@
         <p>It works with malformed e-books, doesn't modify the book's layout more than absolutely necessary, doesn't depend on any external software, and works from the command-line.</p>
         <p>
             <a href="./dl/" class="btn btn--primary">Download</a>
-            <a href="./try/" class="btn">Web Version <span style="color: #a00; font-weight: 700; position: absolute; margin-top: -.75em; margin-left: -1.5em; font-size: .7em;">New!</span></a>
+            <a href="./try/" class="btn">Web Version</a>
         </p>
     </header>
     <main>
         <section>
-            <h2>New in v4.0.0<span class="mini">2021-07-03</span></h2>
+            <h2>New in v5.0.0<span class="mini">2026-11-08</span></h2>
             <ul class="some-space">
-                <li>Conversion is now 3 to 6 times faster than v3.</li>
-                <li>Kepubify has a new <a href="./try/">web app</a> which supports most conversion options and doesn't upload files to a remote server.</li>
+                <li>Conversion is faster than v4 and uses less memory.</li>
+                <li>Output may differ (including koboSpan numbering) from v4.</li>
+                <li>More kepub renderer workarounds:
+                    <ul>
+                        <li>Paths in the manifest/ncx/nav/links are now normalized to prevent them from causing duplicate page counts and broken navigation.</li>
+                        <li>Improved polyglot HTML generation.</li>
+                    </ul>
+                </li>
+                <li>Many bugfixes:
+                    <ul>
+                        <li>Self-closing &lt;i&gt; tags no longer make the rest of the book italic.</li>
+                        <li>Spans are no longer added inside special elements.</li>
+                        <li>Much better whitespace handling.</li>
+                        <li>Headings are no longer hyphenated when hypenation is enabled.</li>
+                        <li>Content documents with special characters in the path are now processed correctly.</li>
+                    </ul>
+                </li>
+                <li>More workarounds for malformed books:
+                    <ul>
+                        <li>XML 1.1 declarations are no longer rejected.</li>
+                        <li>Significantly improved handling of malformed OPFs and content documents.</li>
+                        <li>Significantly improved charset support and detection.</li>
+                        <li>Malformed zip fields are now dropped.</li>
+                    </ul>
+                </li>
+                <li>CLI improvements:
+                    <ul>
+                        <li>File modification time and permissions can now be preserved for the output file.</li>
+                        <li>KEPUBs are now rejected by default, but can also be copied or reprocessed.</li>
+                        <li>Improved handling of output path edge cases.</li>
+                    </ul>
+                </li>
+                <li>Dummy titlepage now includes the cover image if known (or automatically detected, if enabled).</li>
+                <li>Kepubify no longer includes covergen and seriesmeta (use <a href="./ns/">NickelSeries</a> instead).</li>
                 <li>Kepubify can now fix layout issues caused by books without a standalone cover page (issue <a href="https://github.com/pgaskin/kepubify/issues/33">#33</a>).</li>
-                <li>HTML content files with non-standard extensions now work correctly (issue <a href="https://github.com/pgaskin/kepubify/issues/55">#55</a>).</li>
-                <li>There's now a new website with updated documentation and a more concise homepage.</li>
-                <li><a href="javascript:void(0)" onclick="document.querySelector('ul#dev-v4-0-0').classList.toggle('hidden')">Notes for developers/packagers &raquo;</a></li>
+                <li><a href="javascript:void(0)" onclick="document.querySelector('ul#dev-v5-0-0').classList.toggle('hidden')">Notes for developers/packagers &raquo;</a></li>
             </ul>
-            <ul id="dev-v4-0-0" class="some-space hidden">
-                <li>Building kepubify now requires Go 1.16+.</li>
-                <li>Embedding kepubify in other applications doesn't require go.mod changes for the custom x/net/html fork.</li>
-                <li>Kepubify now supports the js/wasm platform.</li>
-                <li>The test suite now has nearly complete functionality and code coverage.</li>
-                <li>The Go API can now stream directly from a fs.FS to a zip.Writer, with additional optimizations for reading from zip.Reader.</li>
-                <li>Kepubify is now immune to Zip Slip when converting EPUBs with un-sanitized paths.</li>
-                <li>The kepubify CLI interface is identical to v3.</li>
-                <li>Packagers, please add <code>-tags zip117</code> to the build options for cmd/kepubify to match the release builds. See the README for more information.</li>
+            <ul id="dev-v5-0-0" class="some-space hidden">
+                <li>Building kepubify now requires Go 1.26+.</li>
+                <li>Significantly fewer dependencies.</li>
+                <li>JavaScript bindings are now available on NPM.</li>
+                <li>Can now be built with TinyGo, with the scheduler disabled.</li>
+                <li>Improved test suite.</li>
+                <li>The kepubify CLI interface is compatible with v4 (but the output may differ).</li>
+                <li>If embedding kepubify, I recommend caching the converted output, or letting users choose between v4/v5, as span numbering has changed slightly in some cases, especially for badly formatted books.</li>
             </ul>
         </section>
         <section>

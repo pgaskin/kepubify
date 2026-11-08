@@ -58,8 +58,8 @@
             </ol>
             <h3>Building from source / other</h3>
             <ol>
-                <li>Install Go 1.16 or later if you haven't already done so.</li>
-                <li>Run <code>go install github.com/pgaskin/kepubify/v4/cmd/kepubify@latest</code>. The resulting binary will be in <code>$HOME/go/bin</code>, or whatever <code>GOBIN</code> is set to. If you are using Go 1.16, I also recommend adding <code> -tags zip117</code> after <code>go build</code> for better performance.</li>
+                <li>Install Go 1.26 or later if you haven't already done so.</li>
+                <li>Run <code>go install github.com/pgaskin/kepubify/v5@latest</code>. The resulting binary will be in <code>$HOME/go/bin</code>, or whatever <code>GOBIN</code> is set to.</li>
             </ol>
         </section>
         <section id="kepubify">
@@ -199,62 +199,10 @@ Conversion Options:
         </section>
         <section id="seriesmeta">
             <h2>Seriesmeta</h2>
-            <h3>About</h3>
             <p>
-                <b>Note:</b> I recommend using my new mod, <a
-                href="../ns/">NickelSeries</a>, after you run seriesmeta once.
-                NickelSeries will add built-in support for series metadata to
-                Kobo's import process and eliminate the requirement to run
-                seriesmeta every time you add books.
+                The old seriesmeta tool is deprecated. You should use  <a
+                href="../ns/">NickelSeries</a> instead.
             </p>
-            <h3>Usage</h3>
-            <pre>Usage: seriesmeta [options] [kobo_path]
-
-Options:
-  -h, --help         Show this help message
-  -p, --no-persist   Don't ensure metadata is always set (this will cause series metadata to be lost if opening a book after an import but before a reboot)
-  -n, --no-replace   Don't replace existing series metadata (you probably don't want this option)
-  -u, --uninstall    Uninstall seriesmeta table and hooks (imported series metadata will be left untouched)
-
-Arguments:
-  kobo_path is the path to the Kobo eReader. If not specified, seriesmeta will try to automatically detect the Kobo.</pre>
-            <h3>NickelSeries</h3>
-            <p>
-                I've written a mod for the Kobo firmware, <a
-                href="../ns/">NickelSeries</a>, which will add built-in support
-                for series metadata to Kobo's import process and eliminate the
-                requirement to run seriesmeta every time you add books.
-            </p>
-            <p>
-                After using seriesmeta to add metadata for existing books, I
-                recommend installing NickelSeries. Note that you can safely use
-                both at the same time, and neither conflict with Calibre.
-            </p>
-        </section>
-        <section id="covergen">
-            <h2>Covergen</h2>
-            <h3>About</h3>
-            <p>
-                Cover thumbnails on Kobo devices can generated or re-generated
-                using covergen. This will speed up library browsing, and will
-                improve the quality of resized covers.
-            </p>
-            <p>
-                This tool is standalone, and will not conflict with Calibre.
-            </p>
-            <h3>Usage</h3>
-            <pre>Usage: covergen [options] [kobo_path]
-
-Options:
-  -a, --aspect-ratio float   Stretch the covers to fit a specific aspect ratio (for example 1.3, 1.5, 1.6)
-  -g, --grayscale            Convert images to grayscale
-  -h, --help                 Show this help message
-  -i, --invert               Invert images
-  -m, --method string        Resize algorithm to use (bilinear, bicubic, lanczos2, lanczos3) (default "lanczos3")
-  -r, --regenerate           Re-generate all covers
-
-Arguments:
-  kobo_path is the path to the Kobo eReader. If not specified, covergen will try to automatically detect the Kobo.</pre>
         </section>
         <section id="troubleshooting">
             <h2>Troubleshooting</h2>
