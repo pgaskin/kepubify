@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pgaskin/kepubify/v5/internal"
 	"github.com/pgaskin/kepubify/v5/kepub"
 	"github.com/spf13/pflag"
 )
@@ -200,7 +201,7 @@ func main() {
 		suffixes, explicitSuffixes = append(suffixes, explicitSuffixes...), nil
 	}
 
-	pathMap, skipList, err := transformer{
+	pathMap, skipList, err := internal.Transformer{
 		NoPreserveDirs:   *nopreservedirs,
 		Update:           *update,
 		Inplace:          *inplace,

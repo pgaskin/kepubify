@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type transformer struct {
+type Transformer struct {
 	NoPreserveDirs bool
 	Inplace        bool
 	Update         bool // if not set, output files set may already exist
@@ -58,8 +58,8 @@ type matchedFile struct {
 //
 // It returns the output path for each input file, and the input files skipped
 // (existing outputs if Update is set, and files whose output is the same as a
-// file matched by a higher priority suffix, see [transformer.Suffixes]).
-func (t transformer) TransformPaths(output string, inputs ...string) (map[string]string, []string, error) {
+// file matched by a higher priority suffix, see [Transformer.Suffixes]).
+func (t Transformer) TransformPaths(output string, inputs ...string) (map[string]string, []string, error) {
 	for _, suffix := range t.PreserveSuffixes {
 		if strings.EqualFold(suffix, t.TargetSuffix) {
 			return nil, nil, fmt.Errorf("preserved suffix %#v overlaps with target suffix %#v", suffix, t.TargetSuffix)
@@ -281,10 +281,10 @@ func (t transformer) TransformPaths(output string, inputs ...string) (map[string
 	return pathMap, skipList, nil
 }
 
-// matchSuffix returns the longest transformer suffix matching name, how files
+// matchSuffix returns the longest Transformer suffix matching name, how files
 // with it are handled, and its priority (the position in Suffixes followed by
 // ExplicitSuffixes).
-func (t transformer) matchSuffix(name string) (suffix string, kind suffixKind, rank int, ok bool) {
+func (t Transformer) matchSuffix(name string) (suffix string, kind suffixKind, rank int, ok bool) {
 	var n int
 	for i, suffixes := range [][]string{t.Suffixes, t.ExplicitSuffixes, t.PreserveSuffixes} {
 		for j, x := range suffixes {
@@ -300,7 +300,7 @@ func (t transformer) matchSuffix(name string) (suffix string, kind suffixKind, r
 // inputName returns the base name of a cleaned input directory for use in the
 // name of its output directory, resolving "." and ".." against the working
 // directory.
-func (t transformer) inputName(input string) (string, error) {
+func (t Transformer) inputName(input string) (string, error) {
 	name := filepath.Base(input)
 	if name == "." || name == ".." {
 		abs, err := filepath.Abs(input)
