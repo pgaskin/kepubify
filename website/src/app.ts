@@ -85,20 +85,22 @@ export class KepubifyApp {
 
         this.#ref.placeholder = el
 
-        this.#ref.placeholder.addEventListener("click", () => {
-            const input = document.createElement("input")
-            input.type = "file"
-            input.accept = "application/epub+zip"
-            input.multiple = true
-            input.addEventListener("input", () => {
-                if (input.files) {
-                    for (let i = 0; i < input.files.length; i++) {
-                        this.enqueue(input.files[i])
-                    }
+        // note: in the document since iOS Safari may not report the selected
+        // files for a detached input
+        const input = this.#ref.files.appendChild(document.createElement("input"))
+        input.type = "file"
+        input.accept = ".epub,application/epub+zip" // note: Android often has no MIME type for epubs
+        input.multiple = true
+        input.hidden = true
+        input.addEventListener("change", () => {
+            if (input.files) {
+                for (let i = 0; i < input.files.length; i++) {
+                    this.enqueue(input.files[i])
                 }
-            })
-            input.click()
+            }
+            input.value = "" // so the same files can be selected again
         })
+        this.#ref.placeholder.addEventListener("click", () => input.click())
 
         for (const x of ["drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave", "drop"]) {
             this.#ref.files.addEventListener(x, ev => {
