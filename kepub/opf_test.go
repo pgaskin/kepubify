@@ -284,11 +284,11 @@ func must[T any](v T, err error) T {
 func testTransformOPF(t *testing.T, in string) string {
 	t.Helper()
 	var a, b bytes.Buffer
-	if err := transformOPF(&a, strings.NewReader(in)); err != nil {
+	if err := transformOPF(&a, strings.NewReader(in), nil); err != nil {
 		t.Fatalf("transform: %v", err)
 	}
 	// one-byte reader to ensure streaming works correctly
-	if err := transformOPF(&b, iotest.OneByteReader(strings.NewReader(in))); err != nil {
+	if err := transformOPF(&b, iotest.OneByteReader(strings.NewReader(in)), nil); err != nil {
 		t.Fatalf("transform (one byte reader): %v", err)
 	}
 	if a.String() != b.String() {

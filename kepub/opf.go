@@ -27,16 +27,19 @@ var (
 		htmlstream.AttrEquals("role", "bkp"),
 		htmlstream.AttrNSEquals(nsOPF, "role", "bkp"),
 	))
+	isManifestItem   = htmlstream.TagNS(nsOPF, "item")
+	isGuideReference = htmlstream.TagNS(nsOPF, "reference")
 )
 
-// transformOPF transforms the OPF document for a KEPUB.
+// transformOPF transforms the OPF document for a KEPUB. If m is not nil, the
+// guide path references are rewritten to the manifest's encoding.
 //
 // See [Convert] for the list of changes.
 //
 // Formatting is preserved where possible, and malformed documents are
 // transformed on a best-effort basis. Element matching is namespace-aware. The
 // output document is in UTF-8 if possible.
-func transformOPF(w io.Writer, r io.Reader) error {
+func transformOPF(w io.Writer, r io.Reader, m *manifestHrefs) error {
 	opf, err := io.ReadAll(r)
 	if err != nil {
 		return err
@@ -90,8 +93,21 @@ func transformOPF(w io.Writer, r io.Reader) error {
 			if isCalibreMeta(tok) || isCalibreContributor(tok) {
 				space.Drop(t)
 				t.Remove()
-			} else if tok.Pos() == cover.pos {
-				t.SetAttr("properties", "cover-image")
+			} else {
+				if tok.Pos() == cover.pos {
+					t.SetAttr("properties", "cover-image")
+				}
+				switch a, ok := tok.Attr("href"); {
+				case !ok:
+				case isManifestItem(tok):
+					if href := escapeHref(a.Value()); href != a.Value() {
+						t.SetAttr("href", href)
+					}
+				case isGuideReference(tok) && m != nil:
+					if href, _ := m.Fix(m.opf, a.Value()); href != a.Value() {
+						t.SetAttr("href", href)
+					}
+				}
 			}
 		}
 		space.Next(t, nil)

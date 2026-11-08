@@ -49,6 +49,21 @@ import (
 //   - [extra] remove unnecessary Calibre metadata.
 //     Removes extraneous metadata elements commonly added by Calibre.
 //
+//   - [important] percent-encode manifest hrefs.
+//     Characters which aren't allowed in URLs (e.g., spaces) are
+//     percent-encoded, and the guide references are rewritten to the
+//     manifest's encoding.
+//
+// For the NCX and the content documents (in addition to [TransformContent]):
+//
+//   - [important] rewrite references to manifest items in the NCX and
+//     hyperlinks in the content documents to the manifest's encoding.
+//     Kobo treats differently encoded references to the same file (e.g., with
+//     a space and with %20) as different files, which doubles the page count
+//     and breaks navigation (#101). Case differences are fixed if exactly one
+//     file matches. References in the NCX and nav document to files which
+//     aren't in the manifest emit warnings to [Options.Warn].
+//
 // If processing untrusted EPUBs, r should be a [zip.Reader] or other
 // in-memory/sandboxed filesystem, rather than an on-disk filesystem since paths
 // are not sanitized.
@@ -62,6 +77,7 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 		FileActionIgnore           = 1
 		FileActionTransformContent = 2
 		FileActionTransformOPF     = 3
+		FileActionTransformNCX     = 4
 	)
 
 	p := opt.progress()
@@ -137,6 +153,20 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 		}
 	}
 
+	opfData, err := fs.ReadFile(r, opf)
+	if err != nil {
+		return fmt.Errorf("read source EPUB: %w", err)
+	}
+	hrefs, err := newManifestHrefs(r, opf, opfData)
+	if err != nil {
+		return fmt.Errorf("read source EPUB: parse OPF package: %w", err)
+	}
+	warnHref := func(name, href string) {
+		if opt.Warn != nil {
+			opt.Warn(name, fmt.Sprintf("href %q doesn't refer to a manifest item", href))
+		}
+	}
+
 	// mark the opf to be transformed
 	fileAct[fileIdx[opf]] = FileActionTransformOPF
 
@@ -176,6 +206,25 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 	// we'll manually create the mimetype file
 	if i, ok := fileIdx["mimetype"]; ok {
 		fileAct[i] = FileActionIgnore
+	}
+
+	// transform the NCX now, but only replace it if it was changed
+	var ncx *bytes.Buffer
+	if i, ok := fileIdx[hrefs.ncx]; ok && fileAct[i] == FileActionCopy {
+		f := files[i]
+		rc, err := r.Open(f.Name)
+		if err != nil {
+			return fmt.Errorf("transform %q: %w", f.Name, err)
+		}
+		ncx = bytes.NewBuffer(nil)
+		changed, err := transformNCX(ncx, rc, f.Name, hrefs, warnHref)
+		rc.Close()
+		if err != nil {
+			return fmt.Errorf("transform %q: %w", f.Name, err)
+		}
+		if changed {
+			fileAct[i] = FileActionTransformNCX
+		}
 	}
 
 	// initialize the output EPUB
@@ -222,7 +271,7 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 			return fmt.Errorf("transform %q: %w", f.Name, err)
 		}
 		buf := bytes.NewBuffer(nil)
-		err = transformOPF(buf, rc)
+		err = transformOPF(buf, rc, hrefs)
 		rc.Close()
 		if err != nil {
 			return fmt.Errorf("transform %q: %w", f.Name, err)
@@ -245,6 +294,16 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 		written()
 	}
 
+	// write the transformed NCX
+	for i, f := range files {
+		if fileAct[i] == FileActionTransformNCX {
+			if err := zipReplace(zw, f, ncx); err != nil {
+				return fmt.Errorf("write %q to output EPUB: %w", f.Name, err)
+			}
+			written()
+		}
+	}
+
 	// transform the content documents in parallel, writing them in order
 	var content []int
 	for i := range files {
@@ -265,8 +324,15 @@ func Convert(ctx context.Context, w io.Writer, r fs.FS, opt Options) error {
 		if err != nil {
 			return nil, fmt.Errorf("transform %q: %w", f.Name, err)
 		}
+		fixHref := func(href string) string {
+			fixed, ok := hrefs.Fix(f.Name, href)
+			if !ok && f.Name == hrefs.nav {
+				warnHref(f.Name, href)
+			}
+			return fixed
+		}
 		buf := pool.Get().(*bytes.Buffer)
-		err = transformContent(buf, rc, opt, f.Name)
+		err = transformContent(buf, rc, opt, f.Name, fixHref)
 		rc.Close()
 		if err != nil {
 			buf.Reset()

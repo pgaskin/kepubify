@@ -151,6 +151,113 @@ func TestConvert(t *testing.T) {
 		},
 	}.Run(t)
 
+	var tocWarnings []string
+	ConvertTestCase{
+		What: "with toc hrefs encoded differently from the manifest",
+		EPUB: overlayMapFS(testEPUB, fstest.MapFS{
+			"OEBPS/content.opf": &fstest.MapFile{
+				Data: []byte(strings.NewReplacer(
+					`href="xhtml/ch01.xhtml"`, `href="xhtml/ch 01.xhtml"`,
+					`href="xhtml/ch02.xhtml"`, `href="xhtml/ch%2002.xhtml"`,
+					`<item id="cover"`, `<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="cover"`,
+					`<reference href="xhtml/title.xhtml"`, `<reference href="./xhtml/title.xhtml"`,
+				).Replace(string(testEPUB["OEBPS/content.opf"].Data))),
+				Mode: testEPUB["OEBPS/content.opf"].Mode,
+			},
+			"OEBPS/nav.xhtml": &fstest.MapFile{
+				Data: []byte(strings.NewReplacer(
+					`href="xhtml/ch01.xhtml"`, `href="xhtml/ch%2001.xhtml"`,
+					`href="xhtml/ch02.xhtml"`, `href="xhtml/ch 02.xhtml#a"`,
+					`href="xhtml/ch03.xhtml"`, `href="xhtml/missing.xhtml"`,
+				).Replace(string(testEPUB["OEBPS/nav.xhtml"].Data))),
+				Mode: testEPUB["OEBPS/nav.xhtml"].Mode,
+			},
+			"OEBPS/toc.ncx": &fstest.MapFile{
+				Data: []byte(fixIndent("\t", true, `
+					<?xml version="1.0" encoding="UTF-8"?>
+					<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+						<navMap>
+							<navPoint id="n1"><navLabel><text>1</text></navLabel><content src="xhtml/ch 01.xhtml"/></navPoint>
+							<navPoint id="n2"><navLabel><text>2</text></navLabel><content src="xhtml/ch%2002.xhtml"/></navPoint>
+							<navPoint id="n4"><navLabel><text>4</text></navLabel><content src="./XHTML/Ch04.xhtml#p"/></navPoint>
+						</navMap>
+					</ncx>
+				`)),
+				Mode: 0666,
+			},
+			"OEBPS/xhtml/title.xhtml": &fstest.MapFile{
+				Data: []byte(fixIndent("\t", true, `
+					<!DOCTYPE html>
+					<html xmlns="http://www.w3.org/1999/xhtml" xmlns:xlink="http://www.w3.org/1999/xlink" lang="en">
+						<head><title>Test Book</title></head>
+						<body>
+							<img src="../Cover.PNG"/>
+							<p><a href="ch 02.xhtml#a">2</a> <a href="CH03.XHTML">3</a> <a href="ch%2001.xhtml">1</a> <a href="missing.xhtml">x</a> <a href="http://example.com/a b">y</a></p>
+							<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="../Cover.PNG"/><a xlink:href="ch 02.xhtml">2</a></svg>
+						</body>
+					</html>
+				`)),
+				Mode: testEPUB["OEBPS/xhtml/title.xhtml"].Mode,
+			},
+			"OEBPS/xhtml/ch01.xhtml":  nil,
+			"OEBPS/xhtml/ch 01.xhtml": testEPUB["OEBPS/xhtml/ch01.xhtml"],
+			"OEBPS/xhtml/ch02.xhtml":  nil,
+			"OEBPS/xhtml/ch 02.xhtml": testEPUB["OEBPS/xhtml/ch02.xhtml"],
+		}),
+		ShouldError: false,
+
+		Options: Options{
+			Warn: func(name, msg string) {
+				if strings.Contains(msg, "manifest item") {
+					tocWarnings = append(tocWarnings, name+": "+msg)
+				}
+			},
+		},
+		Checks: []ShouldFunc{
+			ShouldHaveAllSourceDocumentsWithSaneOPF(0),
+			FileShould("OEBPS/content.opf", func(contents string) error {
+				for _, s := range []string{`href="xhtml/ch%2001.xhtml"`, `href="xhtml/ch%2002.xhtml"`, `<reference href="xhtml/title.xhtml"`} {
+					if !strings.Contains(contents, s) {
+						return fmt.Errorf("no %s", s)
+					}
+				}
+				return nil
+			}).Because("should percent-encode the manifest and fix the guide"),
+			FileShould("OEBPS/nav.xhtml", func(contents string) error {
+				for _, s := range []string{`href="xhtml/ch%2001.xhtml"`, `href="xhtml/ch%2002.xhtml#a"`, `href="xhtml/missing.xhtml"`} {
+					if !strings.Contains(contents, s) {
+						return fmt.Errorf("no %s", s)
+					}
+				}
+				return nil
+			}).Because("should use the manifest encoding in the nav"),
+			FileShould("OEBPS/toc.ncx", func(contents string) error {
+				for _, s := range []string{`src="xhtml/ch%2001.xhtml"`, `src="xhtml/ch%2002.xhtml"`, `src="xhtml/ch04.xhtml#p"`} {
+					if !strings.Contains(contents, s) {
+						return fmt.Errorf("no %s", s)
+					}
+				}
+				return nil
+			}).Because("should use the manifest encoding in the ncx"),
+			FileShould("OEBPS/xhtml/title.xhtml", func(contents string) error {
+				for _, s := range []string{`src="../Cover.PNG"`, `href="ch%2002.xhtml#a"`, `href="ch03.xhtml"`, `href="ch%2001.xhtml"`, `href="missing.xhtml"`, `href="http://example.com/a b"`, `<image xlink:href="../Cover.PNG"`, `<a xlink:href="ch%2002.xhtml"`} {
+					if !strings.Contains(contents, s) {
+						return fmt.Errorf("no %s", s)
+					}
+				}
+				return nil
+			}).Because("should use the manifest encoding in hyperlinks, and leave other references"),
+			FileShould("OEBPS/xhtml/ch 01.xhtml", DocumentProbablyHasSpans),
+			FileShould("OEBPS/xhtml/ch 02.xhtml", DocumentProbablyHasSpans),
+			func(fs.FS, *zip.Reader) error {
+				if want := `OEBPS/nav.xhtml: href "xhtml/missing.xhtml" doesn't refer to a manifest item`; strings.Join(tocWarnings, "\n") != want {
+					return fmt.Errorf("warnings %q, want %q", tocWarnings, want)
+				}
+				return nil
+			},
+		},
+	}.Run(t)
+
 	ConvertTestCase{
 		What: "with incorrect extensions and mimetypes",
 		EPUB: overlayMapFS(testEPUB, fstest.MapFS{

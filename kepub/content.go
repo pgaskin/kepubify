@@ -108,12 +108,13 @@ var cssFullScreenFixes = fixIndent("    ", false, `
 // The document is streamed, so existing Kobo divs and spans are only detected
 // if they are close to the start of the body (which they should be).
 func TransformContent(w io.Writer, r io.Reader, opt Options) error {
-	return transformContent(w, r, opt, "")
+	return transformContent(w, r, opt, "", nil)
 }
 
 // transformContent is TransformContent for the content document at the path
-// name in the EPUB, for Warn.
-func transformContent(w io.Writer, r io.Reader, opt Options, name string) error {
+// name in the EPUB, for Warn. If fixHref is not nil, the hyperlinks are
+// replaced with its result (see transformContentLinks).
+func transformContent(w io.Writer, r io.Reader, opt Options, name string, fixHref func(href string) string) error {
 	r, err := transformContentCharset(r, opt.Charset)
 	if err != nil {
 		return fmt.Errorf("parse html: %w", err)
@@ -132,6 +133,14 @@ func transformContent(w io.Writer, r io.Reader, opt Options, name string) error 
 		OnTag:       k.OnTag,
 		OnText:      k.OnText,
 	}
+	if fixHref != nil {
+		popt.OnTag = func(e *polyglot.Tag) {
+			if e.Start && e.Token != nil {
+				transformContentLinks(e, fixHref)
+			}
+			k.OnTag(e)
+		}
+	}
 	if opt.Warn != nil {
 		popt.Warn = func(w polyglot.Warning) {
 			opt.Warn(name, w.Msg)
@@ -148,6 +157,33 @@ func transformContent(w io.Writer, r io.Reader, opt Options, name string) error 
 	}
 
 	return nil
+}
+
+// transformContentLinks replaces the hyperlink of the start tag e (the href of
+// an HTML a or area element, or the href or xlink:href of an SVG a element)
+// with the result of fixHref.
+func transformContentLinks(e *polyglot.Tag, fixHref func(string) string) {
+	var names []string
+	switch {
+	case e.NS == htmlstream.NamespaceXHTML && (e.Local == "a" || e.Local == "area"):
+		names = []string{"href"}
+	case e.NS == htmlstream.NamespaceSVG && e.Local == "a":
+		names = []string{"href", "xlink:href"}
+	}
+	for _, name := range names {
+		a, ok := e.Token.Attr(name)
+		if !ok {
+			continue
+		}
+		if name == "xlink:href" {
+			if _, ok := e.LookupPrefix("xlink"); !ok {
+				continue // can't be set
+			}
+		}
+		if v := fixHref(a.Value()); v != a.Value() {
+			e.SetAttr(name, v)
+		}
+	}
 }
 
 // transformContentCharset returns a reader decoding r to UTF-8 from the
