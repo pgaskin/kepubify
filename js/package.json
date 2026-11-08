@@ -1,0 +1,41 @@
+{
+  "name": "kepubify",
+  "version": "5.0.0",
+  "author": "Patrick Gaskin",
+  "license": "MIT",
+  "description": "Fast, standalone EPUB to KEPUB converter (WebAssembly)",
+  "homepage": "https://pgaskin.net/kepubify",
+  "bugs": {
+    "url": "https://github.com/pgaskin/kepubify/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pgaskin/kepubify.git",
+    "directory": "js"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "go run ./src"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">= 22"
+  }
+}

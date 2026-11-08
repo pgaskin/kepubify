@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2022", "DOM"],
+		"declaration": true,
+		"emitDeclarationOnly": true,
+		"rootDir": "src",
+		"outDir": "dist",
+		"skipLibCheck": true
+	},
+	"files": [
+		"src/index.ts",
+		"src/worker.ts",
+		"src/kepubify.worker.ts"
+	]
+}
