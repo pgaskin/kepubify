@@ -1,10 +1,16 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import * as Sentry from "@sentry/minimal"
-import { Kepubify, KepubifyConfig } from "../kepubify"
+import * as Sentry from "@sentry/browser"
+import { AlreadyKepubError, convert, setModule, type WorkerOptions } from "kepubify/worker"
+
+declare const KEPUBIFY_VERSION: string
+
+const maxFileSize = 300_000_000
+const maxConversions = Math.min(navigator.hardwareConcurrency || 2, 4)
 
 export class KepubifyApp {
-    private kepubify: Kepubify // private instead of actually private to allow it to be accessed from devtools
-    #version?: string
+    #version = KEPUBIFY_VERSION
+    #running = 0
+    #waiting: (() => void)[] = []
     #ref: {
         el: HTMLElement,
         title: HTMLElement,
@@ -17,7 +23,6 @@ export class KepubifyApp {
 
     constructor(id: string) {
         const el = document.querySelector(id)! as HTMLElement
-        this.kepubify = new Kepubify()
         this.#ref = {
             el,
             title: el.querySelector(".try__pane--files > .try__pane__title")!,
@@ -37,15 +42,17 @@ export class KepubifyApp {
 
         this.#ref.title.textContent = "Downloading kepubify..."
         try {
-            this.#version = await this.kepubify.init((lengthComputable, loaded, total) => {
-                if (lengthComputable) {
+            const module = WebAssembly.compile(await download(new URL("kepubify.wasm", import.meta.url), (loaded, total) => {
+                if (total) {
                     this.#ref.title.textContent = `Downloading kepubify... ${(loaded / 1000000).toFixed(2)} / ${(total / 1000000).toFixed(2)} MB (${(loaded / total * 100).toFixed(0)}%)`
                 } else if (loaded) {
                     this.#ref.title.textContent = `Downloading kepubify... ${(loaded / 1000000).toFixed(2)} MB`
                 } else {
                     this.#ref.title.textContent = "Downloading kepubify..."
                 }
-            })
+            }))
+            setModule(module)
+            await module
         } catch (ex) {
             this.#ref.title.textContent = `Failed to download kepubify: ${ex}`
             this.#ref.title.title = `${ex}`
@@ -138,12 +145,18 @@ export class KepubifyApp {
         elInfoName.classList.add("file__info__name")
         elInfoName.textContent = epub.name
 
-        let kepub, config
+        let kepub: Uint8Array<ArrayBuffer>, config: WorkerOptions | undefined
         try {
+            if (epub.size > maxFileSize) {
+                throw new Error(`File too large for web version (maximum: ${maxFileSize / 1000000} MB)`)
+            }
             config = this.config
-            kepub = await this.kepubify.kepubify(epub, config, (n, total) => {
-                elInfoProgress.style.width = `${(total ? n / total : 0) * 100}%`
-            })
+            kepub = await this.#limit(async () => convert(new Uint8Array(await epub.arrayBuffer()), {
+                ...config,
+                progress: percent => {
+                    elInfoProgress.style.width = `${percent * 100}%`
+                },
+            }))
             elInfoProgress.style.width = "100%"
             elInfoProgress.classList.add("file__info__progress--success")
         } catch (ex) {
@@ -152,7 +165,7 @@ export class KepubifyApp {
 
             const elStatus = el.appendChild(document.createElement("div"))
             elStatus.classList.add("file__status")
-            elStatus.textContent = `${ex}`
+            elStatus.textContent = ex instanceof AlreadyKepubError ? "Error: already a KEPUB" : `${ex}`
 
             const elInfoRemove = elInfo.appendChild(document.createElement("button"))
             elInfoRemove.textContent = "−"
@@ -161,18 +174,20 @@ export class KepubifyApp {
                 el.remove()
             })
 
-            Sentry.captureException(ex, {
-                extra: {
-                    file: { name: epub?.name, size: epub?.size, type: epub?.type },
-                    worker: { version: this.#version },
-                    config: config,
-                },
-            })
+            if (!(ex instanceof AlreadyKepubError)) {
+                Sentry.captureException(ex, {
+                    extra: {
+                        file: { name: epub?.name, size: epub?.size, type: epub?.type },
+                        worker: { version: this.#version },
+                        config: config,
+                    },
+                })
+            }
             return
         }
 
         Sentry.addBreadcrumb({
-            message: `Finished ${epub.name} (${kepub.size} bytes)`,
+            message: `Finished ${epub.name} (${kepub.length} bytes)`,
         })
 
         try {
@@ -198,7 +213,7 @@ export class KepubifyApp {
             Sentry.captureException(new Error(`failed to create download link: ${ex}`), {
                 extra: {
                     file: { name: epub.name, size: epub.size, type: epub.type },
-                    kepub: { size: kepub.size },
+                    kepub: { size: kepub.length },
                     worker: { version: this.#version },
                 },
             })
@@ -211,45 +226,82 @@ export class KepubifyApp {
         })
     }
 
-    get config(): KepubifyConfig {
-        const cfg = new KepubifyConfig()
-        switch (this.#ref.options["smarten-punctuation"].value) {
+    get config(): WorkerOptions {
+        const cfg: WorkerOptions = {}
+        const option = (name: string) => (this.#ref.options.elements.namedItem(name) as HTMLInputElement | RadioNodeList).value
+        switch (option("smarten-punctuation")) {
             case "off":
                 break
             case "on":
-                cfg.smartypants()
+                cfg.smartypants = true
                 break
         }
-        switch (this.#ref.options["dummy-titlepage"].value) {
+        switch (option("dummy-titlepage")) {
             case "auto":
                 break
             case "always":
-                cfg.dummyTitlepage(true)
+                cfg.dummyTitlepage = true
                 break
             case "never":
-                cfg.dummyTitlepage(false)
+                cfg.dummyTitlepage = false
                 break
         }
-        if (this.#ref.options["custom-css"].value.trim() != "") {
-            cfg.addCSS(this.#ref.options["custom-css"].value)
+        if (option("custom-css").trim() != "") {
+            cfg.css = [option("custom-css")]
         }
-        switch (this.#ref.options["hyphenation"].value) {
+        switch (option("hyphenation")) {
             case "default":
                 break
             case "enable":
-                cfg.hyphenate(true)
+                cfg.hyphenate = true
                 break
             case "disable":
-                cfg.hyphenate(false)
+                cfg.hyphenate = false
                 break
         }
-        switch (this.#ref.options["full-screen-fixes"].value) {
+        switch (option("full-screen-fixes")) {
             case "off":
                 break
             case "on":
-                cfg.fullScreenFixes()
+                cfg.fullScreenFixes = true
                 break
         }
         return cfg
     }
+
+    async #limit<T>(fn: () => Promise<T>): Promise<T> {
+        while (this.#running >= maxConversions) {
+            await new Promise<void>(resolve => this.#waiting.push(resolve))
+        }
+        this.#running++
+        try {
+            return await fn()
+        } finally {
+            this.#running--
+            this.#waiting.shift()?.()
+        }
+    }
+}
+
+async function download(url: URL, progress: (loaded: number, total: number) => void): Promise<ArrayBuffer> {
+    const resp = await fetch(url)
+    if (!resp.ok) {
+        throw new Error(`fetch ${url}: response status ${resp.status}`)
+    }
+    const total = Number(resp.headers.get("Content-Length")) || 0
+    const chunks: Uint8Array[] = []
+    let loaded = 0
+    progress(loaded, total)
+    const reader = resp.body!.getReader() // note: async iteration needs Safari 27
+    for (let r; !(r = await reader.read()).done;) {
+        chunks.push(r.value)
+        progress(loaded += r.value.length, total)
+    }
+    const buf = new Uint8Array(loaded)
+    let p = 0
+    for (const chunk of chunks) {
+        buf.set(chunk, p)
+        p += chunk.length
+    }
+    return buf.buffer
 }

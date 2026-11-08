@@ -1,0 +1,15 @@
+{
+  "name": "kepubify-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "go run ."
+  },
+  "dependencies": {
+    "@sentry/browser": "11.9.0",
+    "kepubify": "file:../js"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}
