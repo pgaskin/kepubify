@@ -10,9 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,71 +20,6 @@ import (
 	"github.com/pgaskin/kepubify/v5/kepub"
 	"github.com/spf13/pflag"
 )
-
-var version = "unknown"
-
-func init() {
-	if version == "unknown" {
-		var (
-			vcs struct { // only set if built with `go build` or `go install` with vcs metadata available
-				revision string
-				time     time.Time
-				modified bool
-			}
-			major  string // only set if non-v1 (which it shouldn't be...)
-			modver string // only set if built with `go install`
-		)
-		if info, ok := debug.ReadBuildInfo(); ok {
-			for _, s := range info.Settings {
-				switch s.Key {
-				case "vcs.revision":
-					if v := s.Value; len(v) == 20 || len(v) == 40 {
-						vcs.revision = v
-					} else {
-						//panic(fmt.Errorf("parse %s %q: unexpected length %d", s.Key, s.Value, len(v)))
-					}
-				case "vcs.time":
-					if v, err := time.ParseInLocation(time.RFC3339Nano, s.Value, time.UTC); err == nil {
-						vcs.time = v
-					} else {
-						//panic(fmt.Errorf("parse %s %q: %w", s.Key, s.Value, err))
-					}
-				case "vcs.modified":
-					if v, err := strconv.ParseBool(s.Value); err == nil {
-						vcs.modified = v
-					} else {
-						//panic(fmt.Errorf("parse %s %q: %w", s.Key, s.Value, err))
-					}
-				}
-			}
-			if _, rest, ok := strings.CutLast(info.Main.Path, "/"); ok && strings.Trim(strings.TrimPrefix(rest, "v"), "0123456789") == "" {
-				major = rest
-			}
-			if info.Main.Version != "" {
-				modver = info.Main.Version
-			}
-		}
-		if modver != "" {
-			version = modver
-			if vcs.modified {
-				version += " (dev)" // wouldn't be modified if it was built directly from the module
-			}
-		} else {
-			if major == "" {
-				version = "unknown-"
-			} else {
-				version = major + "-"
-			}
-			if vcs.revision != "" {
-				version += vcs.revision[:7]
-			}
-			if vcs.modified {
-				version += "+dirty"
-			}
-			version += " (dev)"
-		}
-	}
-}
 
 func main() {
 	pflag.CommandLine.SortFlags = false
@@ -134,7 +67,7 @@ func main() {
 	pflag.Parse()
 
 	if *sversion {
-		fmt.Printf("kepubify %s\n", version)
+		fmt.Printf("kepubify %s\n", internal.Version)
 		exit(0)
 		return
 	}
@@ -219,7 +152,7 @@ func main() {
 
 	// --- Convert --- //
 
-	fmt.Printf("Kepubify %s\n", version)
+	fmt.Printf("Kepubify %s\n", internal.Version)
 	if *calibre {
 		fmt.Printf("Using extension %s for Calibre compatibility (this is meant for use with a Calibre library and will not work directly on a Kobo reader)\n", ext)
 	}
@@ -494,7 +427,7 @@ func (w *warnings) Format(i int64) string {
 
 func helpExit() {
 	fmt.Fprintf(os.Stderr, "Usage: kepubify [options] input_path [input_path]...\n")
-	fmt.Fprintf(os.Stderr, "\nVersion:\n  kepubify %s\n", version)
+	fmt.Fprintf(os.Stderr, "\nVersion:\n  kepubify %s\n", internal.Version)
 
 	categories := map[string]*pflag.FlagSet{}
 	pflag.VisitAll(func(flag *pflag.Flag) {
