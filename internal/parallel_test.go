@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -11,7 +13,7 @@ import (
 	"time"
 )
 
-func TestParallel(t *testing.T) {
+func testParallel(t *testing.T, parallel func(context.Context, int, []int, func(int, int) (int, error)) func(*error) iter.Seq2[int, int], ordered bool) {
 	items := make([]int, 100)
 	for i := range items {
 		items[i] = i
@@ -47,23 +49,24 @@ func TestParallel(t *testing.T) {
 		t.Run(strconv.Itoa(n), func(t *testing.T) {
 			t.Run("Simple", func(t *testing.T) {
 				var err error
-				var got []int
-				for i, r := range Parallel(context.Background(), n, items, square)(&err) {
-					if i != len(got) {
-						t.Fatalf("expected index %d, got %d", len(got), i)
+				var got []int // indices
+				for i, r := range parallel(context.Background(), n, items, square)(&err) {
+					if ordered && i != len(got) {
+						t.Fatalf("expected index %d, got %d (results must be in order)", len(got), i)
 					}
-					got = append(got, r)
+					if slices.Contains(got, i) {
+						t.Fatalf("index %d yielded more than once", i)
+					}
+					if r != i*i {
+						t.Fatalf("result %d: expected %d, got %d", i, i*i, r)
+					}
+					got = append(got, i)
 				}
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				if len(got) != len(items) {
 					t.Fatalf("expected %d results, got %d", len(items), len(got))
-				}
-				for i, r := range got {
-					if r != i*i {
-						t.Fatalf("result %d: expected %d, got %d (results must be in order)", i, i*i, r)
-					}
 				}
 			})
 
@@ -76,16 +79,19 @@ func TestParallel(t *testing.T) {
 					return square(i, x)
 				})
 				var err error
-				var got []int
-				for _, r := range Parallel(context.Background(), n, items, fn)(&err) {
-					got = append(got, r)
+				var got []int // indices
+				for i := range parallel(context.Background(), n, items, fn)(&err) {
+					got = append(got, i)
 				}
 				check()
 				if !errors.Is(err, errTest) {
 					t.Fatalf("expected error, got %v", err)
 				}
-				if len(got) != 10 {
+				if ordered && len(got) != 10 {
 					t.Fatalf("expected the results before the error, got %d", len(got))
+				}
+				if slices.Contains(got, 10) {
+					t.Fatalf("expected the failed item not to be yielded")
 				}
 			})
 
@@ -93,7 +99,7 @@ func TestParallel(t *testing.T) {
 				fn, check := tracked(t, square)
 				var err error
 				var got []int
-				for _, r := range Parallel(context.Background(), n, items, fn)(&err) {
+				for _, r := range parallel(context.Background(), n, items, fn)(&err) {
 					if got = append(got, r); len(got) == 5 {
 						break
 					}
@@ -113,7 +119,7 @@ func TestParallel(t *testing.T) {
 				fn, check := tracked(t, square)
 				var err error
 				var got []int
-				for _, r := range Parallel(ctx, n, items, fn)(&err) {
+				for _, r := range parallel(ctx, n, items, fn)(&err) {
 					if got = append(got, r); len(got) == 5 {
 						cancel()
 					}
@@ -131,7 +137,7 @@ func TestParallel(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				var err error
-				for range Parallel(ctx, n, items, square)(&err) {
+				for range parallel(ctx, n, items, square)(&err) {
 					t.Fatal("expected no results")
 				}
 				if !errors.Is(err, context.Canceled) {
@@ -141,7 +147,7 @@ func TestParallel(t *testing.T) {
 
 			t.Run("Empty", func(t *testing.T) {
 				var err error
-				for range Parallel(context.Background(), n, nil, square)(&err) {
+				for range parallel(context.Background(), n, nil, square)(&err) {
 					t.Fatal("expected no results")
 				}
 				if err != nil {
@@ -177,7 +183,7 @@ func TestParallel(t *testing.T) {
 					}
 				}()
 				var err error
-				for range Parallel(context.Background(), n, items, fn)(&err) {
+				for range parallel(context.Background(), n, items, fn)(&err) {
 				}
 				t.Fatal("expected a panic")
 			})
@@ -192,7 +198,7 @@ func TestParallel(t *testing.T) {
 					}
 				}()
 				var err error
-				for _, r := range Parallel(context.Background(), n, items, fn)(&err) {
+				for _, r := range parallel(context.Background(), n, items, fn)(&err) {
 					if r == 25 {
 						panic("loop")
 					}
@@ -201,8 +207,13 @@ func TestParallel(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestParallel(t *testing.T) {
+	testParallel(t, Parallel[int, int], true)
 
 	t.Run("Bounded", func(t *testing.T) {
+		items := make([]int, 100)
 		var started atomic.Int64
 		release := make(chan struct{})
 		observed := make(chan int64, 1)
@@ -232,6 +243,38 @@ func TestParallel(t *testing.T) {
 		}
 		if n := <-observed; n > 4 {
 			t.Fatalf("expected at most 4 items to be started while the first was delayed, got %d", n)
+		}
+	})
+}
+
+func TestParallelUnordered(t *testing.T) {
+	testParallel(t, ParallelUnordered[int, int], false)
+
+	t.Run("NotBlocked", func(t *testing.T) {
+		// the first result is delayed until the others have been yielded
+		items := make([]int, 100)
+		release := make(chan struct{})
+		var err error
+		var got int
+		for range ParallelUnordered(context.Background(), 4, items, func(i, _ int) (int, error) {
+			if i == 0 {
+				select {
+				case <-release:
+				case <-time.After(5 * time.Second):
+					return 0, errors.New("expected the other results to be yielded while the first was delayed")
+				}
+			}
+			return i, nil
+		})(&err) {
+			if got++; got == len(items)-1 {
+				close(release)
+			}
+		}
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != len(items) {
+			t.Fatalf("expected %d results, got %d", len(items), got)
 		}
 	})
 }
