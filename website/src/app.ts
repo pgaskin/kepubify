@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import * as Sentry from "@sentry/browser"
 import { AlreadyKepubError, convert, setModule, type WorkerOptions } from "kepubify/worker"
+import { crc32, zip, type ZipEntry } from "./zip"
 
 declare const KEPUBIFY_VERSION: string
 
@@ -14,12 +15,14 @@ export class KepubifyApp {
     #version = KEPUBIFY_VERSION
     #running = 0
     #waiting: (() => void)[] = []
+    #done: ZipEntry[] = [] // converted files, for downloading all
     #ref: {
         el: HTMLElement,
         title: HTMLElement,
         files: HTMLElement,
         options: HTMLFormElement,
         placeholder?: HTMLElement,
+        downloadAll?: HTMLElement,
         hint?: HTMLElement,
     }
     #initializedUI = false
@@ -80,6 +83,13 @@ export class KepubifyApp {
         elInfoName.textContent = window.matchMedia("(pointer: coarse)").matches
             ? "Choose a file..."
             : "Drop your files here, or click to browse..."
+
+        const elAll = this.#ref.files.appendChild(document.createElement("div"))
+        elAll.classList.add("download-all", "hidden")
+        const elAllButton = elAll.appendChild(document.createElement("button"))
+        elAllButton.title = "Download all converted files as a ZIP"
+        elAllButton.addEventListener("click", () => this.#downloadAll())
+        this.#ref.downloadAll = elAll
 
         this.#ref.hint = this.#ref.files.appendChild(document.createElement("div"))
         this.#ref.hint.classList.add("hint")
@@ -218,12 +228,18 @@ export class KepubifyApp {
                 })
             }
 
+            const entry = { name: file.name, data: file, crc32: crc32(kepub) }
+            this.#done.push(entry)
+            this.#updateDownloadAll()
+
             const elInfoRemove = elInfo.appendChild(document.createElement("button"))
             elInfoRemove.textContent = "−"
             elInfoRemove.title = "Remove"
             elInfoRemove.addEventListener("click", () => {
                 el.remove()
                 URL.revokeObjectURL(elInfoName.href)
+                this.#done.splice(this.#done.indexOf(entry), 1)
+                this.#updateDownloadAll()
             })
         } catch (ex) {
             elInfoProgress.style.width = "100%"
@@ -290,6 +306,34 @@ export class KepubifyApp {
                 break
         }
         return cfg
+    }
+
+    #updateDownloadAll() {
+        const el = this.#ref.downloadAll!
+        el.classList.toggle("hidden", this.#done.length == 0)
+        el.querySelector("button")!.textContent = `Download all (${this.#done.length} ${this.#done.length == 1 ? "file" : "files"})`
+    }
+
+    #downloadAll() {
+        try {
+            const names = new Set<string>()
+            const entries = this.#done.map(e => {
+                let name = e.name
+                for (let i = 2; names.has(name); i++) {
+                    name = e.name.replace(/([.]kepub[.]epub)?$/, ` (${i})$1`)
+                }
+                names.add(name)
+                return { ...e, name }
+            })
+            const a = document.createElement("a")
+            a.href = URL.createObjectURL(zip(entries))
+            a.download = "kepubify.zip"
+            a.click()
+            setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
+        } catch (ex) {
+            this.#ref.downloadAll!.querySelector("button")!.textContent = `Error: ${ex}`
+            Sentry.captureException(new Error(`failed to create zip: ${ex}`))
+        }
     }
 
     async #limit<T>(fn: () => Promise<T>): Promise<T> {
