@@ -168,7 +168,7 @@ export class KepubifyApp {
                 throw new Error(`File too large for web version (maximum: ${maxFileSize / 1000000} MB)`)
             }
             config = this.config
-            kepub = await this.#limit(async () => convertBlob(new Uint8Array(await epub.arrayBuffer()), {
+            kepub = await this.#limit(async () => convertBlob(epub, {
                 ...config,
                 progress: percent => {
                     elInfoProgress.style.width = `${percent * 100}%`
