@@ -671,6 +671,22 @@ func TestTransformContentWarn(t *testing.T) {
 	}
 }
 
+func TestTransformContentWarnIgnored(t *testing.T) {
+	var warns []string
+	opt := Options{
+		Warn: func(name, msg string) {
+			warns = append(warns, msg)
+		},
+	}
+	doc := `<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body><section epub:type="chapter"><p xmlns:x="u" x:a="1">x</p></section></body></html>`
+	if err := TransformContent(io.Discard, strings.NewReader(doc), opt); err != nil {
+		t.Fatalf("transform: %v", err)
+	}
+	if len(warns) != 1 || !strings.Contains(warns[0], `"x:a"`) {
+		t.Errorf("got %q, expected only x:a", warns)
+	}
+}
+
 func TestTransformContentReplacementsWrites(t *testing.T) {
 	const in = "aab abab ba aaab b"
 	for _, repl := range [][][2]string{

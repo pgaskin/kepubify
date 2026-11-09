@@ -146,6 +146,9 @@ func transformContent(w io.Writer, r io.Reader, opt Options, name string, fixHre
 	}
 	if opt.Warn != nil {
 		popt.Warn = func(w polyglot.Warning) {
+			if strings.HasPrefix(w.Msg, `attribute "epub:`) && strings.Contains(w.Msg, `is in namespace "http://www.idpf.org/2007/ops" for XML parsers and in no namespace for HTML parsers`) {
+				return
+			}
 			opt.Warn(name, w.Msg)
 		}
 	}
