@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import * as Sentry from "@sentry/browser"
-import { AlreadyKepubError, convertBlob, setModule, type WorkerOptions } from "kepubify/worker"
+import { AlreadyKepubError, convertBlob, setModule, setWorker, type WorkerOptions } from "kepubify/worker"
 import { zip, type ZipEntry } from "./zip"
+
+// inline so buggy caches don't cause mixed versions or 404s (this happens more
+// than you'd expect, unfortunately)
+import kepubifyWasm from "inline:kepubify.wasm"
+import kepubifyWorker from "inline:kepubify.worker"
 
 declare const KEPUBIFY_VERSION: string
 
@@ -78,19 +83,14 @@ export class KepubifyApp {
             message: "Initializing kepubify",
         })
 
-        this.#ref.dropText.textContent = "Downloading kepubify..."
-        this.#module = download(new URL("kepubify.wasm", import.meta.url), (loaded, total) => {
-            if (total) {
-                this.#ref.dropText.textContent = `Downloading kepubify... ${(loaded / 1000000).toFixed(1)} / ${(total / 1000000).toFixed(1)} MB (${(loaded / total * 100).toFixed(0)}%)`
-            } else if (loaded) {
-                this.#ref.dropText.textContent = `Downloading kepubify... ${(loaded / 1000000).toFixed(1)} MB`
-            }
-        }).then(buf => WebAssembly.compile(buf))
+        const workerURL = URL.createObjectURL(new Blob([kepubifyWorker], { type: "text/javascript" }))
+        setWorker(() => new Worker(workerURL, { type: "module" }))
+        this.#module = WebAssembly.compile(kepubifyWasm)
         setModule(this.#module)
         try {
             await this.#module
         } catch (ex) {
-            this.#ref.dropText.textContent = `Failed to download kepubify: ${ex}`
+            this.#ref.dropText.textContent = `Failed to load kepubify: ${ex}`
             this.#ref.dropText.classList.add("try-drop__text--error")
             throw new Error(`failed to initialize kepubify: ${ex}`)
         }
@@ -738,27 +738,4 @@ function save(file: File, share = isIOS, url?: string) {
 
 function formatSize(n: number): string {
     return n < 1_000_000 ? `${Math.max(1, Math.round(n / 1000))} KB` : `${(n / 1_000_000).toFixed(1)} MB`
-}
-
-async function download(url: URL, progress: (loaded: number, total: number) => void): Promise<ArrayBuffer> {
-    const resp = await fetch(url)
-    if (!resp.ok) {
-        throw new Error(`fetch ${url}: response status ${resp.status}`)
-    }
-    const total = Number(resp.headers.get("Content-Length")) || 0
-    const chunks: Uint8Array[] = []
-    let loaded = 0
-    progress(loaded, total)
-    const reader = resp.body!.getReader() // note: async iteration needs Safari 27
-    for (let r; !(r = await reader.read()).done;) {
-        chunks.push(r.value)
-        progress(loaded += r.value.length, total)
-    }
-    const buf = new Uint8Array(loaded)
-    let p = 0
-    for (const chunk of chunks) {
-        buf.set(chunk, p)
-        p += chunk.length
-    }
-    return buf.buffer
 }

@@ -10,6 +10,7 @@
 	},
 	"files": [
 		"src/index.ts",
-		"src/app.ts"
+		"src/app.ts",
+		"src/inline.d.ts"
 	]
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -88,9 +87,20 @@ func build() error {
 		return fmt.Errorf("parse kepubify package.json: %w", err)
 	}
 
+	wasm, err := os.ReadFile(filepath.FromSlash(kepubify + "/dist/kepubify.wasm"))
+	if err != nil {
+		return err
+	}
+	worker, err := bundleWorker(kepubify + "/dist/kepubify.worker.js")
+	if err != nil {
+		return err
+	}
+
 	// TODO: version from git since we deploy the website on every commit?
-	js, err := bundle(tryDir, map[string]string{"KEPUBIFY_VERSION": pkg.Version},
-		"src/index.ts", kepubify+"/dist/kepubify.worker.js")
+	js, err := bundle(tryDir, map[string]string{"KEPUBIFY_VERSION": pkg.Version}, map[string]inline{
+		"kepubify.wasm":   {wasm, api.LoaderBinary},
+		"kepubify.worker": {worker, api.LoaderText},
+	}, "src/index.ts")
 	if err != nil {
 		return err
 	}
@@ -101,14 +111,6 @@ func build() error {
 		if err := os.WriteFile(filepath.Join(tryDir, name), data, 0o644); err != nil {
 			return err
 		}
-	}
-
-	wasm, err := os.ReadFile(filepath.FromSlash(kepubify + "/dist/kepubify.wasm"))
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(tryDir, "kepubify.wasm"), wasm, 0o644); err != nil {
-		return err
 	}
 
 	var static int
@@ -124,11 +126,17 @@ func build() error {
 	for _, name := range slices.Sorted(maps.Keys(js)) {
 		fmt.Printf("%-32s %8d bytes\n", "try/"+name, len(js[name]))
 	}
-	fmt.Printf("%-32s %8d bytes (kepubify %s)\n", "try/kepubify.wasm", len(wasm), pkg.Version)
+	fmt.Printf("%-32s %8d bytes (kepubify %s, inlined)\n", "kepubify.wasm", len(wasm), pkg.Version)
+	fmt.Printf("%-32s %8d bytes (inlined)\n", "kepubify.worker.js", len(worker))
 	return nil
 }
 
-func bundle(outDir string, define map[string]string, entries ...string) (map[string][]byte, error) {
+type inline struct {
+	data   []byte
+	loader api.Loader
+}
+
+func bundle(outDir string, define map[string]string, inlines map[string]inline, entries ...string) (map[string][]byte, error) {
 	slog.Info("esbuild", "op", "bundle", "entries", entries)
 	defines := map[string]string{}
 	for k, v := range define {
@@ -140,7 +148,6 @@ func bundle(outDir string, define map[string]string, entries ...string) (map[str
 		Outdir:            outDir,
 		EntryNames:        "[name]",
 		Bundle:            true,
-		Splitting:         true,
 		Format:            api.FormatESModule,
 		Target:            api.ES2022,
 		Charset:           api.CharsetUTF8,
@@ -155,6 +162,23 @@ func bundle(outDir string, define map[string]string, entries ...string) (map[str
 		LegalComments:     api.LegalCommentsNone,
 		LogLevel:          api.LogLevelSilent,
 		Write:             false,
+		Plugins: []api.Plugin{{
+			Name: "inline",
+			Setup: func(b api.PluginBuild) {
+				b.OnResolve(api.OnResolveOptions{Filter: `^inline:`}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
+					name := strings.TrimPrefix(args.Path, "inline:")
+					if _, ok := inlines[name]; !ok {
+						return api.OnResolveResult{}, fmt.Errorf("unknown inline import %q", name)
+					}
+					return api.OnResolveResult{Path: name, Namespace: "inline"}, nil
+				})
+				b.OnLoad(api.OnLoadOptions{Filter: `.*`, Namespace: "inline"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+					x := inlines[args.Path]
+					contents := string(x.data)
+					return api.OnLoadResult{Contents: &contents, Loader: x.loader}, nil
+				})
+			},
+		}},
 	})
 	if len(res.Errors) != 0 {
 		return nil, fmt.Errorf("esbuild: %s", strings.TrimSpace(strings.Join(api.FormatMessages(res.Errors, api.FormatMessagesOptions{}), "")))
@@ -171,10 +195,34 @@ func bundle(outDir string, define map[string]string, entries ...string) (map[str
 		}
 		files[name] = f.Contents
 	}
-	if _, ok := files["kepubify.worker.js"]; !ok {
-		return nil, errors.New("no kepubify.worker.js in the output")
-	}
 	return files, nil
+}
+
+func bundleWorker(entry string) ([]byte, error) {
+	slog.Info("esbuild", "op", "bundle", "entries", []string{entry})
+	res := api.Build(api.BuildOptions{
+		EntryPoints:       []string{entry},
+		Bundle:            true,
+		Format:            api.FormatESModule,
+		Target:            api.ES2022,
+		Charset:           api.CharsetUTF8,
+		Platform:          api.PlatformBrowser,
+		External:          []string{"node:*"}, // kepubify's node fallback for loading the module
+		TreeShaking:       api.TreeShakingTrue,
+		MinifyWhitespace:  true,
+		MinifyIdentifiers: true,
+		MinifySyntax:      true,
+		LegalComments:     api.LegalCommentsNone,
+		LogLevel:          api.LogLevelSilent,
+		Write:             false,
+	})
+	if len(res.Errors) != 0 {
+		return nil, fmt.Errorf("esbuild: %s", strings.TrimSpace(strings.Join(api.FormatMessages(res.Errors, api.FormatMessagesOptions{}), "")))
+	}
+	if len(res.OutputFiles) != 1 {
+		return nil, fmt.Errorf("expected one output file, got %d", len(res.OutputFiles))
+	}
+	return res.OutputFiles[0].Contents, nil
 }
 
 // TODO: process CSS?
