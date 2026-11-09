@@ -1,4 +1,6 @@
 github.com/evanw/esbuild v0.28.2 h1:A2uETn4jrQTcXaT/shwTDTYBxDjl7fV7nXmUrJxfA2w=
 github.com/evanw/esbuild v0.28.2/go.mod h1:D2vIQZqV/vIf/VRHtViaUtViZmG7o+kKmlBfVQuRi48=
+github.com/pgaskin/htmlstream v0.0.4 h1:SuVOQJef/2YeRIFObXv4aLe9NIsCI2PVWxKuxU31Xzk=
+github.com/pgaskin/htmlstream v0.0.4/go.mod h1:jmLge4/tS3KmlKDp90/QHuGdRbfC5O1K8mGYz0FNauU=
 golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=
 golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=

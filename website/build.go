@@ -1,19 +1,25 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"maps"
+	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/pgaskin/htmlstream"
 )
 
 // note: this is loosely based on what I did for github.com/pgaskin/htmlstream@v0.0.4/web/polyglottify
@@ -113,6 +119,11 @@ func build() error {
 		}
 	}
 
+	hashed, err := hashAssets(outDir)
+	if err != nil {
+		return fmt.Errorf("hash assets: %w", err)
+	}
+
 	var static int
 	if err := fs.WalkDir(os.DirFS("static"), ".", func(_ string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
@@ -123,6 +134,7 @@ func build() error {
 		return err
 	}
 	fmt.Printf("%-32s %8d files\n", "static", static)
+	fmt.Printf("%-32s %8d urls\n", "hashed", hashed)
 	for _, name := range slices.Sorted(maps.Keys(js)) {
 		fmt.Printf("%-32s %8d bytes\n", "try/"+name, len(js[name]))
 	}
@@ -223,6 +235,80 @@ func bundleWorker(entry string) ([]byte, error) {
 		return nil, fmt.Errorf("expected one output file, got %d", len(res.OutputFiles))
 	}
 	return res.OutputFiles[0].Contents, nil
+}
+
+func hashAssets(dir string) (int, error) {
+	fsys := os.DirFS(dir)
+	hashes := map[string]string{}
+	assetHash := func(name string) (string, error) {
+		if h, ok := hashes[name]; ok {
+			return h, nil
+		}
+		var h string
+		if fi, err := fs.Stat(fsys, name); err == nil && fi.Mode().IsRegular() && path.Ext(name) != ".html" {
+			b, err := fs.ReadFile(fsys, name)
+			if err != nil {
+				return "", err
+			}
+			sum := sha256.Sum256(b)
+			h = hex.EncodeToString(sum[:6])
+		}
+		hashes[name] = h
+		return h, nil
+	}
+	var n int
+	err := fs.WalkDir(fsys, ".", func(page string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || path.Ext(page) != ".html" {
+			return err
+		}
+		src, err := fs.ReadFile(fsys, page)
+		if err != nil {
+			return err
+		}
+		var buf bytes.Buffer
+		x := htmlstream.NewTransformer(&buf, bytes.NewReader(src))
+		for x.Next() {
+			if x.Token().Kind() != htmlstream.StartTag {
+				continue
+			}
+			for _, attr := range []string{"src", "href"} {
+				a, ok := x.Token().Attr(attr)
+				if !ok {
+					continue
+				}
+				v := a.Value()
+				u, err := url.Parse(v)
+				if err != nil || u.Scheme != "" || u.Host != "" || u.Path == "" || strings.HasPrefix(u.Path, "/") || u.RawQuery != "" || u.ForceQuery {
+					continue // not a relative path, or already has a query
+				}
+				name := path.Join(path.Dir(page), u.Path)
+				if !fs.ValidPath(name) {
+					continue
+				}
+				h, err := assetHash(name)
+				if err != nil {
+					return fmt.Errorf("%s: %w", page, err)
+				}
+				if h == "" {
+					continue
+				}
+				v, frag, _ := strings.Cut(v, "#")
+				v += "?v=" + h
+				if u.Fragment != "" {
+					v += "#" + frag
+				}
+				if err := x.SetAttr(attr, v); err != nil {
+					return fmt.Errorf("%s: %w", page, err)
+				}
+				n++
+			}
+		}
+		if err := x.Close(); err != nil {
+			return fmt.Errorf("%s: %w", page, err)
+		}
+		return os.WriteFile(filepath.Join(dir, filepath.FromSlash(page)), buf.Bytes(), 0o644)
+	})
+	return n, err
 }
 
 // TODO: process CSS?
