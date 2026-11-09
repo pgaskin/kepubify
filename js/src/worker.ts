@@ -1,4 +1,4 @@
-import { type Options, type Request, type Response, AlreadyKepubError, contentInput, dec, getModule, withCRC32 } from "./kepubify";
+import { type Input, type Options, type Request, type Response, AlreadyKepubError, contentInput, dec, getModule, withCRC32 } from "./kepubify";
 
 export { AlreadyKepubError, setModule } from "./kepubify";
 
@@ -28,8 +28,11 @@ export function setWorker(create: () => Worker) {
 	createWorker = create;
 }
 
-/** Converts an EPUB to a KEPUB. */
-export async function convert(epub: Uint8Array, options: WorkerOptions = {}): Promise<Uint8Array<ArrayBuffer>> {
+/**
+ * Converts an EPUB to a KEPUB. The EPUB may be a Blob (e.g., a File), which is
+ * passed to the worker without copying it and read as needed.
+ */
+export async function convert(epub: Input, options: WorkerOptions = {}): Promise<Uint8Array<ArrayBuffer>> {
 	return run("convert", epub, options, false);
 }
 
@@ -38,7 +41,7 @@ export async function convert(epub: Uint8Array, options: WorkerOptions = {}): Pr
  * than {@link convert} since the output doesn't need to be copied into a single
  * buffer, and the Blob is passed from the worker without copying it.
  */
-export async function convertBlob(epub: Uint8Array, options: WorkerOptions = {}): Promise<Blob> {
+export async function convertBlob(epub: Input, options: WorkerOptions = {}): Promise<Blob> {
 	return run("convert", epub, options, true);
 }
 
@@ -48,9 +51,9 @@ export async function transformContent(html: string | Uint8Array, options: Worke
 	return dec.decode(await run("transform_content", input, o, false));
 }
 
-async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions, blob: false): Promise<Uint8Array<ArrayBuffer>>;
-async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions, blob: true): Promise<Blob>;
-async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions, blob: boolean): Promise<Uint8Array<ArrayBuffer> | Blob> {
+async function run(fn: Request["fn"], input: Input, o: WorkerOptions, blob: false): Promise<Uint8Array<ArrayBuffer>>;
+async function run(fn: Request["fn"], input: Input, o: WorkerOptions, blob: true): Promise<Blob>;
+async function run(fn: Request["fn"], input: Input, o: WorkerOptions, blob: boolean): Promise<Uint8Array<ArrayBuffer> | Blob> {
 	const { signal, warn, progress, memory, ...options } = o;
 	signal?.throwIfAborted();
 	const module = await getModule();

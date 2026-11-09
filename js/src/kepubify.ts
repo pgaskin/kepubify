@@ -66,10 +66,16 @@ export interface Options {
 	/**
 	 * Called when the conversion finishes (even if it fails) with the size of
 	 * the WebAssembly memory in bytes (i.e., peak memory usage since it doesn't
-	 * shrink). Note that this currently includes the entire input file.
+	 * shrink).
 	 */
 	memory?: (bytes: number) => void;
 }
+
+/**
+ * The input of a call. A Blob is read as needed if FileReaderSync is available
+ * (i.e., in a worker), or all at once otherwise.
+ */
+export type Input = Uint8Array | Blob;
 
 /** Thrown by {@link convert} when the book is already a KEPUB and {@link Options.reprocessKepub} is not set. */
 export class AlreadyKepubError extends Error {
@@ -83,7 +89,7 @@ export class AlreadyKepubError extends Error {
 export interface Request {
 	module: WebAssembly.Module;
 	fn: "convert" | "transform_content";
-	input: Uint8Array;
+	input: Input;
 	blob: boolean;
 	options: Omit<Options, "warn" | "progress" | "memory"> & { warn: boolean; progress: boolean; memory: boolean };
 }
@@ -101,8 +107,8 @@ interface Exports {
 	memory: WebAssembly.Memory;
 	_initialize(): void;
 	alloc(n: number): number;
-	convert(input: number, inputLen: number, options: number, optionsLen: number): number;
-	transform_content(input: number, inputLen: number, options: number, optionsLen: number): number;
+	convert(inputSize: number, options: number, optionsLen: number): number;
+	transform_content(inputSize: number, options: number, optionsLen: number): number;
 }
 
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -183,7 +189,7 @@ function encodeOptions(o: Options) {
 	return concat(parts);
 }
 
-async function instantiate(module: WebAssembly.Module, o: Options, write: (b: Uint8Array<ArrayBuffer>) => void) {
+async function instantiate(module: WebAssembly.Module, o: Options, write: (b: Uint8Array<ArrayBuffer>) => void, read: (b: Uint8Array<ArrayBuffer>, off: number) => number) {
 	let x!: Exports, dv: DataView, output = "";
 	const view = () => dv?.buffer == x.memory.buffer ? dv : (dv = new DataView(x.memory.buffer));
 	const bytes = (p: number, n: number) => new Uint8Array(x.memory.buffer, p, n);
@@ -215,6 +221,7 @@ async function instantiate(module: WebAssembly.Module, o: Options, write: (b: Ui
 		warn: (name: number, nameLen: number, msg: number, msgLen: number) => o.warn?.(dec.decode(bytes(name, nameLen)), dec.decode(bytes(msg, msgLen))),
 		progress: (percent: number) => o.progress?.(percent),
 		write: (p: number, n: number) => write(bytes(p, n)),
+		read: (p: number, n: number, off: number) => read(bytes(p, n), off),
 	};
 
 	x = (await WebAssembly.instantiate(module, { wasi_snapshot_preview1: wasi, kepubify })).exports as unknown as Exports;
@@ -234,14 +241,14 @@ export function withCRC32(blob: Blob, crc: number): Blob {
 }
 
 /** Calls the export fn of a new instance of module. */
-export async function call(module: WebAssembly.Module, fn: "convert" | "transform_content", input: Uint8Array, o: Options): Promise<Uint8Array<ArrayBuffer>> {
+export async function call(module: WebAssembly.Module, fn: "convert" | "transform_content", input: Input, o: Options): Promise<Uint8Array<ArrayBuffer>> {
 	const chunks: Uint8Array[] = [];
 	await callWith(module, fn, input, o, b => chunks.push(b.slice()));
 	return concat(chunks);
 }
 
 /** Calls convert, returning the output as a Blob, and its CRC-32. */
-export async function callBlob(module: WebAssembly.Module, input: Uint8Array, o: Options): Promise<{ blob: Blob; crc32: number }> {
+export async function callBlob(module: WebAssembly.Module, input: Input, o: Options): Promise<{ blob: Blob; crc32: number }> {
 	// note: the Blob constructor copies the data, so the chunks don't need to be copied first
 	const parts: Blob[] = [];
 	let crc = ~0;
@@ -252,16 +259,17 @@ export async function callBlob(module: WebAssembly.Module, input: Uint8Array, o:
 	return { blob: new Blob(parts, { type: "application/epub+zip" }), crc32: ~crc >>> 0 };
 }
 
-async function callWith(module: WebAssembly.Module, fn: "convert" | "transform_content", input: Uint8Array, o: Options, write: (b: Uint8Array<ArrayBuffer>) => void): Promise<void> {
-	const { x, view, bytes } = await instantiate(module, o, write);
+async function callWith(module: WebAssembly.Module, fn: "convert" | "transform_content", input: Input, o: Options, write: (b: Uint8Array<ArrayBuffer>) => void): Promise<void> {
+	if (input instanceof Blob && typeof FileReaderSync == "undefined") {
+		input = new Uint8Array(await input.arrayBuffer()); // can't read it synchronously
+	}
+	const { x, view, bytes } = await instantiate(module, o, write, reader(input));
 	const opts = encodeOptions(o);
-	const ip = x.alloc(input.length);
-	bytes(ip, input.length).set(input);
 	const op = x.alloc(opts.length);
 	bytes(op, opts.length).set(opts);
 	let r: number;
 	try {
-		r = x[fn](ip, input.length, op, opts.length);
+		r = x[fn](input instanceof Blob ? input.size : input.length, op, opts.length);
 	} finally {
 		o.memory?.(x.memory.buffer.byteLength);
 	}
@@ -274,6 +282,24 @@ async function callWith(module: WebAssembly.Module, fn: "convert" | "transform_c
 		default:
 			throw new Error(`kepubify: ${dec.decode(bytes(p, n))}`);
 	}
+}
+
+declare const FileReaderSync: { new(): { readAsArrayBuffer(blob: Blob): ArrayBuffer } };
+
+function reader(input: Input): (b: Uint8Array, off: number) => number {
+	if (input instanceof Blob) {
+		const fr = new FileReaderSync();
+		return (b, off) => {
+			const r = new Uint8Array(fr.readAsArrayBuffer(input.slice(off, off + b.length)));
+			b.set(r);
+			return r.length;
+		};
+	}
+	return (b, off) => {
+		const r = input.subarray(off, off + b.length);
+		b.set(r);
+		return r.length;
+	};
 }
 
 const crcTable = new Uint32Array(256).map((_, n) => {

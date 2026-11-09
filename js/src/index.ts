@@ -1,12 +1,16 @@
 // The main entry point, converting on the calling thread. See worker.ts for
 // the same API running in a Web Worker.
 
-import { type Options, call, callBlob, contentInput, dec, getModule, withCRC32 } from "./kepubify";
+import { type Input, type Options, call, callBlob, contentInput, dec, getModule, withCRC32 } from "./kepubify";
 
 export { type Options, AlreadyKepubError, setModule } from "./kepubify";
 
-/** Converts an EPUB to a KEPUB. */
-export async function convert(epub: Uint8Array, options: Options = {}): Promise<Uint8Array<ArrayBuffer>> {
+/**
+ * Converts an EPUB to a KEPUB. The EPUB may be a Blob (e.g., a File), which is
+ * read as needed when running in a worker, and read into memory first
+ * otherwise.
+ */
+export async function convert(epub: Input, options: Options = {}): Promise<Uint8Array<ArrayBuffer>> {
 	return call(await getModule(), "convert", epub, options);
 }
 
@@ -15,7 +19,7 @@ export async function convert(epub: Uint8Array, options: Options = {}): Promise<
  * than {@link convert} since the output doesn't need to be copied into a new
  * buffer.
  */
-export async function convertBlob(epub: Uint8Array, options: Options = {}): Promise<Blob> {
+export async function convertBlob(epub: Input, options: Options = {}): Promise<Blob> {
 	const { blob, crc32 } = await callBlob(await getModule(), epub, options);
 	return withCRC32(blob, crc32);
 }

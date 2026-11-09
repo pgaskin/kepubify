@@ -5,9 +5,9 @@ package main
 import (
 	"archive/zip"
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
+	"io"
 	"unsafe"
 
 	"github.com/pgaskin/kepubify/v5/kepub"
@@ -37,6 +37,9 @@ func hostProgress(percent float64)
 //go:wasmimport kepubify write
 func hostWrite(p, n uint32)
 
+//go:wasmimport kepubify read
+func hostRead(p, n uint32, off float64) uint32
+
 //go:wasmexport alloc
 func alloc(n uint32) uint32 {
 	b := make([]byte, max(n, 1))
@@ -45,10 +48,9 @@ func alloc(n uint32) uint32 {
 }
 
 //go:wasmexport convert
-func convert(in, inLen, opts, optsLen uint32) uint32 {
+func convert(size float64, opts, optsLen uint32) uint32 {
 	opt := options(view(opts, optsLen))
-	input := view(in, inLen)
-	zr, err := zip.NewReader(bytes.NewReader(input), int64(len(input)))
+	zr, err := zip.NewReader(newHostReader(int64(size)), int64(size))
 	if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
 		return result(1, []byte(err.Error()))
 	}
@@ -65,10 +67,10 @@ func convert(in, inLen, opts, optsLen uint32) uint32 {
 }
 
 //go:wasmexport transform_content
-func transformContent(in, inLen, opts, optsLen uint32) uint32 {
+func transformContent(size float64, opts, optsLen uint32) uint32 {
 	opt := options(view(opts, optsLen))
 	w := newHostWriter()
-	if err := kepub.TransformContent(w, bytes.NewReader(view(in, inLen)), opt); err != nil {
+	if err := kepub.TransformContent(w, io.NewSectionReader(newHostReader(int64(size)), 0, int64(size)), opt); err != nil {
 		return result(1, []byte(err.Error()))
 	}
 	if err := w.Flush(); err != nil {
@@ -81,6 +83,10 @@ func newHostWriter() *bufio.Writer {
 	return bufio.NewWriterSize(hostWriter{}, 64<<10)
 }
 
+func newHostReader(size int64) *hostReader {
+	return &hostReader{size: size, buf: make([]byte, min(size, 1<<20))} // 1 MB readahead
+}
+
 type hostWriter struct{}
 
 func (hostWriter) Write(b []byte) (int, error) {
@@ -88,6 +94,44 @@ func (hostWriter) Write(b []byte) (int, error) {
 		hostWrite(addr(b), uint32(len(b)))
 	}
 	return len(b), nil
+}
+
+type hostReader struct {
+	size int64
+	buf  []byte // readahead if read is smaller (much better performance since compress/flate does a lot of small reads)
+	off  int64  // of buf
+	n    int    // valid bytes in buf
+}
+
+func (r *hostReader) ReadAt(p []byte, off int64) (int, error) {
+	if off < 0 {
+		return 0, errors.New("negative offset")
+	}
+	if off >= r.size {
+		return 0, io.EOF
+	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+	p = p[:min(int64(len(p)), r.size-off)]
+	var n int
+	switch {
+	case off >= r.off && off+int64(len(p)) <= r.off+int64(r.n):
+		n = copy(p, r.buf[off-r.off:r.n])
+	case len(p) >= len(r.buf):
+		n = hostReadAt(p, off)
+	default:
+		r.off, r.n = off, hostReadAt(r.buf[:min(int64(len(r.buf)), r.size-off)], off)
+		n = copy(p, r.buf[:r.n])
+	}
+	if n < len(p) || off+int64(n) == r.size {
+		return n, io.EOF
+	}
+	return n, nil
+}
+
+func hostReadAt(p []byte, off int64) int {
+	return int(hostRead(addr(p), uint32(len(p)), float64(off)))
 }
 
 func result(status uint32, b []byte) uint32 {
