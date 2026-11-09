@@ -84,6 +84,7 @@ export interface Request {
 	module: WebAssembly.Module;
 	fn: "convert" | "transform_content";
 	input: Uint8Array;
+	blob: boolean;
 	options: Omit<Options, "warn" | "progress" | "memory"> & { warn: boolean; progress: boolean; memory: boolean };
 }
 
@@ -93,6 +94,7 @@ export type Response =
 	| { memory: number }
 	| { warn: [name: string, msg: string] }
 	| { output: Uint8Array<ArrayBuffer> }
+	| { blob: Blob; crc32: number }
 	| { error: string; alreadyKepub: boolean };
 
 interface Exports {
@@ -181,7 +183,7 @@ function encodeOptions(o: Options) {
 	return concat(parts);
 }
 
-async function instantiate(module: WebAssembly.Module, o: Options, write: (b: Uint8Array) => void) {
+async function instantiate(module: WebAssembly.Module, o: Options, write: (b: Uint8Array<ArrayBuffer>) => void) {
 	let x!: Exports, dv: DataView, output = "";
 	const view = () => dv?.buffer == x.memory.buffer ? dv : (dv = new DataView(x.memory.buffer));
 	const bytes = (p: number, n: number) => new Uint8Array(x.memory.buffer, p, n);
@@ -220,10 +222,38 @@ async function instantiate(module: WebAssembly.Module, o: Options, write: (b: Ui
 	return { x, view, bytes };
 }
 
+/**
+ * Used by /try for creating ZIPs without re-reading the output. Not part of
+ * the public API.
+ */
+export const crc32Key = Symbol.for("kepubify.crc32");
+
+/** Sets {@link crc32Key} on a Blob. */
+export function withCRC32(blob: Blob, crc: number): Blob {
+	return Object.defineProperty(blob, crc32Key, { value: crc });
+}
+
 /** Calls the export fn of a new instance of module. */
 export async function call(module: WebAssembly.Module, fn: "convert" | "transform_content", input: Uint8Array, o: Options): Promise<Uint8Array<ArrayBuffer>> {
 	const chunks: Uint8Array[] = [];
-	const { x, view, bytes } = await instantiate(module, o, b => chunks.push(b.slice()));
+	await callWith(module, fn, input, o, b => chunks.push(b.slice()));
+	return concat(chunks);
+}
+
+/** Calls convert, returning the output as a Blob, and its CRC-32. */
+export async function callBlob(module: WebAssembly.Module, input: Uint8Array, o: Options): Promise<{ blob: Blob; crc32: number }> {
+	// note: the Blob constructor copies the data, so the chunks don't need to be copied first
+	const parts: Blob[] = [];
+	let crc = ~0;
+	await callWith(module, "convert", input, o, b => {
+		parts.push(new Blob([b]));
+		crc = crc32(crc, b);
+	});
+	return { blob: new Blob(parts, { type: "application/epub+zip" }), crc32: ~crc >>> 0 };
+}
+
+async function callWith(module: WebAssembly.Module, fn: "convert" | "transform_content", input: Uint8Array, o: Options, write: (b: Uint8Array<ArrayBuffer>) => void): Promise<void> {
+	const { x, view, bytes } = await instantiate(module, o, write);
 	const opts = encodeOptions(o);
 	const ip = x.alloc(input.length);
 	bytes(ip, input.length).set(input);
@@ -236,15 +266,25 @@ export async function call(module: WebAssembly.Module, fn: "convert" | "transfor
 		o.memory?.(x.memory.buffer.byteLength);
 	}
 	const [status, p, n] = [0, 4, 8].map(i => view().getUint32(r + i, true));
-	const out = bytes(p, n).slice();
 	switch (status) {
 		case 0:
-			return concat(chunks);
+			return;
 		case 2:
-			throw new AlreadyKepubError(dec.decode(out));
+			throw new AlreadyKepubError(dec.decode(bytes(p, n)));
 		default:
-			throw new Error(`kepubify: ${dec.decode(out)}`);
+			throw new Error(`kepubify: ${dec.decode(bytes(p, n))}`);
 	}
+}
+
+const crcTable = new Uint32Array(256).map((_, n) => {
+	let c = n;
+	for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+	return c;
+});
+
+function crc32(c: number, b: Uint8Array): number {
+	for (let i = 0; i < b.length; i++) c = crcTable[(c ^ b[i]) & 0xFF] ^ (c >>> 8);
+	return c;
 }
 
 function concat(chunks: Uint8Array[]): Uint8Array<ArrayBuffer> {

@@ -1,4 +1,4 @@
-import { type Options, type Request, type Response, AlreadyKepubError, contentInput, dec, getModule } from "./kepubify";
+import { type Options, type Request, type Response, AlreadyKepubError, contentInput, dec, getModule, withCRC32 } from "./kepubify";
 
 export { AlreadyKepubError, setModule } from "./kepubify";
 
@@ -30,16 +30,27 @@ export function setWorker(create: () => Worker) {
 
 /** Converts an EPUB to a KEPUB. */
 export async function convert(epub: Uint8Array, options: WorkerOptions = {}): Promise<Uint8Array<ArrayBuffer>> {
-	return run("convert", epub, options);
+	return run("convert", epub, options, false);
+}
+
+/**
+ * Converts an EPUB to a KEPUB, returning it as a Blob. This uses less memory
+ * than {@link convert} since the output doesn't need to be copied into a single
+ * buffer, and the Blob is passed from the worker without copying it.
+ */
+export async function convertBlob(epub: Uint8Array, options: WorkerOptions = {}): Promise<Blob> {
+	return run("convert", epub, options, true);
 }
 
 /** Transforms a single (X)HTML content document, returning it as UTF-8. */
 export async function transformContent(html: string | Uint8Array, options: WorkerOptions = {}): Promise<string> {
 	const [input, o] = contentInput(html, options);
-	return dec.decode(await run("transform_content", input, o));
+	return dec.decode(await run("transform_content", input, o, false));
 }
 
-async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions): Promise<Uint8Array<ArrayBuffer>> {
+async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions, blob: false): Promise<Uint8Array<ArrayBuffer>>;
+async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions, blob: true): Promise<Blob>;
+async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions, blob: boolean): Promise<Uint8Array<ArrayBuffer> | Blob> {
 	const { signal, warn, progress, memory, ...options } = o;
 	signal?.throwIfAborted();
 	const module = await getModule();
@@ -59,6 +70,7 @@ async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions): Prom
 				else if ("warn" in m) warn?.(...m.warn);
 				else if ("memory" in m) memory?.(m.memory);
 				else if ("output" in m) stop(), resolve(m.output);
+				else if ("blob" in m) stop(), resolve(withCRC32(m.blob, m.crc32));
 				else stop(m.alreadyKepub ? new AlreadyKepubError(m.error) : new Error(m.error));
 			} catch (err) {
 				stop(err);
@@ -70,6 +82,7 @@ async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions): Prom
 			module,
 			fn,
 			input,
+			blob,
 			options: {
 				...options,
 				warn: !!warn,
