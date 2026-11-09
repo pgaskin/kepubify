@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import * as Sentry from "@sentry/browser"
-import { AlreadyKepubError, convert, setModule, type WorkerOptions } from "kepubify/worker"
-import { crc32, zip, type ZipEntry } from "./zip"
+import { AlreadyKepubError, convertBlob, setModule, type WorkerOptions } from "kepubify/worker"
+import { zip, type ZipEntry } from "./zip"
 
 declare const KEPUBIFY_VERSION: string
 
@@ -162,13 +162,13 @@ export class KepubifyApp {
         elInfoName.classList.add("file__info__name")
         elInfoName.textContent = epub.name
 
-        let kepub: Uint8Array<ArrayBuffer>, config: WorkerOptions | undefined
+        let kepub: Blob, config: WorkerOptions | undefined
         try {
             if (epub.size > maxFileSize) {
                 throw new Error(`File too large for web version (maximum: ${maxFileSize / 1000000} MB)`)
             }
             config = this.config
-            kepub = await this.#limit(async () => convert(new Uint8Array(await epub.arrayBuffer()), {
+            kepub = await this.#limit(async () => convertBlob(new Uint8Array(await epub.arrayBuffer()), {
                 ...config,
                 progress: percent => {
                     elInfoProgress.style.width = `${percent * 100}%`
@@ -204,12 +204,16 @@ export class KepubifyApp {
         }
 
         Sentry.addBreadcrumb({
-            message: `Finished ${epub.name} (${kepub.length} bytes)`,
+            message: `Finished ${epub.name} (${kepub.size} bytes)`,
         })
 
         try {
             elInfoName.download = epub.name.replace(/([.]epub)?$/i, ".kepub.epub")
             elInfoName.textContent = elInfoName.download
+            const crc = (kepub as Blob & Record<symbol, unknown>)[Symbol.for("kepubify.crc32")] // kepubify.ts crc32Key
+            if (typeof crc != "number") {
+                throw new Error("missing crc32")
+            }
             const file = new File([kepub], elInfoName.download, { type: "application/epub+zip" })
             elInfoName.href = URL.createObjectURL(file)
 
@@ -228,7 +232,7 @@ export class KepubifyApp {
                 })
             }
 
-            const entry = { name: file.name, data: file, crc32: crc32(kepub) }
+            const entry = { name: file.name, data: file, crc32: crc }
             this.#done.push(entry)
             this.#updateDownloadAll()
 
@@ -252,7 +256,7 @@ export class KepubifyApp {
             Sentry.captureException(new Error(`failed to create download link: ${ex}`), {
                 extra: {
                     file: { name: epub.name, size: epub.size, type: epub.type },
-                    kepub: { size: kepub.length },
+                    kepub: { size: kepub.size },
                     worker: { version: this.#version },
                 },
             })

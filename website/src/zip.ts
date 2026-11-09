@@ -1,19 +1,3 @@
-const crcTable = new Uint32Array(256).map((_, n) => {
-    let c = n
-    for (let k = 0; k < 8; k++) {
-        c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1
-    }
-    return c
-})
-
-export function crc32(b: Uint8Array): number {
-    let c = 0xFFFFFFFF
-    for (let i = 0; i < b.length; i++) {
-        c = crcTable[(c ^ b[i]) & 0xFF] ^ (c >>> 8)
-    }
-    return (c ^ 0xFFFFFFFF) >>> 0
-}
-
 export interface ZipEntry {
     name: string
     data: Blob
