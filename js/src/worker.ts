@@ -40,7 +40,7 @@ export async function transformContent(html: string | Uint8Array, options: Worke
 }
 
 async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions): Promise<Uint8Array<ArrayBuffer>> {
-	const { signal, warn, progress, ...options } = o;
+	const { signal, warn, progress, memory, ...options } = o;
 	signal?.throwIfAborted();
 	const module = await getModule();
 	signal?.throwIfAborted();
@@ -57,6 +57,7 @@ async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions): Prom
 			try {
 				if ("progress" in m) progress?.(m.progress);
 				else if ("warn" in m) warn?.(...m.warn);
+				else if ("memory" in m) memory?.(m.memory);
 				else if ("output" in m) stop(), resolve(m.output);
 				else stop(m.alreadyKepub ? new AlreadyKepubError(m.error) : new Error(m.error));
 			} catch (err) {
@@ -65,6 +66,16 @@ async function run(fn: Request["fn"], input: Uint8Array, o: WorkerOptions): Prom
 		};
 		w.onerror = e => (e.preventDefault(), stop(new Error(`kepubify: worker: ${e.message}`)));
 		w.onmessageerror = () => stop(new Error("kepubify: worker: message can't be deserialized"));
-		w.postMessage({ module, fn, input, options: { ...options, warn: !!warn, progress: !!progress } } satisfies Request);
+		w.postMessage({
+			module,
+			fn,
+			input,
+			options: {
+				...options,
+				warn: !!warn,
+				progress: !!progress,
+				memory: !!memory,
+			},
+		} satisfies Request);
 	});
 }

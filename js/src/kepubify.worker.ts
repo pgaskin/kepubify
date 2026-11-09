@@ -11,6 +11,7 @@ scope.onmessage = async ({ data: { module, fn, input, options } }) => {
 			...options,
 			warn: options.warn ? (name, msg) => scope.postMessage({ warn: [name, msg] }) : undefined,
 			progress: options.progress ? percent => scope.postMessage({ progress: percent }) : undefined,
+			memory: options.memory ? bytes => scope.postMessage({ memory: bytes }) : undefined,
 		});
 		scope.postMessage({ output }, [output.buffer]);
 	} catch (err) {

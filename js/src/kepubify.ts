@@ -62,6 +62,13 @@ export interface Options {
 	 * Throwing aborts the conversion.
 	 */
 	progress?: (percent: number) => void;
+
+	/**
+	 * Called when the conversion finishes (even if it fails) with the size of
+	 * the WebAssembly memory in bytes (i.e., peak memory usage since it doesn't
+	 * shrink). Note that this currently includes the entire input/output files.
+	 */
+	memory?: (bytes: number) => void;
 }
 
 /** Thrown by {@link convert} when the book is already a KEPUB and {@link Options.reprocessKepub} is not set. */
@@ -77,12 +84,13 @@ export interface Request {
 	module: WebAssembly.Module;
 	fn: "convert" | "transform_content";
 	input: Uint8Array;
-	options: Omit<Options, "warn" | "progress"> & { warn: boolean; progress: boolean };
+	options: Omit<Options, "warn" | "progress" | "memory"> & { warn: boolean; progress: boolean; memory: boolean };
 }
 
 /** A message from the worker to the calling thread. */
 export type Response =
 	| { progress: number }
+	| { memory: number }
 	| { warn: [name: string, msg: string] }
 	| { output: Uint8Array<ArrayBuffer> }
 	| { error: string; alreadyKepub: boolean };
@@ -222,7 +230,12 @@ export async function call(module: WebAssembly.Module, fn: "convert" | "transfor
 	bytes(ip, input.length).set(input);
 	const op = x.alloc(opts.length);
 	bytes(op, opts.length).set(opts);
-	const r = x[fn](ip, input.length, op, opts.length);
+	let r: number;
+	try {
+		r = x[fn](ip, input.length, op, opts.length);
+	} finally {
+		o.memory?.(x.memory.buffer.byteLength);
+	}
 	const [status, p, n] = [0, 4, 8].map(i => view().getUint32(r + i, true));
 	const out = bytes(p, n).slice();
 	switch (status) {
