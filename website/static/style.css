@@ -283,331 +283,630 @@ section > div.dl > div > ul > li > ul > li {
 }
 
 /* Try */
-section#try {
-    display: flex;
-    flex-direction: row;
-    border: 0 solid rgba(0, 0, 0, 0.2);
-    background: rgba(255, 255, 255, 0.2);
-    -webkit-user-select: none;
-    user-select: none;
+.try-header {
+    margin: 2rem 0 0;
 }
-section#try > .try__pane {
-    display: block;
-    border: inherit;
-    min-width: 0;
+.try-header > h2 {
+    margin: 0;
+    font-size: 1.85rem;
+    color: #861913;
 }
-section#try > .try__pane:not(:first-child) {
-    border-width: 1px 1px 1px 0;
+.try-header > p {
+    margin: .375rem 0 0;
+    color: #4a4539;
 }
-section#try > .try__pane > .try__pane__title {
-    display: block;
-    padding: .5rem;
-    font-weight: 700;
-    background: rgba(0, 0, 0, 0.05);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.try-notice {
+    margin: 1rem 0 0;
+    padding: .625rem 1rem;
+    background: #e6dfc9;
+    border-radius: 6px;
+    color: #3f3b31;
 }
-section#try > .try__pane > .try__pane__title::before {
-    display: inline;
-    content: '\0200B';
+.try-notice.try-notice--error {
+    background: #f7e9e4;
+    color: #8f1f16;
 }
-section#try > .try__pane > .try__pane__contents {
-    display: block;
-    padding: .5rem;
-    min-height: 20rem;
-}
-section#try > .try__pane.try__pane--files {
-    flex: 2;
-    border: inherit;
-    border-width: 1px;
-}
-section#try > .try__pane.try__pane--files > .try__pane__contents.dragover {
-    background: rgba(0, 0, 0, 0.1);
-    box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.2) inset;
-}
-section#try > .try__pane.try__pane--files > .try__pane__contents.dragover > * {
-    pointer-events: none !important;
-}
-section#try .file.file--placeholder {
-    all: unset;
-}
-section#try .file,
-section#try .file.file--placeholder {
-    display: block;
-    width: 100%;
-    margin-bottom: .5rem;
-    border: 0 solid rgba(0, 0, 0, 0.1);
-}
-section#try .file.file--placeholder {
-    cursor: pointer;
-}
-section#try .file.file--placeholder:hover {
-    background: rgba(0, 0, 0, 0.05);
-}
-section#try .file.file--placeholder:active {
-    background: rgba(0, 0, 0, 0.1);
-}
-section#try .file > .file__info {
-    display: flex;
-    position: relative;
-    border: inherit;
-    border-width: 1px;
-    font-size: 0.825em;
-}
-section#try .file.file--placeholder:focus > .file__info {
-    border-color: rgba(0, 0, 0, 0.6);
-}
-section#try .file.file--placeholder:focus:not(:focus-visible) > .file__info {
-    border-color: inherit;
-}
-section#try .file.file--placeholder .file__info {
-    border-style: dashed;
-}
-section#try .download-all {
-    margin-bottom: .5rem;
-    text-align: right;
-}
-section#try .download-all > button {
-    all: unset;
-    display: inline-block;
-    cursor: pointer;
-    font-size: 0.825em;
-    padding: .25rem .75rem;
-    border: 1px solid rgba(0, 0, 0, 0.25);
-    background: rgba(0, 0, 0, 0.05);
-}
-section#try .download-all > button:hover {
-    background: rgba(0, 0, 0, 0.1);
-}
-section#try .download-all > button:active {
-    background: rgba(0, 0, 0, 0.15);
-}
-section#try .download-all > button:focus {
-    outline: 1px dotted currentColor;
-}
-section#try .download-all > button:focus:not(:focus-visible) {
-    outline: 0;
-}
-section#try .file > .file__info > .file__info__progress {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    background: rgba(0, 0, 128, 0.1);
-    pointer-events: none;
-    width: 0;
-    transition: width .1s linear, background .2s linear;
-}
-section#try .file > .file__info > .file__info__progress.file__info__progress--success {
-    background: rgba(0, 128, 0, 0.1);
-}
-section#try .file > .file__info > .file__info__progress.file__info__progress--error {
-    background: rgba(128, 0, 0, 0.1);
-}
-section#try .file > .file__info > .file__info__name {
-    flex: 1;
-    min-width: 0;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    padding: .25rem;
-}
-section#try .file > .file__info > .file__info__name:link:not(:hover) {
-    text-decoration: underline dotted 1px;
-}
-section#try .file > .file__info > button {
-    all: unset;
-    display: block;
-    flex: 0 0 auto;
-    border: inherit;
-    padding: .25rem .5rem;
-    border-width: 0 0 0 1px;
-}
-section#try .file > .file__info > button:hover {
-    background: rgba(0, 0, 0, 0.05);
-}
-section#try .file > .file__info > button:active {
-    background: rgba(0, 0, 0, 0.1);
-}
-section#try .file > .file__info > button:focus {
-    outline: 1px dotted currentColor;
-}
-section#try .file > .file__info > button:focus:not(:focus-visible) {
-    outline: 0;
-}
-section#try .file > .file__status {
-    text-overflow: ellipsis;
-    overflow: hidden;
-    padding: .25rem;
-    font-size: 0.825em;
-    border: 0 solid rgba(0, 0, 0, 0.1);
-    border-width: 0 1px 1px 1px;
-}
-section#try .file:not(:focus):not(:hover) > .file__status {
-    display: none;
-}
-section#try .file > .file__status:not(:focus):not(:hover) {
-    white-space: nowrap;
-}
-section#try .hint {
-    font-size: 0.75em;
-    padding: .25rem;
+.try-more {
+    margin: 2.5rem;
+    font-size: .8rem;
+    color: #4a4539;
     text-align: center;
-    opacity: 0.75;
 }
-section#try .hint.hint--hidden {
-    display: none;
+#try {
+    margin: 1.5rem 0 0;
+    line-height: 1.4;
 }
-section#try > .try__pane.try__pane--options {
+#try button,
+#try input,
+#try select,
+#try textarea {
+    font: inherit;
+    color: inherit;
+}
+#try .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 7.75rem;
+    padding: .375rem .75rem;
+    background: #d6e3ec;
+    color: #00406e;
+    border: 1px solid #9fbdd3;
+    border-radius: 4px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: pointer;
+}
+#try .btn:hover:not(:disabled) {
+    background: #c6d8e6;
+}
+#try .btn:active:not(:disabled) {
+    background: #b6cde0;
+}
+#try .btn:disabled {
+    background: #e4ddca;
+    color: #6b6452;
+    border-color: #d0c8b2;
+    cursor: default;
+}
+#try .btn.btn--outline {
+    background: transparent;
+    color: #005b9c;
+}
+#try .btn.btn--outline:hover {
+    background: rgba(0, 91, 156, .08);
+}
+#try .btn.btn--plain {
+    min-width: 0;
+    padding: .375rem .625rem;
+    background: transparent;
+    color: #005b9c;
+    border-color: transparent;
+}
+#try .btn.btn--plain:hover {
+    background: rgba(0, 91, 156, .08);
+}
+#try .btn.btn--solid {
+    min-width: 0;
+    padding: .4375rem 1.25rem;
+    background: #005b9c;
+    color: #fff;
+    border-color: #005b9c;
+}
+#try .btn.btn--solid:hover {
+    background: #00406e;
+}
+#try :focus-visible {
+    outline: 2px solid #005b9c;
+    outline-offset: 2px;
+}
+#try .try-settings {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    width: 100%;
+    padding: .625rem 1rem;
+    background: #f6f2e7;
+    border: 1px solid #cfc8b4;
+    border-radius: 4px;
+    text-align: left;
+    cursor: pointer;
+}
+#try .try-settings:hover {
+    background: #f1ecdd;
+}
+#try .try-settings > svg {
+    flex: none;
+}
+#try .try-settings__title {
+    flex: none;
+    font-weight: 600;
+}
+#try .try-settings__summary {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #4a4539;
 }
-section#try > .try__pane.try__pane--options > .try__pane__contents {
+#try .try-settings__edit {
+    color: #005b9c;
+}
+#try .try-drop {
+    display: flex;
+    align-items: center;
+    gap: .875rem;
+    margin-top: .875rem;
+    padding: .625rem 1rem;
+    background: #f4f0e4;
+    border: 1px dashed #b5ac94;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .1s linear, border-color .1s linear;
+}
+#try .try-drop:hover {
+    background: #efeadb;
+    border-color: #9d947c;
+}
+#try .try-drop.try-drop--empty {
+    padding: 5rem 1rem;
+}
+#try .try-drop.try-drop--dragover {
+    background: #e3ebef;
+    border-color: #005b9c;
+    border-style: solid;
+}
+#try .try-drop__icon {
+    flex: none;
+    color: #6b6452;
+}
+#try .try-drop__text {
+    flex: 1;
+    min-width: 0;
+    color: #4a4539;
+}
+#try .try-drop__text.try-drop__text--error {
+    color: #8f1f16;
+}
+#try .try-books {
+    margin-top: .875rem;
+    background: #f6f2e7;
+    border: 1px solid #cfc8b4;
+    border-radius: 6px;
+    overflow: hidden;
+}
+#try .try-books__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .25rem 1rem;
+    min-height: 2.75rem;
+    padding: .375rem .75rem .375rem 1rem;
+    background: #efe9d8;
+    border-bottom: 1px solid #cfc8b4;
+}
+#try .try-books__summary {
+    flex: 1;
+    color: #4a4539;
+}
+#try .try-books__summary > b {
+    color: #1d1b16;
+}
+#try .try-books__list {
+    list-style: none;
+    margin: 0;
     padding: 0;
 }
-section#try .options {
-    font-size: 0.875em;
+#try .try-share-hint {
+    margin: .625rem .25rem 0;
+    font-size: .875rem;
+    color: #4a4539;
 }
-section#try .options > .options__option {
-    border-top: 1px solid rgba(0, 0, 0, 0.2);
-}
-section#try .options > .options__option > .options__option__header {
+#try .try-next {
     display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    background: rgba(0, 0, 0, 0.05);
-    position: relative;
+    gap: .875rem;
+    margin-top: 1.25rem;
+    padding: 1rem;
+    background: #e6dfc9;
+    border-radius: 6px;
 }
-section#try .options > .options__option > .options__option__header > .options__option__header__title {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1;
-    padding: .5em;
+#try .try-next > svg {
+    flex: none;
+    margin-top: 2px;
+    color: #4a4539;
 }
-section#try .options > .options__option > .options__option__header > button {
-    all: unset;
-    display: block;
-    flex: 0 0 auto;
-    padding: .25em;
+#try .try-next__title {
+    font-weight: 600;
 }
-section#try .options > .options__option > .options__option__header > button:hover {
-    background: rgba(0, 0, 0, 0.05);
+#try .try-next p {
+    margin: .25rem 0 0;
+    color: #3f3b31;
 }
-section#try .options > .options__option > .options__option__header > button:active {
-    background: rgba(0, 0, 0, 0.1);
-}
-section#try .options > .options__option > .options__option__header > button:focus {
-    outline: 1px dotted currentColor;
-}
-section#try .options > .options__option > .options__option__header > button:focus:not(:focus-visible) {
-    outline: 0;
-}
-section#try .options > .options__option > .options__option__header > button.options__option__header__help {
-    font: inherit;
-}
-section#try .options > .options__option > .options__option__header > button.options__option__header__help::before {
-    display: inline;
-    content: '\00a0?\00a0';
-    font-family: sans-serif;
-    font-size: .875rem;
-    line-height: 1;
-}
-section#try .options > .options__option > .options__option__header > button.options__option__header__help > span {
-    display: block;
-    position: absolute;
-    right: 1%;
-    top: 110%;
-    width: 50vw;
-    max-width: 20em;
-    padding: .25rem;
-    pointer-events: none;
-    z-index: 1000;
-    background: inherit;
-    background: #f5f3ef;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    color: #000;
-    font-size: .875rem;
-    box-shadow: 0 0 8px 0 rgba(0, 0, 0, 0.2);
-}
-section#try .options > .options__option > .options__option__header > button.options__option__header__help:not(:active):not(:hover) > span {
+#try .narrow-only {
     display: none;
 }
-section#try .options > .options__option > .options__option__content > textarea {
-    display: block;
-    border: 0;
-    min-width: 100%;
-    max-width: 100%;
-    min-height: 3rem;
-    max-height: 6rem;
-    padding: .5em;
-    background: transparent;
-    font-family: 'Source Code Pro', monospace;
-    font-size: .625em;
+
+#try .book {
+    --progress: 0%;
+    margin: 0;
+    padding: .375rem .5rem .375rem 1rem;
 }
-section#try .options > .options__option > .options__option__content > textarea:focus {
-    outline: 1px solid #000;
+#try .book + .book {
+    border-top: 1px solid #ddd5c0;
 }
-section#try .options > .options__option > .options__option__content > label {
+#try .book[data-state="waiting"],
+#try .book[data-state="kepub"] {
+    background: #efe9db;
+}
+#try .book[data-state="converting"] {
+    background: linear-gradient(to right, rgba(0, 91, 156, .07) var(--progress), transparent var(--progress)), #efe9db;
+}
+#try .book[data-state="failed"] {
+    background: #f7e9e4;
+}
+#try .book__row {
     display: flex;
-    width: 100%;
     align-items: center;
-    flex-direction: row;
-    justify-content: flex-start;
-    font-size: .875rem;
-    line-height: 1;
-    overflow: hidden;
-    white-space: nowrap;
+    gap: .75rem;
 }
-section#try .options > .options__option > .options__option__content > label:hover {
-    background: rgba(0, 0, 0, 0.02);
+#try .book__icon {
+    flex: none;
 }
-section#try .options > .options__option > .options__option__content > label:active {
-    background: rgba(0, 0, 0, 0.04);
+#try .book[data-state="converting"] .book__icon {
+    animation: try-spin 1s linear infinite;
 }
-section#try .options > .options__option > .options__option__content > label > input[type="radio"] {
-    margin: .5em;
-    flex: 0 0 auto;
-    -webkit-appearance: initial;
-    -moz-appearance: initial;
-    appearance: initial;
-    text-align: center;
-    outline: 0;
+@keyframes try-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
-section#try .options > .options__option > .options__option__content > label > input[type="radio"]:before {
-    visibility: visible;
-    content: "\2713";
-    color: #000;
+@media (prefers-reduced-motion: reduce) {
+    #try .book[data-state="converting"] .book__icon {
+        animation: none;
+    }
 }
-section#try .options > .options__option > .options__option__content > label > input[type="radio"]:focus:before {
-    text-decoration: underline;
+#try .book[data-state="waiting"] .book__icon {
+    color: #6b6452;
 }
-section#try .options > .options__option > .options__option__content > label > input[type="radio"]:focus:not(:focus-visible):before {
-    text-decoration: none;
+#try .book[data-state="converting"] .book__icon,
+#try .book[data-state="kepub"] .book__icon {
+    color: #005b9c;
 }
-section#try .options > .options__option > .options__option__content > label > input[type="radio"]:not(:checked):before {
-    opacity: 0;
+#try .book[data-state="ready"] .book__icon {
+    color: #2e6b1f;
 }
-section#try .options > .options__option > .options__option__content > label > input[type="radio"]:not(:checked):active:before {
-    opacity: 0.25;
+#try .book[data-state="ready"].book--warnings .book__icon {
+    color: #7a5a00;
 }
-section#try .options > .options__option > .options__option__content > label > span {
-    display: block;
+#try .book[data-state="failed"] .book__icon {
+    color: #a3241a;
+}
+#try .book__info {
     flex: 1;
     min-width: 0;
-    text-overflow: ellipsis;
-    padding: .5em;
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+}
+#try .book__name {
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-section#try .options > .options__option > .options__option__content > label > input[type="radio"] + span {
-    padding-left: 0;
+#try a.book__name[href]:hover {
+    text-decoration: underline;
 }
+#try .book[data-state="failed"] .book__name,
+#try .book[data-state="kepub"] .book__name {
+    flex: none;
+    max-width: 60%;
+}
+#try .book__size,
+#try .book__status {
+    flex: none;
+    font-size: .875rem;
+    color: #5e584a;
+}
+#try .book__status {
+    flex: 0 4 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #4a4539;
+}
+#try .book[data-state="failed"] .book__status {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #8f1f16;
+}
+#try .book__warnings-toggle {
+    flex: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: #6b4e00;
+    font-size: .875rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+#try .book__warnings {
+    margin: .375rem 0 .125rem;
+    background: #fbf5e2;
+    border: 1px solid #e3d29a;
+    border-radius: 4px;
+    color: #3f3b31;
+}
+#try .book__warnings > p {
+    margin: 0;
+    padding: .4375rem .75rem;
+    font-size: .875rem;
+    border-bottom: 1px solid #ecdfb5;
+}
+#try .book__warnings > ul {
+    list-style: none;
+    max-height: 7.5rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: .25rem 0;
+    font-size: .8125rem;
+}
+#try .book__warnings li {
+    display: flex;
+    align-items: baseline;
+    gap: .75rem;
+    padding: .1875rem .75rem;
+}
+#try .book__warnings code {
+    flex: none;
+    width: 13.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0;
+    background: none;
+    border: 0;
+    font-size: 1em;
+}
+#try .book__remove {
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    color: #5e584a;
+    cursor: pointer;
+}
+#try .book__remove:hover {
+    background: rgba(0, 0, 0, .06);
+}
+#try .book__action {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    min-width: 7.75rem;
+}
+#try .book__failed {
+    font-size: .875rem;
+    font-weight: 600;
+    color: #8f1f16;
+}
+
+#try .try-dialog {
+    width: min(35rem, calc(100% - 2rem));
+    max-height: calc(100% - 4rem);
+    padding: 0;
+    background: #f6f2e7;
+    color: #1d1b16;
+    border: 0;
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .3);
+}
+#try .try-dialog::backdrop {
+    background: rgba(29, 27, 22, .45);
+}
+#try .try-dialog__header {
+    display: flex;
+    align-items: center;
+    padding: .625rem .5rem .625rem 1.25rem;
+    border-bottom: 1px solid #ddd5c0;
+}
+#try .try-dialog__header > h2 {
+    flex: 1;
+    margin: 0;
+    font-size: 1.25rem;
+}
+#try .try-dialog__close {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    color: #4a4539;
+    cursor: pointer;
+}
+#try .try-dialog__close:hover {
+    background: rgba(0, 0, 0, .06);
+}
+#try .try-dialog__body {
+    padding: .25rem 1.25rem .5rem;
+}
+#try .try-dialog__body > h3 {
+    margin: .625rem -1.25rem 0;
+    padding: .875rem 1.25rem .125rem;
+    border-top: 1px solid #ddd5c0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: #861913;
+}
+#try .try-dialog__body > h3:first-child {
+    margin-top: 0;
+    padding-top: .625rem;
+    border-top: 0;
+}
+#try .try-dialog__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+    padding: .625rem 1.25rem;
+    background: #efe9d8;
+    border-top: 1px solid #ddd5c0;
+    font-size: .9375rem;
+}
+#try .try-dialog__footer > .btn--plain {
+    margin-left: -.625rem;
+}
+#try .try-dialog__note {
+    flex: 1;
+    text-align: right;
+    color: #5e584a;
+}
+#try .option {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .5625rem 0;
+}
+#try .option > label {
+    flex: 1;
+}
+#try .option > label > b,
+#try .option > b {
+    font-weight: 600;
+}
+#try .option > label > span,
+#try .option > span {
+    font-size: .875rem;
+    color: #5e584a;
+}
+#try .option > input[type="checkbox"] {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    accent-color: #005b9c;
+}
+#try .option select {
+    flex: none;
+    width: 10.625rem;
+    padding: .3125rem .5rem;
+    background: #fffdf6;
+    border: 1px solid #b5ac94;
+    border-radius: 4px;
+    font-size: .9375rem;
+}
+#try .option textarea,
+#try .option input[type="text"] {
+    padding: .375rem .5rem;
+    background: #fffdf6;
+    border: 1px solid #b5ac94;
+    border-radius: 4px;
+    font-family: 'Source Code Pro', ui-monospace, Menlo, Consolas, monospace;
+    font-size: .8125rem;
+}
+#try .option.option--block {
+    display: block;
+}
+#try .option textarea {
+    display: block;
+    width: 100%;
+    height: 3.25rem;
+    margin-top: .375rem;
+    resize: vertical;
+}
+#try .replace__row {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    margin-top: .375rem;
+}
+#try .replace__row > input {
+    flex: 1;
+    min-width: 0;
+}
+#try .replace__row:last-child > input {
+    border-style: dashed;
+}
+#try .replace__remove {
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    color: #5e584a;
+    cursor: pointer;
+}
+#try .replace__remove:hover {
+    background: rgba(0, 0, 0, .06);
+}
+#try .replace__row:last-child > .replace__remove {
+    visibility: hidden;
+}
+
 @media screen and (max-width: 40rem) {
-    section#try {
-        flex-direction: column;
+    .try-header {
+        margin-top: 1.5rem;
     }
-    section#try > .try__pane:not(:first-child) {
-        border-width: 0 1px 1px 1px;
+    .try-header > h2 {
+        font-size: 1.55rem;
+    }
+    #try .try-settings__icon,
+    #try .try-drop__icon,
+    #try .book__size,
+    #try .book__failed {
+        display: none;
+    }
+    #try .try-settings {
+        gap: .625rem;
+        padding: .6875rem .875rem;
+    }
+    #try .try-drop {
+        padding: .375rem .375rem .375rem .875rem;
+    }
+    #try .try-drop.try-drop--empty {
+        padding: 1.25rem .875rem;
+    }
+    #try .btn {
+        min-width: 0;
+        padding: .375rem .625rem;
+        font-size: .9375rem;
+    }
+    #try .book {
+        padding: .25rem .375rem .25rem .75rem;
+    }
+    #try .book__row {
+        gap: .625rem;
+    }
+    #try .book__remove {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+    #try .book__action {
+        min-width: 0;
+    }
+    #try .try-books__header {
+        padding: .25rem .5rem .25rem .75rem;
+        font-size: .9375rem;
+    }
+    #try .try-next {
+        padding: .875rem;
+    }
+    #try .book__warnings li {
+        display: block;
+    }
+    #try .book__warnings code {
+        display: block;
+        width: auto;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    #try .wide-only {
+        display: none;
+    }
+    #try .narrow-only {
+        display: inline;
     }
 }

@@ -9,185 +9,199 @@
     <meta name="description" content="Easily convert EPUB e-books to Kobo EPUBs (KEPUB) online using kepubify.">
     <meta name="author" content="Patrick Gaskin">
     <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none">
+        <!-- Material Symbols Rounded (weight 400), from @material-symbols/svg-400@0.48.3, Apache-2.0 -->
+        <symbol id="icon-tune" viewBox="0 -960 960 960" fill="currentColor"><path d="M435.5-128.63Q427-137.25 427-150v-165q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v53h323q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H487v52q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM150-202q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h187q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150Zm165.5-174.63Q307-385.25 307-398v-52H150q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h157v-54q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v166q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM457-450q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h353q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H457Zm144.5-173.63Q593-632.25 593-645v-165q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v52h157q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H653v53q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM150-698q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h353q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150Z"/></symbol>
+        <symbol id="icon-upload" viewBox="0 -960 960 960" fill="currentColor"><path d="M220-160q-24 0-42-18t-18-42v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113h520v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113q0 24-18 42t-42 18H220Zm230-524-99 99q-8.8 9-20.9 8.5-12.1-.5-21.49-9.5-8.61-9-8.61-21.5t9-21.5l150-150q5-5 10.13-7 5.14-2 11-2 5.87 0 10.87 2 5 2 10 7l151 151q9 9 9 21t-8.61 21q-9.39 9-21.89 9t-21.5-9l-99-98v341q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-341Z"/></symbol>
+        <symbol id="icon-close" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-438 270-228q-9 9-21 9t-21-9q-9-9-9-21t9-21l210-210-210-210q-9-9-9-21t9-21q9-9 21-9t21 9l210 210 210-210q9-9 21-9t21 9q9 9 9 21t-9 21L522-480l210 210q9 9 9 21t-9 21q-9 9-21 9t-21-9L480-438Z"/></symbol>
+        <symbol id="icon-mobile_3" viewBox="0 -960 960 960" fill="currentColor"><path d="M260-40q-24.75 0-42.37-17.63Q200-75.25 200-100v-760q0-24 18-42t42-18h438q24.75 0 42.38 17.62Q758-884.75 758-860v150q18 3 30 16.95 12 13.96 12 31.63V-587q0 19-12 33t-30 17v437q0 24.75-17.62 42.37Q722.75-40 698-40H260Zm0-60h438v-760H260v760Zm0 0v-760 760Zm110-80h218q12.75 0 21.38-8.68 8.62-8.67 8.62-21.5 0-12.82-8.62-21.32-8.63-8.5-21.38-8.5H370q-12.75 0-21.37 8.68-8.63 8.67-8.63 21.5 0 12.82 8.63 21.32 8.62 8.5 21.37 8.5Z"/></symbol>
+        <symbol id="icon-schedule" viewBox="0 -960 960 960" fill="currentColor"><path d="M513-492v-171q0-13-8.5-21.5T483-693q-13 0-21.5 8.5T453-663v183q0 6 2 11t6 10l144 149q9 10 22.5 9.5T650-310q9-9 9-22t-9-22L513-492ZM480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-82 31.5-155t86-127.5Q252-817 325-848.5T480-880q82 0 155 31.5t127.5 86Q817-708 848.5-635T880-480q0 82-31.5 155t-86 127.5Q708-143 635-111.5T480-80Zm0-400Zm0 340q140 0 240-100t100-240q0-140-100-240T480-820q-140 0-240 100T140-480q0 140 100 240t240 100Z"/></symbol>
+        <symbol id="icon-progress_activity" viewBox="0 -960 960 960" fill="currentColor"><path d="M323-111q-73-31-127-85t-85-127q-31-73-31-157t31-157q31-73 85-127t127-85q73-31 157-31 12 0 21 9t9 21q0 12-9 21t-21 9q-141 0-240.5 99.5T140-480q0 141 99.5 240.5T480-140q141 0 240.5-99.5T820-480q0-12 9-21t21-9q12 0 21 9t9 21q0 84-31 157t-85 127q-54 54-127 85T480-80q-84 0-157-31Z"/></symbol>
+        <symbol id="icon-check_circle" viewBox="0 -960 960 960" fill="currentColor"><path d="m421-389-98-98q-9-9-22-9t-23 10q-9 9-9 22t9 22l122 123q9 9 21 9t21-9l239-239q10-10 10-23t-10-23q-10-9-23.5-8.5T635-603L421-389Zm59 309q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-156t86-127Q252-817 325-848.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 82-31.5 155T763-197.5q-54 54.5-127 86T480-80Zm0-60q142 0 241-99.5T820-480q0-142-99-241t-241-99q-141 0-240.5 99T140-480q0 141 99.5 240.5T480-140Zm0-340Z"/></symbol>
+        <symbol id="icon-warning" viewBox="0 -960 960 960" fill="currentColor"><path d="M92-120q-9 0-15.5-4T66-135q-4-7-4.5-14.5T66-165l388-670q5-8 11.5-11.5T480-850q8 0 14.5 3.5T506-835l388 670q5 8 4.5 15.5T894-135q-4 7-10.5 11t-15.5 4H92Zm52-60h672L480-760 144-180Zm361.5-65.5Q514-254 514-267t-8.5-21.5Q497-297 484-297t-21.5 8.5Q454-280 454-267t8.5 21.5Q471-237 484-237t21.5-8.5Zm0-111Q514-365 514-378v-164q0-13-8.5-21.5T484-572q-13 0-21.5 8.5T454-542v164q0 13 8.5 21.5T484-348q13 0 21.5-8.5ZM480-470Z"/></symbol>
+        <symbol id="icon-info" viewBox="0 -960 960 960" fill="currentColor"><path d="M504.5-288.63q8.5-8.62 8.5-21.37v-180q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v180q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63 12.82 0 21.32-8.63Zm-1-314.57q9.5-9.2 9.5-22.8 0-14.45-9.48-24.22-9.48-9.78-23.5-9.78t-23.52 9.78Q447-640.45 447-626q0 13.6 9.48 22.8 9.48 9.2 23.5 9.2t23.52-9.2ZM480.27-80q-82.74 0-155.5-31.5Q252-143 197.5-197.5t-86-127.34Q80-397.68 80-480.5t31.5-155.66Q143-709 197.5-763t127.34-85.5Q397.68-880 480.5-880t155.66 31.5Q709-817 763-763t85.5 127Q880-563 880-480.27q0 82.74-31.5 155.5Q817-252 763-197.68q-54 54.31-127 86Q563-80 480.27-80Zm.23-60Q622-140 721-239.5t99-241Q820-622 721.19-721T480-820q-141 0-240.5 98.81T140-480q0 141 99.5 240.5t241 99.5Zm-.5-340Z"/></symbol>
+        <symbol id="icon-error" viewBox="0 -960 960 960" fill="currentColor"><path d="M503.5-289.48q9.5-9.48 9.5-23.5t-9.48-23.52q-9.48-9.5-23.5-9.5t-23.52 9.48q-9.5 9.48-9.5 23.5t9.48 23.52q9.48 9.5 23.5 9.5t23.52-9.48Zm1-152.15q8.5-8.62 8.5-21.37v-193q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v193q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63 12.82 0 21.32-8.63ZM480.27-80q-82.74 0-155.5-31.5Q252-143 197.5-197.5t-86-127.34Q80-397.68 80-480.5t31.5-155.66Q143-709 197.5-763t127.34-85.5Q397.68-880 480.5-880t155.66 31.5Q709-817 763-763t85.5 127Q880-563 880-480.27q0 82.74-31.5 155.5Q817-252 763-197.68q-54 54.31-127 86Q563-80 480.27-80Zm.23-60Q622-140 721-239.5t99-241Q820-622 721.19-721T480-820q-141 0-240.5 98.81T140-480q0 141 99.5 240.5t241 99.5Zm-.5-340Z"/></symbol>
+    </svg>
     <nav class="main">
         <h1><a href="../">kepubify</a></h1>
         <a href="../">Home</a>
         <a href="../docs/">Docs</a>
         <a href="../dl/">Download</a>
-        <a href="../try/" class="active">Try</a>
+        <a href="../try/" class="active" aria-current="page">Try</a>
     </nav>
     <main>
-        <section>
+        <header class="try-header">
             <h2>Online EPUB to KEPUB converter</h2>
             <p>
                 Quickly convert your EPUB e-books into Kobo EPUBs using kepubify
-                without downloading any software or sending your files to remote
-                servers.
+                without downloading any software. Books are processed locally,
+                and are never uploaded.
             </p>
-        </section>
-        <section>
-            <noscript>
-                <p style="text-align: center;">
-                    This page requires JavaScript.
-                </p>
-            </noscript>
-            <p style="text-align: center; color: red;" id="unsupported-browser" class="hidden">
-                Your browser appears to be unsupported, or there was an unknown
-                error when loading the script. Try using a different browser,
-                and if the issue still persists, <a
-                href="https://github.com/pgaskin/kepubify/issues/new">open an
-                issue</a>.
-            </p>
-            <p style="text-align: center;" id="in-app-browser" class="hidden">
-                This page appears to be open in an app's built-in browser, which
-                may not be able to download the converted books. If tapping a
-                converted book does nothing, open this page in your web browser
-                instead.
-            </p>
-        </section>
-        <!-- TODO: improve the UI -->
+        </header>
+        <noscript>
+            <p class="try-notice try-notice--error">This page requires JavaScript.</p>
+        </noscript>
+        <p class="try-notice try-notice--error hidden" id="unsupported-browser">
+            Your browser appears to be unsupported, or there was an unknown
+            error when loading the script. This page requires Chrome 85+, Safari
+            15.4+ (iOS 15.4, macOS 12.3), Edge 85+, or Firefox 114+. If the
+            issue still persists, <a
+            href="https://github.com/pgaskin/kepubify/issues/new">open an
+            issue</a>.
+        </p>
+        <p class="try-notice hidden" id="in-app-browser">
+            This page appears to be open in an app's built-in browser, which
+            may not be able to download the converted books. If downloading a
+            converted book does nothing, open this page in your web browser
+            instead.
+        </p>
         <section id="try">
-            <div class="try__pane try__pane--files">
-                <div class="try__pane__title">Loading...</div>
-                <div class="try__pane__contents"></div>
+            <button type="button" class="try-settings" aria-haspopup="dialog">
+                <!-- note: text also in app.ts -->
+                <svg class="try-settings__icon" width="22" height="22" aria-hidden="true"><use href="#icon-tune"/></svg>
+                <span class="try-settings__title">Settings</span>
+                <span class="try-settings__summary">Defaults</span>
+                <span class="try-settings__edit">Edit</span>
+            </button>
+
+            <div class="try-drop">
+                <svg class="try-drop__icon" width="24" height="24" aria-hidden="true"><use href="#icon-upload"/></svg>
+                <span class="try-drop__text" aria-live="polite">Loading...</span>
+                <button type="button" class="btn try-drop__open">Open</button>
+                <input type="file" accept=".epub,application/epub+zip" multiple hidden>
             </div>
-            <div class="try__pane try__pane--options">
-                <div class="try__pane__title">Options</div>
-                <div class="try__pane__contents">
-                    <form class="options" onsubmit="return false">
-                        <div class="options__option">
-                            <div class="options__option__header">
-                                <span class="options__option__header__title">Smarten punctuation</span>
-                                <button class="options__option__header__help" aria-label="help">
-                                    <span role="tooltip">
-                                        Replace dashes, quotes, ellipses,
-                                        fractions, and certain symbols with
-                                        their "smart" versions.
-                                    </span>
-                                </button>
-                            </div>
-                            <div class="options__option__content">
-                                <label for="c--smarten-punctuation--off">
-                                    <input type="radio" name="smarten-punctuation" id="c--smarten-punctuation--off" value="off" checked>
-                                    <span>Off</span>
-                                </label>
-                                <label for="c--smarten-punctuation--on">
-                                    <input type="radio" name="smarten-punctuation" id="c--smarten-punctuation--on" value="on">
-                                    <span>On</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="options__option">
-                            <div class="options__option__header">
-                                <span class="options__option__header__title">Add dummy titlepage</span>
-                                <button class="options__option__header__help" aria-label="help">
-                                    <span role="tooltip">
-                                        Fix layout issues on books without a
-                                        dedicated title page. By default,
-                                        kepubify automatically determines if it
-                                        is necessary.
-                                    </span>
-                                </button>
-                            </div>
-                            <div class="options__option__content">
-                                <label for="c--dummy-titlepage--auto">
-                                    <input type="radio" name="dummy-titlepage" id="c--dummy-titlepage--auto" value="auto" checked>
-                                    <span>Auto</span>
-                                </label>
-                                <label for="c--dummy-titlepage--never">
-                                    <input type="radio" name="dummy-titlepage" id="c--dummy-titlepage--never" value="never">
-                                    <span>Never</span>
-                                </label>
-                                <label for="c--dummy-titlepage--always">
-                                    <input type="radio" name="dummy-titlepage" id="c--dummy-titlepage--always" value="always">
-                                    <span>Always</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="options__option">
-                            <div class="options__option__header">
-                                <span class="options__option__header__title">Custom CSS</span>
-                                <button class="options__option__header__help" aria-label="help">
-                                    <span role="tooltip">
-                                        Add a custom stylesheet to all content
-                                        files. Warning: If the stylesheet is
-                                        invalid, the book may fail to load.
-                                    </span>
-                                </button>
-                            </div>
-                            <div class="options__option__content">
-                                <textarea name="custom-css" id="c--custom-css" spellcheck="false" aria-label="CSS"></textarea>
-                            </div>
-                        </div>
-                        <div class="options__option">
-                            <div class="options__option__header">
-                                <span class="options__option__header__title">Hyphenation</span>
-                                <button class="options__option__header__help" aria-label="help">
-                                    <span role="tooltip">
-                                        Enable or disable hyphenation.
-                                    </span>
-                                </button>
-                            </div>
-                            <div class="options__option__content">
-                                <label for="c--hyphenation--default">
-                                    <input type="radio" name="hyphenation" id="c--hyphenation--default" value="default" checked>
-                                    <span>Publisher default</span>
-                                </label>
-                                <label for="c--hyphenation--enable">
-                                    <input type="radio" name="hyphenation" id="c--hyphenation--enable" value="enable">
-                                    <span>Force enable</span>
-                                </label>
-                                <label for="c--hyphenation--disable">
-                                    <input type="radio" name="hyphenation" id="c--hyphenation--disable" value="disable">
-                                    <span>Force disable</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="options__option">
-                            <div class="options__option__header">
-                                <span class="options__option__header__title">Full-screen reading fixes</span>
-                                <button class="options__option__header__help" aria-label="help">
-                                    <span role="tooltip">
-                                        Fixes layout issues with full-screen
-                                        enabled for firmware versions older than
-                                        4.19.11911.
-                                    </span>
-                                </button>
-                            </div>
-                            <div class="options__option__content">
-                                <label for="c--full-screen-fixes--off">
-                                    <input type="radio" name="full-screen-fixes" id="c--full-screen-fixes--off" value="off" checked>
-                                    <span>Off</span>
-                                </label>
-                                <label for="c--full-screen-fixes--on">
-                                    <input type="radio" name="full-screen-fixes" id="c--full-screen-fixes--on" value="on">
-                                    <span>On</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="options__option" style="align-self: flex-end;">
-                            <div class="options__option__header">
-                                <span class="options__option__header__title"><i>Applies to future conversions.</i></span>
-                                <button type="reset">Reset</button>
-                            </div>
-                        </div>
-                    </form>
+
+            <section class="try-books hidden" aria-label="Converted books">
+                <!-- note: text also in app.ts -->
+                <div class="try-books__header">
+                    <span class="try-books__summary" aria-live="polite"></span>
+                    <button type="button" class="btn btn--plain try-books__all hidden">Download all (.zip)</button>
+                </div>
+                <ul class="try-books__list"></ul>
+            </section>
+
+            <p class="try-share-hint hidden">Save opens the share sheet, and may be helpful if Download doesn't let you choose where to save it.</p>
+
+            <div class="try-next hidden">
+                <svg width="26" height="26" aria-hidden="true"><use href="#icon-mobile_3"/></svg>
+                <div>
+                    <div class="try-next__title">Importing converted books</div>
+                    <p>
+                        <span class="wide-only">
+                            Connect your Kobo with a USB cable and copy the
+                            downloaded files onto it. Keep the .kepub.epub
+                            extension, otherwise your Kobo will open it as a
+                            regular EPUB.
+                        </span>
+                        <span class="narrow-only">
+                            Copy the files onto your Kobo over USB using a file
+                            manager, or using your computer. Keep the
+                            .kepub.epub extension, otherwise your Kobo will open
+                            it as a regular EPUB.
+                        </span>
+                    </p>
                 </div>
             </div>
+
+            <template class="try-book-template">
+                <li class="book" data-state="waiting">
+                    <div class="book__row">
+                        <svg class="book__icon" width="22" height="22" role="img"><use/></svg>
+                        <span class="book__info">
+                            <a class="book__name"></a>
+                            <span class="book__size"></span>
+                            <span class="book__status"></span>
+                            <button type="button" class="book__warnings-toggle hidden" aria-expanded="false"></button>
+                        </span>
+                        <button type="button" class="book__remove"><svg width="20" height="20" aria-hidden="true"><use href="#icon-close"/></svg></button>
+                        <span class="book__action">
+                            <button type="button" class="btn book__download" disabled>Download</button>
+                        </span>
+                    </div>
+                    <div class="book__warnings hidden">
+                        <p>This file is malformed, and was repaired automatically. This is usually fine.</p>
+                        <ul></ul>
+                    </div>
+                </li>
+            </template>
+
+            <template class="try-replace-template">
+                <div class="replace__row">
+                    <input type="text" class="replace__find" aria-label="Find" placeholder="Find" spellcheck="false">
+                    <input type="text" class="replace__with" aria-label="Replace with" placeholder="Replace with" spellcheck="false">
+                    <button type="button" class="replace__remove" aria-label="Remove rule"><svg width="18" height="18" aria-hidden="true"><use href="#icon-close"/></svg></button>
+                </div>
+            </template>
+
+            <dialog class="try-dialog" aria-labelledby="try-dialog-title">
+                <form method="dialog" class="options">
+                    <div class="try-dialog__header">
+                        <h2 id="try-dialog-title">Settings</h2>
+                        <button type="submit" class="try-dialog__close" aria-label="Close"><svg width="22" height="22" aria-hidden="true"><use href="#icon-close"/></svg></button>
+                    </div>
+                    <div class="try-dialog__body">
+                        <h3>General</h3>
+                        <div class="option">
+                            <label for="c--smarten-punctuation"><b>Smarten punctuation</b></label>
+                            <input type="checkbox" name="smarten-punctuation" id="c--smarten-punctuation">
+                        </div>
+                        <div class="option">
+                            <label for="c--hyphenation"><b>Hyphenation</b></label>
+                            <select name="hyphenation" id="c--hyphenation">
+                                <option value="default" selected>Follow book/device</option>
+                                <option value="enable">Always</option>
+                                <option value="disable">Never</option>
+                            </select>
+                        </div>
+                        <h3>Advanced</h3>
+                        <div class="option">
+                            <label for="c--dummy-titlepage"><b>Insert title page</b></label>
+                            <select name="dummy-titlepage" id="c--dummy-titlepage">
+                                <option value="auto" selected>Auto</option>
+                                <option value="auto-cover">Auto, detect cover</option>
+                                <option value="always">Always</option>
+                                <option value="always-cover">Always, detect cover</option>
+                                <option value="never">Never</option>
+                            </select>
+                        </div>
+                        <div class="option">
+                            <label for="c--charset"><b>Text encoding</b> <span>if letters are garbled</span></label>
+                            <select name="charset" id="c--charset">
+                                <option value="auto" selected>Detect</option>
+                                <option value="utf-8">UTF-8</option>
+                                <option value="windows-1252">Windows-1252</option>
+                            </select>
+                        </div>
+                        <div class="option">
+                            <label for="c--full-screen-fixes"><b>Full-screen fixes</b> <span>for firmware before 4.19.11911</span></label>
+                            <input type="checkbox" name="full-screen-fixes" id="c--full-screen-fixes">
+                        </div>
+                        <h3>Expert</h3>
+                        <div class="option option--block">
+                            <label for="c--custom-css"><b>Custom CSS</b></label>
+                            <textarea name="custom-css" id="c--custom-css" spellcheck="false" placeholder="p { text-indent: 1.5em; }"></textarea>
+                        </div>
+                        <div class="option option--block">
+                            <b>Find and replace</b> <span>on raw HTML</span>
+                            <div class="replace"></div>
+                        </div>
+                    </div>
+                    <div class="try-dialog__footer">
+                        <button type="reset" class="btn btn--plain">Restore defaults</button>
+                        <span class="try-dialog__note"></span>
+                        <button type="submit" class="btn btn--solid">Done</button>
+                    </div>
+                </form>
+            </dialog>
         </section>
-        <section>
-            <p style="text-align: center; font-size: 0.75rem;">
-                For more efficient (at least 8x faster) conversions and advanced
-                conversion options (e.g. find/replace, output layout),
-                <a href="./">download</a> kepubify.<br><br>
-                This page requires Chrome 85+, Safari 15.1+, Edge 85+, or Firefox
-                114+. <br><br>
-                <a href="https://github.com/pgaskin/kepubify/issues/new">Report an issue</a>
-            </p>
+        <section class="try-more">
+            <p>This is the official web version of kepubify. Other websites may not include the latest fixes or support all features, and may send your books to other servers.</p>
+            <p>This page requires Chrome 85+, Safari 15.4+ (iOS 15.4, macOS 12.3), Edge 85+, or Firefox 114+.</p>
+            <p>If you want to convert books in bulk, you can <a href="../dl/">download kepubify</a>.</p>
         </section>
     </main>
     <footer>
@@ -200,7 +214,7 @@
     <script async crossorigin src="https://fb.pgaskin.net/feedback.js"></script>
     <script>
         window.setTimeout(function() {
-            document.getElementById("unsupported-browser").className = "";
+            document.getElementById("unsupported-browser").className = "try-notice try-notice--error";
         }, 1000)
     </script>
 </html>
