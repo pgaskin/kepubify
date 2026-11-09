@@ -66,7 +66,7 @@ export interface Options {
 	/**
 	 * Called when the conversion finishes (even if it fails) with the size of
 	 * the WebAssembly memory in bytes (i.e., peak memory usage since it doesn't
-	 * shrink). Note that this currently includes the entire input/output files.
+	 * shrink). Note that this currently includes the entire input file.
 	 */
 	memory?: (bytes: number) => void;
 }
@@ -178,13 +178,10 @@ function encodeOptions(o: Options) {
 	u32(o.replace?.length ?? 0);
 	for (const r of o.replace ?? []) str(r.find), str(r.replace);
 
-	const buf = new Uint8Array(parts.reduce((n, b) => n + b.length, 0));
-	let p = 0;
-	for (const b of parts) buf.set(b, p), p += b.length;
-	return buf;
+	return concat(parts);
 }
 
-async function instantiate(module: WebAssembly.Module, o: Options) {
+async function instantiate(module: WebAssembly.Module, o: Options, write: (b: Uint8Array) => void) {
 	let x!: Exports, dv: DataView, output = "";
 	const view = () => dv?.buffer == x.memory.buffer ? dv : (dv = new DataView(x.memory.buffer));
 	const bytes = (p: number, n: number) => new Uint8Array(x.memory.buffer, p, n);
@@ -215,6 +212,7 @@ async function instantiate(module: WebAssembly.Module, o: Options) {
 	const kepubify = {
 		warn: (name: number, nameLen: number, msg: number, msgLen: number) => o.warn?.(dec.decode(bytes(name, nameLen)), dec.decode(bytes(msg, msgLen))),
 		progress: (percent: number) => o.progress?.(percent),
+		write: (p: number, n: number) => write(bytes(p, n)),
 	};
 
 	x = (await WebAssembly.instantiate(module, { wasi_snapshot_preview1: wasi, kepubify })).exports as unknown as Exports;
@@ -224,7 +222,8 @@ async function instantiate(module: WebAssembly.Module, o: Options) {
 
 /** Calls the export fn of a new instance of module. */
 export async function call(module: WebAssembly.Module, fn: "convert" | "transform_content", input: Uint8Array, o: Options): Promise<Uint8Array<ArrayBuffer>> {
-	const { x, view, bytes } = await instantiate(module, o);
+	const chunks: Uint8Array[] = [];
+	const { x, view, bytes } = await instantiate(module, o, b => chunks.push(b.slice()));
 	const opts = encodeOptions(o);
 	const ip = x.alloc(input.length);
 	bytes(ip, input.length).set(input);
@@ -240,10 +239,17 @@ export async function call(module: WebAssembly.Module, fn: "convert" | "transfor
 	const out = bytes(p, n).slice();
 	switch (status) {
 		case 0:
-			return out;
+			return concat(chunks);
 		case 2:
 			throw new AlreadyKepubError(dec.decode(out));
 		default:
 			throw new Error(`kepubify: ${dec.decode(out)}`);
 	}
+}
+
+function concat(chunks: Uint8Array[]): Uint8Array<ArrayBuffer> {
+	const buf = new Uint8Array(chunks.reduce((n, b) => n + b.length, 0));
+	let p = 0;
+	for (const b of chunks) buf.set(b, p), p += b.length;
+	return buf;
 }

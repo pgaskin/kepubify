@@ -4,6 +4,7 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -33,6 +34,9 @@ func hostWarn(name, nameLen, msg, msgLen uint32)
 //go:wasmimport kepubify progress
 func hostProgress(percent float64)
 
+//go:wasmimport kepubify write
+func hostWrite(p, n uint32)
+
 //go:wasmexport alloc
 func alloc(n uint32) uint32 {
 	b := make([]byte, max(n, 1))
@@ -48,23 +52,42 @@ func convert(in, inLen, opts, optsLen uint32) uint32 {
 	if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
 		return result(1, []byte(err.Error()))
 	}
-	var buf bytes.Buffer
-	if err := kepub.Convert(context.Background(), &buf, zr, opt); errors.Is(err, kepub.ErrAlreadyKepub) {
+	w := newHostWriter()
+	if err := kepub.Convert(context.Background(), w, zr, opt); errors.Is(err, kepub.ErrAlreadyKepub) {
 		return result(2, []byte(err.Error()))
 	} else if err != nil {
 		return result(1, []byte(err.Error()))
 	}
-	return result(0, buf.Bytes())
+	if err := w.Flush(); err != nil {
+		return result(1, []byte(err.Error()))
+	}
+	return result(0, nil)
 }
 
 //go:wasmexport transform_content
 func transformContent(in, inLen, opts, optsLen uint32) uint32 {
 	opt := options(view(opts, optsLen))
-	var buf bytes.Buffer
-	if err := kepub.TransformContent(&buf, bytes.NewReader(view(in, inLen)), opt); err != nil {
+	w := newHostWriter()
+	if err := kepub.TransformContent(w, bytes.NewReader(view(in, inLen)), opt); err != nil {
 		return result(1, []byte(err.Error()))
 	}
-	return result(0, buf.Bytes())
+	if err := w.Flush(); err != nil {
+		return result(1, []byte(err.Error()))
+	}
+	return result(0, nil)
+}
+
+func newHostWriter() *bufio.Writer {
+	return bufio.NewWriterSize(hostWriter{}, 64<<10)
+}
+
+type hostWriter struct{}
+
+func (hostWriter) Write(b []byte) (int, error) {
+	if len(b) != 0 {
+		hostWrite(addr(b), uint32(len(b)))
+	}
+	return len(b), nil
 }
 
 func result(status uint32, b []byte) uint32 {
