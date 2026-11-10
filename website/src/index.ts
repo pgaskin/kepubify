@@ -1,12 +1,20 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import * as Sentry from "@sentry/browser"
+import { version, revision } from "kepubify/worker"
 import { KepubifyApp } from "./app"
 
 Sentry.init({
     dsn: "https://4ae9999809ef418b819b16bf383e5fd0@o143001.ingest.sentry.io/5828167",
+    release: revision,
+    environment: location.hostname == "pgaskin.net" ? "production" : "development",
+    tracesSampleRate: 1,
+    initialScope: {
+        tags: { "kepubify.version": version },
+    },
     maxBreadcrumbs: 100,
     attachStacktrace: true,
 })
+Sentry.setAttribute("kepubify.version", version)
 
 const app = new KepubifyApp("#try")
 

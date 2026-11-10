@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -84,15 +83,6 @@ func build() error {
 		return fmt.Errorf("copy static: %w", err)
 	}
 
-	var pkg struct {
-		Version string `json:"version"`
-	}
-	if b, err := os.ReadFile(filepath.FromSlash(kepubify + "/package.json")); err != nil {
-		return err
-	} else if err := json.Unmarshal(b, &pkg); err != nil {
-		return fmt.Errorf("parse kepubify package.json: %w", err)
-	}
-
 	wasm, err := os.ReadFile(filepath.FromSlash(kepubify + "/dist/kepubify.wasm"))
 	if err != nil {
 		return err
@@ -102,8 +92,7 @@ func build() error {
 		return err
 	}
 
-	// TODO: version from git since we deploy the website on every commit?
-	js, err := bundle(tryDir, map[string]string{"KEPUBIFY_VERSION": pkg.Version}, map[string]inline{
+	js, err := bundle(tryDir, map[string]inline{
 		"kepubify.wasm":   {wasm, api.LoaderBinary},
 		"kepubify.worker": {worker, api.LoaderText},
 	}, "src/index.ts")
@@ -138,7 +127,7 @@ func build() error {
 	for _, name := range slices.Sorted(maps.Keys(js)) {
 		fmt.Printf("%-32s %8d bytes\n", "try/"+name, len(js[name]))
 	}
-	fmt.Printf("%-32s %8d bytes (kepubify %s, inlined)\n", "kepubify.wasm", len(wasm), pkg.Version)
+	fmt.Printf("%-32s %8d bytes (inlined)\n", "kepubify.wasm", len(wasm))
 	fmt.Printf("%-32s %8d bytes (inlined)\n", "kepubify.worker.js", len(worker))
 	return nil
 }
@@ -148,13 +137,8 @@ type inline struct {
 	loader api.Loader
 }
 
-func bundle(outDir string, define map[string]string, inlines map[string]inline, entries ...string) (map[string][]byte, error) {
+func bundle(outDir string, inlines map[string]inline, entries ...string) (map[string][]byte, error) {
 	slog.Info("esbuild", "op", "bundle", "entries", entries)
-	defines := map[string]string{}
-	for k, v := range define {
-		b, _ := json.Marshal(v)
-		defines[k] = string(b)
-	}
 	res := api.Build(api.BuildOptions{
 		EntryPoints:       entries,
 		Outdir:            outDir,
@@ -165,7 +149,6 @@ func bundle(outDir string, define map[string]string, inlines map[string]inline, 
 		Charset:           api.CharsetUTF8,
 		Platform:          api.PlatformBrowser,
 		External:          []string{"node:*"}, // kepubify's node fallback for loading the module
-		Define:            defines,
 		Sourcemap:         api.SourceMapLinked,
 		TreeShaking:       api.TreeShakingTrue,
 		MinifyWhitespace:  true,

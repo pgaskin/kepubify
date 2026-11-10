@@ -1,14 +1,12 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import * as Sentry from "@sentry/browser"
-import { AlreadyKepubError, convertBlob, setModule, setWorker, type WorkerOptions } from "kepubify/worker"
+import { AlreadyKepubError, convertBlob, setModule, setWorker, version, type WorkerOptions } from "kepubify/worker"
 import { zip, type ZipEntry } from "./zip"
 
 // inline so buggy caches don't cause mixed versions or 404s (this happens more
 // than you'd expect, unfortunately)
 import kepubifyWasm from "inline:kepubify.wasm"
 import kepubifyWorker from "inline:kepubify.worker"
-
-declare const KEPUBIFY_VERSION: string
 
 const maxFileSize = 300_000_000
 const maxConversions = Math.min(navigator.hardwareConcurrency || 2, 4)
@@ -22,7 +20,6 @@ const settingsKey = "kepubify-try-settings"
 const maxWarnings = 500
 
 export class KepubifyApp {
-    #version = KEPUBIFY_VERSION
     #running = 0
     #waiting: (() => void)[] = []
     #books: Book[] = []
@@ -94,12 +91,12 @@ export class KepubifyApp {
             this.#ref.dropText.classList.add("try-drop__text--error")
             throw new Error(`failed to initialize kepubify: ${ex}`)
         }
-        this.#ref.drop.title = `Kepubify ${this.#version}`
+        this.#ref.drop.title = `kepubify ${version}`
         this.#loaded = true
         this.#update()
 
         Sentry.addBreadcrumb({
-            message: `Initialized kepubify ${this.#version}`,
+            message: `Initialized kepubify ${version}`,
         })
     }
 
@@ -244,12 +241,32 @@ export class KepubifyApp {
         this.#update()
     }
 
-    async #convert(book: Book, config: WorkerOptions) {
-        let kepub: Blob, start = 0, memory = 0
+    #convert(book: Book, config: WorkerOptions): Promise<void> {
+        const settings = {
+            "settings.customized": Object.keys(config).some(k => k != "reprocessKepub"),
+            "settings.expert": config.css !== undefined || config.replace !== undefined,
+            "settings.reprocess_kepub": !!config.reprocessKepub,
+        }
+        // note: we use an inactive span to avoid confusing traces since
+        // sentry doesn't support async contexts in the browser
+        const span = Sentry.startInactiveSpan({
+            name: "kepubify.convert",
+            op: "kepubify.convert",
+            attributes: {
+                "file.path": book.input.name,
+                "file.size": book.input.size,
+                ...settings,
+            },
+        })
+        return this.#convertSpan(book, config, settings, span).finally(() => span.end())
+    }
+
+    async #convertSpan(book: Book, config: WorkerOptions, settings: Record<string, boolean>, span: Sentry.Span) {
+        let kepub: Blob, start = 0, duration = 0, memory = 0
         const log = (result: string, err?: unknown) => {
             let msg = `kepubify: ${book.input.name}: ${result}`
-            if (start) {
-                msg += ` in ${Math.round(performance.now() - start)} ms`
+            if (duration) {
+                msg += ` in ${Math.round(duration)} ms`
             }
             if (memory) {
                 msg += `, peak memory ${formatSize(memory)}`
@@ -259,6 +276,27 @@ export class KepubifyApp {
             }
             console.log(msg)
         }
+        const metrics = (result: "success" | "failed" | "already_kepub", output?: Blob) => Sentry.withActiveSpan(span, () => {
+            const attributes = { result, ...settings }
+            span.setAttribute("result", result)
+            Sentry.metrics.count("kepubify.convert", 1, { attributes })
+            Sentry.metrics.distribution("kepubify.convert.input_size", book.input.size, { unit: "byte", attributes })
+            if (duration) {
+                span.setAttribute("duration", duration)
+                Sentry.metrics.distribution("kepubify.convert.duration", duration, { unit: "millisecond", attributes })
+            }
+            if (memory) {
+                span.setAttribute("peak_memory", memory)
+                Sentry.metrics.distribution("kepubify.convert.peak_memory", memory, { unit: "byte", attributes })
+            }
+            if (output) {
+                span.setAttribute("output_size", output.size)
+                Sentry.metrics.distribution("kepubify.convert.output_size", output.size, { unit: "byte", attributes })
+                if (book.input.size) {
+                    Sentry.metrics.distribution("kepubify.convert.size_ratio", output.size / book.input.size, { unit: "ratio", attributes })
+                }
+            }
+        })
         try {
             if (book.input.size > maxFileSize) {
                 throw new Error(`File too large for the web version (maximum: ${maxFileSize / 1000000} MB)`)
@@ -267,21 +305,37 @@ export class KepubifyApp {
             kepub = await this.#limit(async () => {
                 book.abort.signal.throwIfAborted()
                 book.converting(0)
-                start = performance.now()
-                return convertBlob(book.input, {
-                    ...config,
-                    signal: book.abort.signal,
-                    progress: percent => book.converting(percent),
-                    warn: (name, msg) => book.warnings.push([name, msg]),
-                    memory: bytes => memory = bytes,
+                Sentry.addBreadcrumb({
+                    category: "kepubify",
+                    message: `Converting ${book.input.name}`,
+                    data: { config },
                 })
+                start = performance.now()
+                const worker = Sentry.startInactiveSpan({ name: "kepubify.worker", op: "kepubify.worker", parentSpan: span })
+                try {
+                    return await convertBlob(book.input, {
+                        ...config,
+                        signal: book.abort.signal,
+                        progress: percent => book.converting(percent),
+                        warn: (name, msg) => book.warnings.push([name, msg]),
+                        memory: bytes => memory = bytes,
+                    })
+                } catch (ex) {
+                    worker.setStatus({ code: 2, message: "internal_error" })
+                    throw ex
+                } finally {
+                    duration = performance.now() - start
+                    worker.end()
+                }
             })
         } catch (ex) {
             if (book.abort.signal.aborted) {
+                span.setAttribute("result", "aborted")
                 return
             }
             if (ex instanceof AlreadyKepubError) {
                 log(`${formatSize(book.input.size)}, already a kepub`)
+                metrics("already_kepub")
                 book.kepub(() => {
                     book.reset()
                     this.#convert(book, { ...config, reprocessKepub: true })
@@ -289,18 +343,21 @@ export class KepubifyApp {
                 return
             }
             log(`${formatSize(book.input.size)}, failed`, ex)
+            metrics("failed")
+            span.setStatus({ code: 2, message: "internal_error" })
             book.failed(ex)
-            Sentry.captureException(ex, {
+            Sentry.withActiveSpan(span, () => Sentry.captureException(ex, {
                 extra: {
                     file: { name: book.input.name, size: book.input.size, type: book.input.type },
-                    worker: { version: this.#version },
+                    worker: { version: version },
                     config: config,
                 },
-            })
+            }))
             return
         }
 
         log(`${formatSize(book.input.size)} -> ${formatSize(kepub.size)}`)
+        metrics("success", kepub)
         Sentry.addBreadcrumb({
             message: `Finished ${book.input.name} (${kepub.size} bytes)`,
         })
@@ -315,13 +372,14 @@ export class KepubifyApp {
             book.ready(file, crc)
         } catch (ex) {
             book.failed(new Error(`Failed to save file: ${ex}`))
-            Sentry.captureException(new Error(`failed to create download link: ${ex}`), {
+            span.setStatus({ code: 2, message: "internal_error" })
+            Sentry.withActiveSpan(span, () => Sentry.captureException(new Error(`failed to create download link: ${ex}`), {
                 extra: {
                     file: { name: book.input.name, size: book.input.size, type: book.input.type },
                     kepub: { size: kepub.size },
-                    worker: { version: this.#version },
+                    worker: { version: version },
                 },
-            })
+            }))
             return
         }
 

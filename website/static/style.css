@@ -425,6 +425,7 @@ section > div.dl > div > ul > li > ul > li {
     border-radius: 6px;
     cursor: pointer;
     transition: background .1s linear, border-color .1s linear;
+    position: relative;
 }
 #try .try-drop:hover {
     background: #efeadb;
@@ -432,6 +433,18 @@ section > div.dl > div > ul > li > ul > li {
 }
 #try .try-drop.try-drop--empty {
     padding: 1rem 1rem 9rem;
+}
+#try .try-drop.try-drop--empty[title]::after {
+    position: absolute;
+    content: attr(title);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 1rem 1rem;
+    color: #998e74;
+    font-size: .75em;
 }
 #try .try-drop.try-drop--dragover {
     background: #e3ebef;
@@ -868,6 +881,9 @@ section > div.dl > div > ul > li > ul > li {
     }
     #try .try-drop.try-drop--empty {
         padding: 1.25rem .875rem 9rem;
+    }
+    #try .try-drop.try-drop--empty[title]::after {
+        padding: 1.25rem .875rem;
     }
     #try .btn {
         min-width: 0;
