@@ -431,7 +431,7 @@ section > div.dl > div > ul > li > ul > li {
     border-color: #9d947c;
 }
 #try .try-drop.try-drop--empty {
-    padding: 5rem 1rem;
+    padding: 1rem 1rem 9rem;
 }
 #try .try-drop.try-drop--dragover {
     background: #e3ebef;
@@ -867,7 +867,7 @@ section > div.dl > div > ul > li > ul > li {
         padding: .375rem .375rem .375rem .875rem;
     }
     #try .try-drop.try-drop--empty {
-        padding: 1.25rem .875rem;
+        padding: 1.25rem .875rem 9rem;
     }
     #try .btn {
         min-width: 0;
