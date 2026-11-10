@@ -1,6 +1,6 @@
 import { type Input, type Options, type Request, type Response, AlreadyKepubError, contentInput, dec, getModule, withCRC32 } from "./kepubify";
 
-export { AlreadyKepubError, setModule } from "./kepubify";
+export { AlreadyKepubError, setModule, version, revision } from "./kepubify";
 
 /**
  * Options for {@link convert} and {@link transformContent}. The callbacks are

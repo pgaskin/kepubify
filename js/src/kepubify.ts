@@ -77,6 +77,19 @@ export interface Options {
  */
 export type Input = Uint8Array | Blob;
 
+declare const KEPUBIFY_VERSION: string;
+declare const KEPUBIFY_REVISION: string;
+
+/**
+ * The kepubify Go module version.
+ */
+export const version: string = KEPUBIFY_VERSION;
+
+/**
+ * The git commit kepubify was built from.
+ */
+export const revision: string = KEPUBIFY_REVISION;
+
 /** Thrown by {@link convert} when the book is already a KEPUB and {@link Options.reprocessKepub} is not set. */
 export class AlreadyKepubError extends Error {
 	constructor(message: string) {

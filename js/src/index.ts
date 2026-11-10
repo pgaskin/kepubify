@@ -3,7 +3,7 @@
 
 import { type Input, type Options, call, callBlob, contentInput, dec, getModule, withCRC32 } from "./kepubify";
 
-export { type Options, AlreadyKepubError, setModule } from "./kepubify";
+export { type Options, AlreadyKepubError, setModule, version, revision } from "./kepubify";
 
 /**
  * Converts an EPUB to a KEPUB. The EPUB may be a Blob (e.g., a File), which is

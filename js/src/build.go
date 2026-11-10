@@ -3,6 +3,8 @@
 package main
 
 import (
+	"debug/buildinfo"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -79,12 +81,20 @@ func build() error {
 		return err
 	}
 
+	revision, version, err := moduleVersion("..")
+	if err != nil {
+		return fmt.Errorf("get root module version: %w", err)
+	}
+
 	wasm, used, err := buildWasm(filepath.Join(outDir, "kepubify.wasm"))
 	if err != nil {
 		return err
 	}
 
-	js, err := bundle(outDir, "src/index.ts", "src/worker.ts", "src/kepubify.worker.ts")
+	js, err := bundle(outDir, map[string]string{
+		"KEPUBIFY_VERSION":  version,
+		"KEPUBIFY_REVISION": revision,
+	}, "src/index.ts", "src/worker.ts", "src/kepubify.worker.ts")
 	if err != nil {
 		return err
 	}
@@ -102,7 +112,45 @@ func build() error {
 		fmt.Printf("%-24s %8d bytes\n", name, len(js[name]))
 	}
 	fmt.Printf("%-24s %8d bytes (%s)\n", "kepubify.wasm", len(wasm), used)
+	fmt.Printf("%-24s %s (%s)\n", "version", version, revision)
 	return nil
+}
+
+func moduleVersion(dir string) (revision, version string, err error) {
+	tmp, err := os.MkdirTemp("", "kepubify-website-*")
+	if err != nil {
+		return "", "", err
+	}
+	defer os.RemoveAll(tmp)
+
+	bin := filepath.Join(tmp, "main")
+	cmd := exec.Command("go", "build", "-buildvcs=true", "-o", bin, ".")
+	cmd.Dir = dir
+	if err := run(cmd); err != nil {
+		return "", "", err
+	}
+
+	info, err := buildinfo.ReadFile(bin)
+	if err != nil {
+		return "", "", err
+	}
+	version = info.Main.Version
+	if version == "" || version == "(devel)" {
+		return "", "", fmt.Errorf("no module version for %s", info.Main.Path)
+	}
+	if strings.HasPrefix(version, "v0") {
+		return "", "", fmt.Errorf("module version for %s is v0 (did you fetch tags?)", info.Main.Path)
+	}
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			revision = s.Value
+		}
+	}
+	if revision == "" {
+		return "", "", fmt.Errorf("no vcs revision for %s", info.Main.Path)
+	}
+	return revision, version, nil
 }
 
 func buildWasm(out string) ([]byte, string, error) {
@@ -147,8 +195,13 @@ func buildWasm(out string) ([]byte, string, error) {
 	return wasm, used, err
 }
 
-func bundle(outDir string, entries ...string) (map[string][]byte, error) {
+func bundle(outDir string, define map[string]string, entries ...string) (map[string][]byte, error) {
 	slog.Info("esbuild", "op", "bundle", "entries", entries)
+	defines := map[string]string{}
+	for k, v := range define {
+		b, _ := json.Marshal(v)
+		defines[k] = string(b)
+	}
 	res := api.Build(api.BuildOptions{
 		EntryPoints:   entries,
 		Outdir:        outDir,
@@ -159,6 +212,7 @@ func bundle(outDir string, entries ...string) (map[string][]byte, error) {
 		Charset:       api.CharsetUTF8,
 		Platform:      api.PlatformNeutral,
 		External:      []string{"node:*"},
+		Define:        defines,
 		TreeShaking:   api.TreeShakingTrue,
 		LegalComments: api.LegalCommentsNone,
 		LogLevel:      api.LogLevelSilent,
